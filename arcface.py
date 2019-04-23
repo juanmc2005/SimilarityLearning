@@ -1,0 +1,49 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+
+class ArcLinear(nn.Module):
+    """
+    Linear layer with Additive Angular Margin (ArcFace)
+    Reference: https://arxiv.org/pdf/1801.07698.pdf
+    
+    :param nfeat: the number of features in the embedding
+    :param nclass: the number of classes
+    :param margin: the margin to separate classes in angular space
+    :param s: the scaling factor for the feature vector. This will constrain
+              the model to a hypersphere of radius s
+    """
+    
+    def __init__(self, nfeat, nclass, margin=0.35, s=4.0):
+        self.nclass = nclass
+        self.margin = margin
+        self.s = s
+        self.W = nn.Parameter(torch.Tensor(nclass, nfeat))
+        nn.init.xavier_uniform_(self.W)
+    
+    def forward(self, x, y):
+        """
+        Apply the angular margin transformation
+        :param x: a feature vector batch
+        :param y: a non one-hot label batch
+        """
+        # Normalize the feature vectors and W
+        xnorm = F.normalize(x)
+        Wnorm = F.normalize(self.W)
+        # Calculate the logits, which will be our cosθj
+        cos_theta_j = xnorm * Wnorm
+        # Get the cosθ corresponding to our classes
+        cos_theta_yi = cos_theta_j[y]
+        # Get the angle separating x and W
+        theta_yi = torch.acos(cos_theta_yi)
+        # Apply the margin
+        cos_theta_yi_margin = torch.cos(theta_yi + self.margin)
+        # One hot encoding for y
+        one_hot = torch.zeros_like(cos_theta_j)
+        one_hot.scatter_(1, y.view(-1, 1), 1.0)
+        # Apply the scaling and return the difference in margin for our classes
+        return self.s * one_hot * (cos_theta_yi_margin - cos_theta_yi)
+        

@@ -1,0 +1,138 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+import torch
+import torch.nn as nn
+import torch.optim as optim
+import torch.optim.lr_scheduler as lr_scheduler
+import numpy as np
+from CenterLoss import CenterLoss
+from ContrastiveLoss import ContrastiveLoss
+from visual import visualize
+
+class CenterTrainer:
+    
+    def __init__(self, model, device, loss_weight=1):
+        self.loss_weight = loss_weight
+        self.device = device
+        self.model = model.to(device)
+        # NLLLoss
+        self.nllloss = nn.NLLLoss().to(device) #CrossEntropyLoss = log_softmax + NLLLoss
+        # CenterLoss
+        self.centerloss = CenterLoss(10, 2).to(device)
+        self.optimizer4nn = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+        self.optimzer4center = optim.SGD(self.centerloss.parameters(), lr=0.5)
+    
+    def train(self, epoch, loader):
+        print("Training... Epoch = %d" % epoch)
+        ip1_loader = []
+        idx_loader = []
+        for i, (data, target) in enumerate(loader):
+            data, target = data.to(self.device), target.to(self.device)
+    
+            ip1, pred = self.model(data)
+            loss = self.nllloss(pred, target) + self.loss_weight * self.centerloss(target, ip1)
+    
+            self.optimizer4nn.zero_grad()
+            self.optimzer4center.zero_grad()
+    
+            loss.backward()
+    
+            self.optimizer4nn.step()
+            self.optimzer4center.step()
+    
+            ip1_loader.append(ip1)
+            idx_loader.append((target))
+    
+        feat = torch.cat(ip1_loader, 0)
+        labels = torch.cat(idx_loader, 0)
+        visualize(feat.data.cpu().numpy(),labels.data.cpu().numpy(),epoch)
+
+
+class ContrastiveTrainer:
+    
+    def __init__(self, model, device, margin=1.0, distance='euclidean'):
+        self.device = device
+        self.model = model.to(device)
+        # Contrastive Loss
+        self.loss_fn = ContrastiveLoss(margin, distance).to(device)
+        self.optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+        self.sheduler = lr_scheduler.StepLR(self.optimizer,20,gamma=0.8)
+        self.losses, self.accuracies = [], []
+    
+    def train(self, epoch, loader, test_loader):
+        print("Training... Epoch = %d" % epoch)
+        self.sheduler.step()
+        running_loss = 0.0
+        total_loss = 0.0
+        for i, (data1, data2, y, label1, label2) in enumerate(loader):
+            data1, data2, y = data1.to(self.device), data2.to(self.device), y.to(self.device)
+            
+            emb1 = self.model(data1)
+            emb2 = self.model(data2)
+            loss = self.loss_fn(y, emb1, emb2)
+            running_loss += loss
+            total_loss += loss
+            
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            
+            if i % 500 == 499:
+                print("[%d batches] Loss = %.4f" % (i+1, running_loss / 500))
+                running_loss = 0.0
+        
+        acc = self.eval(test_loader)
+        loss = total_loss / len(loader)
+        self.losses.append(loss)
+        self.accuracies.append(acc)
+        print("Training Loss: %.2f" % loss)
+        print("Test Accuracy: %.2f %%" % acc)
+        #embs = self.model(xtest).data.cpu().numpy()
+        #visualize(embs, ytest.cpu().numpy(), epoch, bound=1)#bound=np.max(embs)+5)
+    
+    def eval(self, loader):
+        correct, total = 0, 0
+        with torch.no_grad():
+            for x1, x2, y, label1, label2 in loader:
+                x1, x2, y, label1, label2 = x1.to(self.device), x2.to(self.device), y.to(self.device), label1.to(self.device), label2.to(self.device)
+                emb1 = self.model(x1)
+                emb2 = self.model(x2)
+                dist = self.loss_fn.distance(emb1, emb2)
+                preds = torch.where(dist < 0.3, torch.zeros_like(dist), torch.ones_like(dist))
+                correct += (preds == y).sum()
+                total += y.size(0)
+        return 100 * correct / total
+    
+    def train_online_recomb(self, epoch, loader, xtest, ytest):
+        print("Training... Epoch = %d" % epoch)
+        for i, (x, y) in enumerate(loader):
+            x, y = x.to(self.device).unsqueeze(1), y.to(self.device)
+            x1, x2, simil = self.build_pairs(x, y)
+            x1, x2, simil = x1.to(self.device), x2.to(self.device), simil.to(self.device)
+            emb1 = self.model(x1)
+            emb2 = self.model(x2)
+            loss = self.loss_fn(simil, emb1, emb2)
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+        embs = self.model(xtest).data.cpu().numpy()
+        visualize(embs, ytest.cpu().numpy(), epoch, bound=np.max(embs)+5)
+    
+    def build_pairs(self, X, Y):
+        n = Y.size(0)
+        fst, snd = [], []
+        Ypairs = []
+        for i in range(n-1):
+            added = []
+            for j in range(i+1, n):
+                label = Y[j]
+                if i != j and label not in added:
+                    fst.append(X[i])
+                    snd.append(X[j])
+                    Ypairs.append(0 if Y[i] == Y[j] else 1)
+                    added.append(label)
+                if len(added) == 10:
+                    break
+        pairs1 = torch.cat(fst, 0).type(torch.FloatTensor)
+        pairs2 = torch.cat(snd, 0).type(torch.FloatTensor)
+        return pairs1, pairs2, torch.FloatTensor(Ypairs)
