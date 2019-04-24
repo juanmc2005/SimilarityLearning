@@ -3,70 +3,51 @@
 from torch import nn
 import torch.nn.functional as F
 
+class CommonNet(nn.Module):
+    def __init__(self):
+        super(CommonNet, self).__init__()
+        self.out_dim = 128*3*3
+        self.conv = nn.Sequential(
+                nn.Conv2d(1, 32, kernel_size=5, padding=2),
+                nn.PReLU(),
+                nn.Conv2d(32, 32, kernel_size=5, padding=2),
+                nn.PReLU(),
+                nn.Conv2d(32, 64, kernel_size=5, padding=2),
+                nn.PReLU(),
+                nn.Conv2d(64, 64, kernel_size=5, padding=2),
+                nn.PReLU(),
+                nn.Conv2d(64, 128, kernel_size=5, padding=2),
+                nn.PReLU(),
+                nn.Conv2d(128, 128, kernel_size=5, padding=2),
+                nn.PReLU()
+        )
+    
+    def forward(self, x):
+        return self.conv(x).view(-1, self.out_dim)
+
 class CenterNet(nn.Module):
     def __init__(self):
         super(CenterNet, self).__init__()
-        self.conv1_1 = nn.Conv2d(1, 32, kernel_size=5, padding=2)
-        self.prelu1_1 = nn.PReLU()
-        self.conv1_2 = nn.Conv2d(32, 32, kernel_size=5, padding=2)
-        self.prelu1_2 = nn.PReLU()
-        self.conv2_1 = nn.Conv2d(32, 64, kernel_size=5, padding=2)
-        self.prelu2_1 = nn.PReLU()
-        self.conv2_2 = nn.Conv2d(64, 64, kernel_size=5, padding=2)
-        self.prelu2_2 = nn.PReLU()
-        self.conv3_1 = nn.Conv2d(64, 128, kernel_size=5, padding=2)
-        self.prelu3_1 = nn.PReLU()
-        self.conv3_2 = nn.Conv2d(128, 128, kernel_size=5, padding=2)
-        self.prelu3_2 = nn.PReLU()
+        self.common = CommonNet()
         self.preluip1 = nn.PReLU()
-        self.ip1 = nn.Linear(128*3*3, 2)
+        self.ip1 = nn.Linear(self.common.out_dim, 2)
         self.ip2 = nn.Linear(2, 10, bias=False)
 
     def forward(self, x):
-        x = self.prelu1_1(self.conv1_1(x))
-        x = self.prelu1_2(self.conv1_2(x))
-        x = F.max_pool2d(x,2)
-        x = self.prelu2_1(self.conv2_1(x))
-        x = self.prelu2_2(self.conv2_2(x))
-        x = F.max_pool2d(x,2)
-        x = self.prelu3_1(self.conv3_1(x))
-        x = self.prelu3_2(self.conv3_2(x))
-        x = F.max_pool2d(x,2)
-        x = x.view(-1, 128*3*3)
+        x = self.common(x)
         ip1 = self.preluip1(self.ip1(x))
         ip2 = self.ip2(ip1)
         return ip1, F.log_softmax(ip2, dim=1)
 
-class Net(nn.Module):
+class ContrastiveNet(nn.Module):
     def __init__(self):
-        super(Net, self).__init__()
-        self.conv1_1 = nn.Conv2d(1, 32, kernel_size=5, padding=2)
-        self.prelu1_1 = nn.PReLU()
-        self.conv1_2 = nn.Conv2d(32, 32, kernel_size=5, padding=2)
-        self.prelu1_2 = nn.PReLU()
-        self.conv2_1 = nn.Conv2d(32, 64, kernel_size=5, padding=2)
-        self.prelu2_1 = nn.PReLU()
-        self.conv2_2 = nn.Conv2d(64, 64, kernel_size=5, padding=2)
-        self.prelu2_2 = nn.PReLU()
-        self.conv3_1 = nn.Conv2d(64, 128, kernel_size=5, padding=2)
-        self.prelu3_1 = nn.PReLU()
-        self.conv3_2 = nn.Conv2d(128, 128, kernel_size=5, padding=2)
-        self.prelu3_2 = nn.PReLU()
+        super(ContrastiveNet, self).__init__()
+        self.common = CommonNet()
         self.preluip1 = nn.PReLU()
-        self.ip1 = nn.Linear(128*3*3, 10)
+        self.ip1 = nn.Linear(self.common.out_dim, 10)
         self.ip2 = nn.Linear(10, 2, bias=False)
 
     def forward(self, x):
-        x = self.prelu1_1(self.conv1_1(x))
-        x = self.prelu1_2(self.conv1_2(x))
-        x = F.max_pool2d(x,2)
-        x = self.prelu2_1(self.conv2_1(x))
-        x = self.prelu2_2(self.conv2_2(x))
-        x = F.max_pool2d(x,2)
-        x = self.prelu3_1(self.conv3_1(x))
-        x = self.prelu3_2(self.conv3_2(x))
-        x = F.max_pool2d(x,2)
-        x = x.view(-1, 128*3*3)
-        ip1 = self.preluip1(self.ip1(x))
-        ip2 = self.ip2(ip1)
-        return ip2
+        x = self.common(x)
+        x = self.preluip1(self.ip1(x))
+        return self.ip2(x)
