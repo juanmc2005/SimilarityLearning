@@ -1,8 +1,8 @@
 import torch
 from torchvision import datasets, transforms
 from  torch.utils.data import DataLoader
-from models import ContrastiveNet
-from trainers import ContrastiveTrainer
+from models import ContrastiveNet, ArcNet
+from trainers import ContrastiveTrainer, ArcTrainer
 from datasets import ContrastiveDataset
 
 # Config
@@ -17,28 +17,41 @@ transform = transforms.Compose([
 trainset = datasets.MNIST(mnist_path, download=True, train=True, transform=transform)
 testset = datasets.MNIST(mnist_path, download=True, train=False, transform=transform)
 
-# Prepare Dataset
-print("Recombining Dataset...")
-xtrain = trainset.data.unsqueeze(1).type(torch.FloatTensor)
-ytrain = trainset.targets
-xtest = testset.data.unsqueeze(1).type(torch.FloatTensor)
-ytest = testset.targets
-dataset = ContrastiveDataset(xtrain, ytrain)
-test_dataset = ContrastiveDataset(xtest, ytest)
-loader = DataLoader(dataset, batch_size=128, shuffle=True, num_workers=4)
-test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False, num_workers=4)
-#xvis = trainset.data[:1000].unsqueeze(1).type(torch.FloatTensor).to(device)
-#yvis = trainset.targets.data[:1000]
 
-# Model
-model = ContrastiveNet()
+def contrastive():
+    # Prepare Dataset
+    # TODO shuffle and recombine train and test before each epoch
+    # TODO return visualization loader too
+    print("Recombining Dataset...")
+    xtrain = trainset.data.unsqueeze(1).type(torch.FloatTensor)
+    ytrain = trainset.targets
+    xtest = testset.data.unsqueeze(1).type(torch.FloatTensor)
+    ytest = testset.targets
+    dataset = ContrastiveDataset(xtrain, ytrain)
+    test_dataset = ContrastiveDataset(xtest, ytest)
+    loader = DataLoader(dataset, batch_size=128, shuffle=True, num_workers=4)
+    test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False, num_workers=4)
+    # Training
+    trainer = ContrastiveTrainer(ContrastiveNet(), device, margin=2.0, distance='euclidean')
+    #trainer = ContrastiveTrainer(ContrastiveNet(), device, margin=0.3, distance='cosine')
+    return trainer, loader, test_loader
 
-# Training
-#trainer = ContrastiveTrainer(model, device, margin=1.5, distance='euclidean')
-trainer = ContrastiveTrainer(model, device, margin=0.1, distance='cosine')
-for epoch in range(10):
-    trainer.train(epoch+1, loader, test_loader)
+
+def arc():
+    # TODO return visualization loader too
+    trainer = ArcTrainer(ArcNet(), device, nfeat=2, nclass=10, margin=0.3)
+    loader = DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
+    test_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
+    return trainer, loader, test_loader
+
+
+trainer, train_loader, test_loader = arc()
 
 visu_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
-trainer.visualize(visu_loader)
+trainer.visualize(visu_loader, "test-before-train-arc")
+
+for epoch in range(20):
+    trainer.train(epoch+1, train_loader, test_loader, visu_loader)
+
+trainer.visualize(visu_loader, "test-20-epochs-arc-m=3,5-s=4")
 

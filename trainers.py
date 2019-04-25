@@ -4,9 +4,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-import numpy as np
 from CenterLoss import CenterLoss
 from ContrastiveLoss import ContrastiveLoss
+from arcface import ArcLoss
 import visual
 
 class CenterTrainer:
@@ -15,9 +15,7 @@ class CenterTrainer:
         self.loss_weight = loss_weight
         self.device = device
         self.model = model.to(device)
-        # NLLLoss
-        self.nllloss = nn.NLLLoss().to(device) #CrossEntropyLoss = log_softmax + NLLLoss
-        # CenterLoss
+        self.nllloss = nn.NLLLoss().to(device)
         self.centerloss = CenterLoss(10, 2).to(device)
         self.optimizer4nn = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
         self.optimzer4center = optim.SGD(self.centerloss.parameters(), lr=0.5)
@@ -45,7 +43,60 @@ class CenterTrainer:
     
         feat = torch.cat(ip1_loader, 0)
         labels = torch.cat(idx_loader, 0)
-        visual.visualize(feat.data.cpu().numpy(),labels.data.cpu().numpy(),epoch)
+        visual.visualize(feat.data.cpu().numpy(), labels.data.cpu().numpy(),
+                         "Epoch = {}".format(epoch), "epoch={}".format(epoch))
+
+
+class ArcTrainer:
+    
+    # TODO add evaluation, print and visualize (if best) after each epoch
+    
+    def __init__(self, model, device, nfeat, nclass, margin=0.35, s=4.0):
+        self.device = device
+        self.model = model.to(device)
+        self.loss_fn = ArcLoss(nfeat, nclass, margin, s).to(device)
+        self.optimizer = optim.Adam([{"params": model.parameters()}, {"params": self.loss_fn.parameters()}])
+        self.sheduler = lr_scheduler.StepLR(self.optimizer,20,gamma=0.8)
+        self.losses, self.accuracies = [], []
+    
+    def train(self, epoch, loader, test_loader, visu_loader, report_interval=500):
+        print("[Epoch %d]" % epoch)
+        self.sheduler.step()
+        running_loss = 0.0
+        total_loss = 0.0
+        for i, (x, y) in enumerate(loader):
+            x, y = x.to(self.device), y.to(self.device)
+            
+            embedding = self.model(x)
+            loss = self.loss_fn(embedding, y)
+            running_loss += loss
+            total_loss += loss
+            
+            self.optimizer.zero_grad()
+            loss.backward()
+            self.optimizer.step()
+            
+            if i % report_interval == report_interval-1:
+                print("[%d batches] Loss = %.4f" % (i+1, running_loss / report_interval))
+                running_loss = 0.0
+        
+        #acc = self.eval(test_loader)
+        #loss = total_loss / len(loader)
+        self.losses.append(loss)
+        #self.accuracies.append(acc)
+        print("Training Loss: %.4f" % loss)
+        #print("Test Accuracy: %.2f %%" % acc)
+    
+    def visualize(self, loader, filename):
+        embs, targets = [], []
+        with torch.no_grad():
+            for x, target in loader:
+                x, target = x.to(self.device), target.to(self.device)
+                embs.append(self.model(x))
+                targets.append(target)
+        embs = torch.cat(embs, 0).type(torch.FloatTensor).data.cpu().numpy()
+        targets = torch.cat(targets, 0).type(torch.FloatTensor).cpu().numpy()
+        visual.visualize(embs, targets, "Test Embeddings", filename)
 
 
 class ContrastiveTrainer:
@@ -53,18 +104,18 @@ class ContrastiveTrainer:
     def __init__(self, model, device, margin=1.0, distance='euclidean'):
         self.device = device
         self.model = model.to(device)
-        # Contrastive Loss
         self.loss_fn = ContrastiveLoss(margin, distance).to(device)
-        self.optimizer = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+        self.optimizer = optim.Adam(model.parameters())
         self.sheduler = lr_scheduler.StepLR(self.optimizer,20,gamma=0.8)
         self.losses, self.accuracies = [], []
     
-    def train(self, epoch, loader, test_loader, report_interval=1000):
-        print("Training... Epoch = %d" % epoch)
+    def train(self, epoch, loader, test_loader, visu_loader, report_interval=1000):
+        print("[Epoch %d]" % epoch)
         self.sheduler.step()
         running_loss = 0.0
         total_loss = 0.0
-        for i, (data1, data2, y, label1, label2) in enumerate(loader):
+        best_acc = 0.0
+        for i, (data1, data2, y, _, _) in enumerate(loader):
             data1, data2, y = data1.to(self.device), data2.to(self.device), y.to(self.device)
             
             emb1 = self.model(data1)
@@ -86,7 +137,10 @@ class ContrastiveTrainer:
         self.losses.append(loss)
         self.accuracies.append(acc)
         print("Training Loss: %.4f" % loss)
-        print("Test Accuracy: %.2f %%" % acc)
+        print("Test Accuracy: {}%".format(acc))
+        if acc > best_acc:
+            best_acc = acc
+            self.visualize(visu_loader, "epoch={}-acc={}".format(epoch, acc))
     
     def eval(self, loader):
         correct, total = 0.0, 0.0
@@ -101,7 +155,7 @@ class ContrastiveTrainer:
                 total += y.size(0)
         return 100 * correct / total
     
-    def visualize(self, loader):
+    def visualize(self, loader, filename):
         embs, targets = [], []
         with torch.no_grad():
             for x, target in loader:
@@ -110,7 +164,7 @@ class ContrastiveTrainer:
                 targets.append(target)
         embs = torch.cat(embs, 0).type(torch.FloatTensor).data.cpu().numpy()
         targets = torch.cat(targets, 0).type(torch.FloatTensor).cpu().numpy()
-        visual.visualize(embs, targets, epoch=0, bound=np.max(embs)+1)
+        visual.visualize(embs, targets, "Test Embeddings", filename)
                 
     
     def train_online_recomb(self, epoch, loader, xtest, ytest):
@@ -126,7 +180,7 @@ class ContrastiveTrainer:
             loss.backward()
             self.optimizer.step()
         embs = self.model(xtest).data.cpu().numpy()
-        visual.visualize(embs, ytest.cpu().numpy(), epoch, bound=np.max(embs)+1)
+        visual.visualize(embs, ytest.cpu().numpy(), "Epoch = {}".format(epoch), "epoch={}".format(epoch))
     
     def build_pairs(self, X, Y):
         n = Y.size(0)

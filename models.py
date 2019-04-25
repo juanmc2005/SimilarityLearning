@@ -12,14 +12,17 @@ class CommonNet(nn.Module):
                 nn.PReLU(),
                 nn.Conv2d(32, 32, kernel_size=5, padding=2),
                 nn.PReLU(),
+                nn.MaxPool2d(2),
                 nn.Conv2d(32, 64, kernel_size=5, padding=2),
                 nn.PReLU(),
                 nn.Conv2d(64, 64, kernel_size=5, padding=2),
                 nn.PReLU(),
+                nn.MaxPool2d(2),
                 nn.Conv2d(64, 128, kernel_size=5, padding=2),
                 nn.PReLU(),
                 nn.Conv2d(128, 128, kernel_size=5, padding=2),
-                nn.PReLU()
+                nn.PReLU(),
+                nn.MaxPool2d(2)
         )
     
     def forward(self, x):
@@ -51,3 +54,15 @@ class ContrastiveNet(nn.Module):
         x = self.common(x)
         x = self.preluip1(self.ip1(x))
         return self.ip2(x)
+
+class ArcNet(nn.Module):
+    def __init__(self):
+        super(ArcNet, self).__init__()
+        self.common = CommonNet()
+        self.bn1 = nn.BatchNorm1d(self.common.out_dim)
+        self.preluip1 = nn.PReLU()
+        self.ip1 = nn.Linear(self.common.out_dim, 2)
+
+    def forward(self, x):
+        x = self.bn1(self.common(x))
+        return self.preluip1(self.ip1(x))

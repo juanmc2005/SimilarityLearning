@@ -7,7 +7,7 @@ import torch.nn.functional as F
 
 class ArcLoss(nn.Module):
     """
-    Linear layer with Additive Angular Margin (ArcFace)
+    Additive Angular Margin loss module (ArcFace)
     Reference: https://arxiv.org/pdf/1801.07698.pdf
     
     :param nfeat: the number of features in the embedding
@@ -36,7 +36,7 @@ class ArcLoss(nn.Module):
         # Normalize the feature vectors and W
         xnorm = F.normalize(x)
         Wnorm = F.normalize(self.W)
-        y = y.type(torch.LongTensor).view(-1, 1)
+        y = y.long().view(-1, 1)
         # Calculate the logits, which will be our cosθj
         cos_theta_j = torch.mm(xnorm, Wnorm)
         # Get the cosθ corresponding to our classes

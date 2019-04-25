@@ -27,13 +27,6 @@ class ContrastiveDataset:
         self.contrastiveY = torch.FloatTensor(Ypairs)
         self.size = self.contrastiveY.size(0)
         
-    def to(self, device):
-        self.X.to(device)
-        self.pairs1.to(device)
-        self.pairs2.to(device)
-        self.contrastiveY.to(device)
-        return self
-        
     def __getitem__(self, i):
         i1 = self.pairs1[i]
         i2 = self.pairs2[i]
