@@ -4,9 +4,11 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
+from  torch.utils.data import DataLoader
 from CenterLoss import CenterLoss
 from ContrastiveLoss import ContrastiveLoss
 from arcface import ArcLinear
+from models import ArcNet
 import visual
 
 
@@ -28,13 +30,25 @@ class BaseTrainer:
         """
         Implement custom behavior before the epoch begins
         """
-        raise NotImplementedError("The trainer must implement the method 'on_before_epoch'")
+        pass
         
-    def feed_forward(self, x):
+    def feed_forward(self, x, y):
         """
         Compute the output of the model for a mini-batch and return the logits
         """
         raise NotImplementedError("The trainer must implement the method 'feed_forward'")
+        
+    def embed(self, x):
+        """
+        Compute the output of the model for a mini-batch and return the embeddings
+        """
+        raise NotImplementedError("The trainer must implement the method 'embed'")
+        
+    def get_schedulers(self):
+        """
+        Return the list of schedulers to use
+        """
+        raise NotImplementedError("The trainer must implement the method 'get_schedulers'")
         
     def get_optimizers(self):
         """
@@ -48,14 +62,20 @@ class BaseTrainer:
         """
         raise NotImplementedError("The trainer must implement the method 'get_best_acc_plot_title'")
         
-    def train(self, epoch, log_interval=20):
+    def train(self, epochs=10, log_interval=20):
+        for sch in self.get_schedulers():
+            sch.step()
+        for i in range(1, epochs+1):
+            self.on_before_epoch(i)
+            self.train_epoch(i, log_interval)
+        
+    def train_epoch(self, epoch, log_interval):
         total_loss, correct = 0, 0
-        self.on_before_epoch(epoch)
         for i, (x, y) in enumerate(self.train_loader):
             x, y = x.to(self.device), y.to(self.device)
             
             # Feed Forward
-            logits = self.feed_forward(x)
+            logits = self.feed_forward(x, y)
             loss = self.loss_fn(logits, y)
             
             # Backprop
@@ -73,9 +93,9 @@ class BaseTrainer:
             
             # Logging
             if i % log_interval == 0:
-                print(f"Train Epoch: {epoch} [{100. * i / len(self.n_batch):.0f}%]\tLoss: {loss.item():.6f}")
+                print(f"Train Epoch: {epoch} [{100. * i / self.n_batch:.0f}%]\tLoss: {loss.item():.6f}")
         
-        test_correct = self.test() # TODO Adapt eval() method from current implementations
+        test_correct = self.test()
         loss = total_loss / self.n_train
         acc = 100 * test_correct / self.n_test
         self.losses.append(loss)
@@ -90,6 +110,27 @@ class BaseTrainer:
             print(f"New Best Test Accuracy! Saving plot as {plot_name}")
             self.best_acc = test_correct
             self.visualize(self.test_loader, self.get_best_acc_plot_title(epoch, acc), plot_name)
+    
+    def test(self):
+        correct = 0
+        with torch.no_grad():
+            for x, y in self.test_loader:
+                x, y = x.to(self.device), y.to(self.device)
+                logits = self.feed_forward(x, y)
+                _, predicted = torch.max(logits.data, 1)
+                correct += (predicted == y.data).sum()
+        return correct
+    
+    def visualize(self, loader, title, filename):
+        embs, targets = [], []
+        with torch.no_grad():
+            for x, y in loader:
+                x, y = x.to(self.device), y.to(self.device)
+                embs.append(self.embed(x))
+                targets.append(y)
+        embs = torch.cat(embs, 0).float().data.cpu().numpy()
+        targets = torch.cat(targets, 0).float().cpu().numpy()
+        visual.visualize(embs, targets, title, filename)
 
 
 class CenterTrainer:
@@ -130,7 +171,47 @@ class CenterTrainer:
                          "Epoch = {}".format(epoch), "epoch={}".format(epoch))
 
 
-# TODO Change to inherit from base trainer
+class ArcTrainerBetter(BaseTrainer):
+
+    def __init__(self, trainset, testset, device, nfeat, nclass, margin=0.2, s=7.0, batch_size=100):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
+        super(ArcTrainerBetter, self).__init__(
+                ArcNet(),
+                device,
+                nn.CrossEntropyLoss().to(device),
+                train_loader,
+                test_loader)
+        self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
+        self.margin = margin
+        self.s = s
+        self.optimizers = [
+                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.arc.parameters(), lr=0.01)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.5)
+        ]
+    
+    def feed_forward(self, x, y):
+        feat = self.model(x)
+        logits = self.arc(feat, y)
+        return logits
+        
+    def embed(self, x):
+        return self.model(x)
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
+    
+    def get_best_acc_plot_title(self, epoch, accuracy):
+        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
+
+
+# TODO remove when confirmed that the other version works well
 class ArcTrainer:
     
     def __init__(self, model, device, nfeat, nclass, margin=0.2, s=7.0):
