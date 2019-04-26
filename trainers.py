@@ -54,7 +54,7 @@ class ArcTrainer:
         self.s = s
         self.device = device
         self.model = model.to(device)
-        self.arc = ArcLinear(nclass, nfeat, device, s=s, m=margin).to(device)
+        self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
         self.lossfn = nn.CrossEntropyLoss().to(device)
         self.optim_nn = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
         self.optim_arc = optim.SGD(self.arc.parameters(), lr=0.01)

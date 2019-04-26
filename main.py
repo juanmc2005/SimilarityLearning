@@ -45,6 +45,6 @@ def arc():
 
 
 trainer, train_loader, test_loader = arc()
-for epoch in range(20):
+for epoch in range(40):
     trainer.train(epoch+1, train_loader, test_loader)
 
