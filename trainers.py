@@ -9,6 +9,89 @@ from ContrastiveLoss import ContrastiveLoss
 from arcface import ArcLinear
 import visual
 
+
+class BaseTrainer:
+    
+    def __init__(self, model, device, loss_fn, train_loader, test_loader):
+        self.model = model.to(device)
+        self.device = device
+        self.loss_fn = loss_fn
+        self.train_loader = train_loader
+        self.test_loader = test_loader
+        self.n_batch = len(self.train_loader)
+        self.n_train = len(train_loader.dataset)
+        self.n_test = len(test_loader.dataset)
+        self.losses, self.accuracies = [], []
+        self.best_acc = 0
+        
+    def on_before_epoch(self, epoch):
+        """
+        Implement custom behavior before the epoch begins
+        """
+        raise NotImplementedError("The trainer must implement the method 'on_before_epoch'")
+        
+    def feed_forward(self, x):
+        """
+        Compute the output of the model for a mini-batch and return the logits
+        """
+        raise NotImplementedError("The trainer must implement the method 'feed_forward'")
+        
+    def get_optimizers(self):
+        """
+        Return the list of optimizers to use
+        """
+        raise NotImplementedError("The trainer must implement the method 'get_optimizers'")
+    
+    def get_best_acc_plot_title(self, epoch, accuracy):
+        """
+        Return the desired title for the plot of test embeddings with the best accuracy
+        """
+        raise NotImplementedError("The trainer must implement the method 'get_best_acc_plot_title'")
+        
+    def train(self, epoch, log_interval=20):
+        total_loss, correct = 0, 0
+        self.on_before_epoch(epoch)
+        for i, (x, y) in enumerate(self.train_loader):
+            x, y = x.to(self.device), y.to(self.device)
+            
+            # Feed Forward
+            logits = self.feed_forward(x)
+            loss = self.loss_fn(logits, y)
+            
+            # Backprop
+            optims = self.get_optimizers()
+            for op in optims:
+                op.zero_grad()
+            loss.backward()
+            for op in optims:
+                op.step()
+            
+            # Loss and Accuracy tracking
+            total_loss += loss
+            _, predicted = torch.max(logits.data, 1)
+            correct += (predicted == y.data).sum()
+            
+            # Logging
+            if i % log_interval == 0:
+                print(f"Train Epoch: {epoch} [{100. * i / len(self.n_batch):.0f}%]\tLoss: {loss.item():.6f}")
+        
+        test_correct = self.test() # TODO Adapt eval() method from current implementations
+        loss = total_loss / self.n_train
+        acc = 100 * test_correct / self.n_test
+        self.losses.append(loss)
+        self.accuracies.append(acc)
+        print(f"--------------- Epoch {epoch} Results ---------------")
+        print(f"Training Accuracy = {100 * correct / self.n_train:.0f}%")
+        print(f"Mean Training Loss: {loss:.6f}")
+        print(f"Test Accuracy: {test_correct} / {self.n_test} ({acc:.0f}%)")
+        print("-----------------------------------------------")
+        if test_correct > self.best_acc:
+            plot_name = f"test-feat-epoch-{epoch}"
+            print(f"New Best Test Accuracy! Saving plot as {plot_name}")
+            self.best_acc = test_correct
+            self.visualize(self.test_loader, self.get_best_acc_plot_title(epoch, acc), plot_name)
+
+
 class CenterTrainer:
     
     def __init__(self, model, device, loss_weight=1):
@@ -47,6 +130,7 @@ class CenterTrainer:
                          "Epoch = {}".format(epoch), "epoch={}".format(epoch))
 
 
+# TODO Change to inherit from base trainer
 class ArcTrainer:
     
     def __init__(self, model, device, nfeat, nclass, margin=0.2, s=7.0):
@@ -60,7 +144,7 @@ class ArcTrainer:
         self.optim_arc = optim.SGD(self.arc.parameters(), lr=0.01)
         self.sheduler = lr_scheduler.StepLR(self.optim_nn, 20, gamma=0.5)
         self.losses, self.accuracies = [], []
-        self.best_acc = 0.8
+        self.best_acc = 0
     
     def train(self, epoch, loader, test_loader, log_interval=20):
         self.sheduler.step()
@@ -102,10 +186,10 @@ class ArcTrainer:
         print(f"Mean Training Loss: {loss:.6f}")
         print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.0f}%)")
         print("-----------------------------------------------")
-        if acc > self.best_acc:
+        if test_correct > self.best_acc:
             plot_name = f"test-feat-epoch-{epoch}"
             print(f"New Best Test Accuracy! Saving plot as {plot_name}")
-            self.best_acc = acc
+            self.best_acc = test_correct
             self.visualize(test_loader, f"Test Embeddings (Epoch {epoch}) - {acc:.0f}% Accuracy - m={self.margin} s={self.s}", plot_name)
         
     def eval(self, loader):
