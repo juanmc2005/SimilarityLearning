@@ -39,17 +39,17 @@ class ArcLinear(nn.Module):
         xnorm = F.normalize(x)
         Wnorm = F.normalize(self.W)
         y = y.long().view(-1, 1)
-        # Calculate the logits, which will be our cosθj
+        # Calculate cosθj (the logits)
         cos_theta_j = torch.matmul(xnorm, torch.transpose(Wnorm, 0, 1))
-        # Get the cosθ corresponding to our classes
+        # Get the cosθ corresponding to the classes
         cos_theta_yi = cos_theta_j.gather(1, y)
         # For numerical stability
         cos_theta_yi = cos_theta_yi.clamp(min=self.min_cos, max=self.max_cos)
-        # Get the angle separating x and W
+        # Get the angle separating xi and Wyi
         theta_yi = torch.acos(cos_theta_yi)
-        # Apply the margin
+        # Apply the margin to the angle
         cos_theta_yi_margin = torch.cos(theta_yi + self.margin)
-        # One hot encoding for y
+        # One hot encode  y
         one_hot = torch.zeros_like(cos_theta_j)
         one_hot.scatter_(1, y, 1.0)
         # Project margin differences into cosθj
