@@ -3,6 +3,74 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+import math
+
+
+class ArcLinear(nn.Module):
+    """
+    Additive Angular Margin loss module (ArcFace)
+    Implementation borrowed from: https://github.com/egcode/pytorch-losses
+    Reference: https://arxiv.org/pdf/1801.07698.pdf
+    
+    :param num_classes: the number of classes
+    :param feat_dim: the number of features in the embedding
+    :param device: the device in which the module will run
+    :param s: the scaling factor for the feature vector
+    :param m: the margin to separate classes in angular space
+    """
+    
+    def __init__(self, num_classes, feat_dim, device, s=7.0, m=0.2):
+        super(ArcLinear, self).__init__()
+        self.feat_dim = feat_dim
+        self.num_classes = num_classes
+        self.s = s
+        self.m = m
+        self.weights = nn.Parameter(torch.randn(num_classes, feat_dim))
+        self.device = device
+        self.cos_m = math.cos(m)
+        self.sin_m = math.sin(m)
+        self.mm = math.sin(math.pi-m)*m
+        self.threshold = math.cos(math.pi-m)
+
+    def forward(self, feat, label):
+        eps = 1e-4
+        norms = torch.norm(feat, p=2, dim=-1, keepdim=True)
+        feat_l2norm = torch.div(feat, norms)
+        feat_l2norm = feat_l2norm * self.s
+
+        norms_w = torch.norm(self.weights, p=2, dim=-1, keepdim=True)
+        weights_l2norm = torch.div(self.weights, norms_w)
+
+        fc7 = torch.matmul(feat_l2norm, torch.transpose(weights_l2norm, 0, 1))
+
+        if torch.cuda.is_available():
+            label = label.cuda()
+            fc7 = fc7.cuda()
+        else:
+            label = label.cpu()
+            fc7 = fc7.cpu()
+
+        target_one_hot = torch.zeros(len(label), 10).to(self.device)
+        target_one_hot = target_one_hot.scatter_(1, label.unsqueeze(1), 1.)        
+        zy = torch.addcmul(torch.zeros(fc7.size()).to(self.device), 1., fc7, target_one_hot)
+        zy = zy.sum(-1)
+
+        cos_theta = zy/self.s
+        cos_theta = cos_theta.clamp(min=-1+eps, max=1-eps) # for numerical stability
+
+        theta = torch.acos(cos_theta)
+        theta = theta+self.m
+
+        body = torch.cos(theta)
+        new_zy = body*self.s
+
+        diff = new_zy - zy
+        diff = diff.unsqueeze(1)
+
+        body = torch.addcmul(torch.zeros(diff.size()).to(self.device), 1., diff, target_one_hot)
+        output = fc7+body
+
+        return output.to(self.device)
 
 
 class ArcLoss(nn.Module):
@@ -24,6 +92,7 @@ class ArcLoss(nn.Module):
         self.s = s
         self.W = nn.Parameter(torch.Tensor(nfeat, nclass))
         self.loss_fn = nn.CrossEntropyLoss()
+        self.last_output = torch.Tensor()
         nn.init.xavier_uniform_(self.W)
     
     def forward(self, x, y):
@@ -52,27 +121,7 @@ class ArcLoss(nn.Module):
         cos_theta_j += one_hot * (cos_theta_yi_margin - cos_theta_yi)
         # Apply the scaling
         cos_theta_j = self.s * cos_theta_j
+        self.last_output = cos_theta_j
         # Apply softmax + cross entropy loss
         return self.loss_fn(cos_theta_j, y.view(-1))
-
-
-def main(test_cuda=False):
-    print('-'*80)
-    device = torch.device("cuda" if test_cuda else "cpu")
-    loss = ArcLoss(2,10).to(device)
-    y = torch.Tensor([0,0,2,1]).to(device)
-    feat = torch.rand(4,2).to(device).requires_grad_()
-    print(list(loss.parameters()))
-    print(loss.W.grad)
-    out = loss(feat, y)
-    print(out.item())
-    out.backward()
-    print(loss.W.grad)
-    print(feat.grad)
-
-if __name__ == '__main__':
-    torch.manual_seed(999)
-    main(test_cuda=False)
-    if torch.cuda.is_available():
-        main(test_cuda=True)
-        
+    

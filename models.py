@@ -59,10 +59,10 @@ class ArcNet(nn.Module):
     def __init__(self):
         super(ArcNet, self).__init__()
         self.common = CommonNet()
-        self.bn1 = nn.BatchNorm1d(self.common.out_dim)
+        #self.bn1 = nn.BatchNorm1d(self.common.out_dim)
         self.preluip1 = nn.PReLU()
         self.ip1 = nn.Linear(self.common.out_dim, 2)
 
     def forward(self, x):
-        x = self.bn1(self.common(x))
+        x = self.common(x)
         return self.preluip1(self.ip1(x))

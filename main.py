@@ -9,6 +9,7 @@ from datasets import ContrastiveDataset
 use_cuda = torch.cuda.is_available() and True
 device = torch.device('cuda' if use_cuda else 'cpu')
 mnist_path = '/localHD/MNIST' if use_cuda else '../MNIST'
+torch.manual_seed(999)
 
 # Load Dataset
 transform = transforms.Compose([
@@ -21,7 +22,6 @@ testset = datasets.MNIST(mnist_path, download=True, train=False, transform=trans
 def contrastive():
     # Prepare Dataset
     # TODO shuffle and recombine train and test before each epoch
-    # TODO return visualization loader too
     print("Recombining Dataset...")
     xtrain = trainset.data.unsqueeze(1).type(torch.FloatTensor)
     ytrain = trainset.targets
@@ -38,20 +38,13 @@ def contrastive():
 
 
 def arc():
-    # TODO return visualization loader too
-    trainer = ArcTrainer(ArcNet(), device, nfeat=2, nclass=10, margin=0.3)
-    loader = DataLoader(trainset, batch_size=128, shuffle=True, num_workers=4)
-    test_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
+    trainer = ArcTrainer(ArcNet(), device, nfeat=2, nclass=10)
+    loader = DataLoader(trainset, batch_size=100, shuffle=True, num_workers=4)
+    test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
     return trainer, loader, test_loader
 
 
 trainer, train_loader, test_loader = arc()
-
-visu_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
-trainer.visualize(visu_loader, "test-before-train-arc")
-
 for epoch in range(20):
-    trainer.train(epoch+1, train_loader, test_loader, visu_loader)
-
-trainer.visualize(visu_loader, "test-20-epochs-arc-m=3,5-s=4")
+    trainer.train(epoch+1, train_loader, test_loader)
 
