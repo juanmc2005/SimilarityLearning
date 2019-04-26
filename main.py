@@ -31,7 +31,7 @@ def contrastive():
     test_dataset = ContrastiveDataset(xtest, ytest)
     loader = DataLoader(dataset, batch_size=128, shuffle=True, num_workers=4)
     test_loader = DataLoader(test_dataset, batch_size=128, shuffle=False, num_workers=4)
-    trainer = ContrastiveTrainer(ContrastiveNet(), device, margin=2.0, distance='euclidean')
+    trainer = ContrastiveTrainer(ContrastiveNet(), device, margin=2.0) # euclidean by default
     #trainer = ContrastiveTrainer(ContrastiveNet(), device, margin=0.3, distance='cosine')
     return trainer, loader, test_loader
 
@@ -48,7 +48,8 @@ def arc():
 #trainer = ArcTrainerBetter(train_sample, test_sample, device, nfeat=2, nclass=10)
 #trainer.train(epochs=15, log_interval=10)
 
-#trainer, train_loader, test_loader = arc()
-#for epoch in range(40):
-#    trainer.train(epoch+1, train_loader, test_loader)
+trainer, train_loader, test_loader = contrastive()
+visu_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
+for epoch in range(2):
+    trainer.train(epoch+1, train_loader, test_loader, visu_loader)
 

@@ -6,9 +6,9 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from  torch.utils.data import DataLoader
 from CenterLoss import CenterLoss
-from ContrastiveLoss import ContrastiveLoss
-from arcface import ArcLinear
+from losses import ArcLinear, ContrastiveLoss
 from models import ArcNet
+from distances import EuclideanDistance
 import visual
 
 
@@ -298,10 +298,12 @@ class ArcTrainer:
 
 class ContrastiveTrainer:
     
-    def __init__(self, model, device, margin=1.0, distance='euclidean'):
+    def __init__(self, model, device, margin=1.0, distance=EuclideanDistance()):
+        print(f"Will optimize Contrastive Loss with {distance}")
         self.device = device
         self.model = model.to(device)
-        self.loss_fn = ContrastiveLoss(margin, distance).to(device)
+        self.distance = distance
+        self.loss_fn = ContrastiveLoss(distance, margin).to(device)
         self.optimizer = optim.Adam(model.parameters())
         self.sheduler = lr_scheduler.StepLR(self.optimizer,20,gamma=0.8)
         self.losses, self.accuracies = [], []
@@ -317,7 +319,7 @@ class ContrastiveTrainer:
             
             emb1 = self.model(data1)
             emb2 = self.model(data2)
-            loss = self.loss_fn(y, emb1, emb2)
+            loss = self.loss_fn(emb1, emb2, y)
             running_loss += loss
             total_loss += loss
             
@@ -346,7 +348,7 @@ class ContrastiveTrainer:
                 x1, x2, y = x1.to(self.device), x2.to(self.device), y.to(self.device)
                 emb1 = self.model(x1)
                 emb2 = self.model(x2)
-                dist = self.loss_fn.distance(emb1, emb2)
+                dist = self.distance(emb1, emb2)
                 preds = torch.where(dist < self.loss_fn.margin, torch.zeros_like(dist), torch.ones_like(dist))
                 correct += (preds == y).sum()
                 total += y.size(0)

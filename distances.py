@@ -4,9 +4,19 @@ import torch
 import torch.nn.functional as F
 
 
-def cos_dist(x1, x2):
-    return 1 - F.cosine_similarity(x1, x2)
+class CosineDistance:
+    
+    def __call__(self, x1, x2):
+        return 1 - F.cosine_similarity(x1, x2)
+    
+    def __str__(self):
+        return 'cosine distance'
 
 
-def eucl_dist(X1, X2):
-    return torch.sqrt(torch.sum(torch.pow(X1-X2, 2), 1))
+class EuclideanDistance:
+    
+    def __call__(self, x1, x2):
+        return torch.norm(x1 - x2, dim=1)
+    
+    def __str__(self):
+        return 'euclidean distance'

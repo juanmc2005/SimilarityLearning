@@ -31,8 +31,10 @@ class ArcLinear(nn.Module):
     def forward(self, x, y):
         """
         Apply the angular margin transformation
+        
         :param x: a feature vector batch
         :param y: a non one-hot label batch
+        
         :return: the value for the Additive Angular Margin loss
         """
         # Normalize the feature vectors and W
@@ -57,4 +59,35 @@ class ArcLinear(nn.Module):
         # Apply the scaling
         cos_theta_j = self.s * cos_theta_j
         return cos_theta_j
+
+
+class ContrastiveLoss(nn.Module):
+    """
+    Contrastive loss module
+    Reference: http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
     
+    :param margin: the margin to separate feature vectors considered different
+    :param distance: the base distance to use (either 'euclidean' or 'cosine')
+    """
+    
+    def __init__(self, distance, margin=1.0):
+        super(ContrastiveLoss, self).__init__()
+        self.margin = margin
+        self.distance = distance
+    
+    def forward(self, x1, x2, y):
+        """
+        Calculate the contrastive loss measure
+        
+        :param x1: a tensor
+        :param x2: a tensor
+        :param y: a non one-hot label tensor
+        
+        :return: the contrastive loss
+        """
+        # Calculate the distance between x1 and x2
+        dist = self.distance(x1, x2)
+        # Calculate the loss
+        loss = (1-y) * torch.pow(dist, 2) + y * torch.pow(torch.clamp(self.margin - dist, min=0.0), 2)
+        # Return the mean loss for this batch
+        return torch.sum(loss) / 2.0 / x1.size(0)
