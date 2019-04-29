@@ -7,7 +7,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from  torch.utils.data import DataLoader
 from CenterLoss import CenterLoss
 from losses import ArcLinear, ContrastiveLoss
-from models import ArcNet
+from models import ArcNet, ContrastiveNet
 from distances import EuclideanDistance
 import visual
 
@@ -133,6 +133,69 @@ class BaseTrainer:
         visual.visualize(embs, targets, title, filename)
 
 
+class ArcTrainer(BaseTrainer):
+
+    def __init__(self, trainset, testset, device, nfeat, nclass, margin=0.2, s=7.0, batch_size=100):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
+        super(ArcTrainer, self).__init__(
+                ArcNet(),
+                device,
+                nn.CrossEntropyLoss().to(device),
+                train_loader,
+                test_loader)
+        self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
+        self.margin = margin
+        self.s = s
+        self.optimizers = [
+                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.arc.parameters(), lr=0.01)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.5)
+        ]
+    
+    def feed_forward(self, x, y):
+        feat = self.model(x)
+        logits = self.arc(feat, y)
+        return logits
+        
+    def embed(self, x):
+        return self.model(x)
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
+    
+    def get_best_acc_plot_title(self, epoch, accuracy):
+        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
+
+
+"""
+class ContrastiveTrainer(BaseTrainer):
+    
+    def __init__(self, trainset, testset, device, nfeat, nclass, margin=2.0, distance=EuclideanDistance(), batch_size=100):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
+        super(ContrastiveTrainer, self).__init__(
+                ContrastiveNet(),
+                device,
+                ContrastiveLoss(distance, margin=2.0).to(device),
+                train_loader,
+                test_loader)
+        self.margin = margin
+        self.optimizers = [
+                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.arc.parameters(), lr=0.01)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.5)
+        ]
+"""
+
+
 class CenterTrainer:
     
     def __init__(self, model, device, loss_weight=1):
@@ -169,131 +232,6 @@ class CenterTrainer:
         labels = torch.cat(idx_loader, 0)
         visual.visualize(feat.data.cpu().numpy(), labels.data.cpu().numpy(),
                          "Epoch = {}".format(epoch), "epoch={}".format(epoch))
-
-
-class ArcTrainerBetter(BaseTrainer):
-
-    def __init__(self, trainset, testset, device, nfeat, nclass, margin=0.2, s=7.0, batch_size=100):
-        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
-        super(ArcTrainerBetter, self).__init__(
-                ArcNet(),
-                device,
-                nn.CrossEntropyLoss().to(device),
-                train_loader,
-                test_loader)
-        self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
-        self.margin = margin
-        self.s = s
-        self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
-                optim.SGD(self.arc.parameters(), lr=0.01)
-        ]
-        self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.5)
-        ]
-    
-    def feed_forward(self, x, y):
-        feat = self.model(x)
-        logits = self.arc(feat, y)
-        return logits
-        
-    def embed(self, x):
-        return self.model(x)
-        
-    def get_schedulers(self):
-        return self.schedulers
-        
-    def get_optimizers(self):
-        return self.optimizers
-    
-    def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
-
-
-# TODO remove when confirmed that the other version works well
-class ArcTrainer:
-    
-    def __init__(self, model, device, nfeat, nclass, margin=0.2, s=7.0):
-        self.margin = margin
-        self.s = s
-        self.device = device
-        self.model = model.to(device)
-        self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
-        self.lossfn = nn.CrossEntropyLoss().to(device)
-        self.optim_nn = optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
-        self.optim_arc = optim.SGD(self.arc.parameters(), lr=0.01)
-        self.sheduler = lr_scheduler.StepLR(self.optim_nn, 20, gamma=0.5)
-        self.losses, self.accuracies = [], []
-        self.best_acc = 0
-    
-    def train(self, epoch, loader, test_loader, log_interval=20):
-        self.sheduler.step()
-        test_total = len(test_loader.dataset)
-        total_loss, correct, total = 0, 0, 0
-        for i, (x, y) in enumerate(loader):
-            x, y = x.to(self.device), y.to(self.device)
-            
-            # Feed Forward
-            feat = self.model(x)
-            logits = self.arc(feat, y)
-            loss = self.lossfn(logits, y)
-            
-            total_loss += loss
-            _, predicted = torch.max(logits.data, 1)
-            total += y.size(0)
-            correct += (predicted == y.data).sum()
-            
-            # Backprop
-            self.optim_nn.zero_grad()
-            self.optim_arc.zero_grad()
-            
-            loss.backward()
-            
-            self.optim_nn.step()
-            self.optim_arc.step()
-            
-            # Logging
-            if i % log_interval == 0:
-                print(f"Train Epoch: {epoch} [{100. * i / len(loader):.0f}%]\tLoss: {loss.item():.6f}")
-        
-        test_correct = self.eval(test_loader)
-        loss = total_loss / len(loader)
-        acc = 100 * test_correct / test_total
-        self.losses.append(loss)
-        self.accuracies.append(acc)
-        print(f"--------------- Epoch {epoch} Results ---------------")
-        print(f"Training Accuracy = {100 * correct / total:.0f}%")
-        print(f"Mean Training Loss: {loss:.6f}")
-        print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.0f}%)")
-        print("-----------------------------------------------")
-        if test_correct > self.best_acc:
-            plot_name = f"test-feat-epoch-{epoch}"
-            print(f"New Best Test Accuracy! Saving plot as {plot_name}")
-            self.best_acc = test_correct
-            self.visualize(test_loader, f"Test Embeddings (Epoch {epoch}) - {acc:.0f}% Accuracy - m={self.margin} s={self.s}", plot_name)
-        
-    def eval(self, loader):
-        correct = 0
-        with torch.no_grad():
-            for x, y in loader:
-                x, y = x.to(self.device), y.to(self.device)
-                feat = self.model(x)
-                logits = self.arc(feat, y)
-                _, predicted = torch.max(logits.data, 1)
-                correct += (predicted == y.data).sum()
-        return correct
-    
-    def visualize(self, loader, title, filename):
-        embs, targets = [], []
-        with torch.no_grad():
-            for x, target in loader:
-                x, target = x.to(self.device), target.to(self.device)
-                embs.append(self.model(x))
-                targets.append(target)
-        embs = torch.cat(embs, 0).type(torch.FloatTensor).data.cpu().numpy()
-        targets = torch.cat(targets, 0).type(torch.FloatTensor).cpu().numpy()
-        visual.visualize(embs, targets, title, filename)
 
 
 class ContrastiveTrainer:

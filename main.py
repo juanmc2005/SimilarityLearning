@@ -2,7 +2,7 @@ import torch
 from torchvision import datasets, transforms
 from  torch.utils.data import DataLoader
 from models import ContrastiveNet, ArcNet
-from trainers import ContrastiveTrainer, ArcTrainer, ArcTrainerBetter
+from trainers import ContrastiveTrainer, ArcTrainer
 from datasets import ContrastiveDataset
 
 # Config
@@ -36,20 +36,11 @@ def contrastive():
     return trainer, loader, test_loader
 
 
-def arc():
-    trainer = ArcTrainer(ArcNet(), device, nfeat=2, nclass=10)
-    loader = DataLoader(trainset, batch_size=100, shuffle=True, num_workers=4)
-    test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
-    return trainer, loader, test_loader
+trainer = ArcTrainer(trainset, testset, device, nfeat=2, nclass=10)
+trainer.train(epochs=20, log_interval=20)
 
-
-#train_sample = [trainset[i] for i in range(5000)]
-#test_sample = [testset[i] for i in range(5000)]
-#trainer = ArcTrainerBetter(train_sample, test_sample, device, nfeat=2, nclass=10)
-#trainer.train(epochs=15, log_interval=10)
-
-trainer, train_loader, test_loader = contrastive()
-visu_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
-for epoch in range(2):
-    trainer.train(epoch+1, train_loader, test_loader, visu_loader)
+#trainer, train_loader, test_loader = contrastive()
+#visu_loader = DataLoader(testset, batch_size=128, shuffle=False, num_workers=4)
+#for epoch in range(2):
+#    trainer.train(epoch+1, train_loader, test_loader, visu_loader)
 
