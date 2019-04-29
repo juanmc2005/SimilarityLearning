@@ -14,8 +14,7 @@ class ArcLinear(nn.Module):
     :param nfeat: the number of features in the embedding
     :param nclass: the number of classes
     :param margin: the margin to separate classes in angular space
-    :param s: the scaling factor for the feature vector. This will constrain
-              the model to a hypersphere of radius s
+    :param s: the scaling factor for the feature vector
     """
     
     def __init__(self, nfeat, nclass, margin=0.2, s=7.0):
@@ -80,8 +79,8 @@ class ContrastiveLoss(nn.Module):
         """
         Calculate the contrastive loss
         
-        :param x: a tensor corresponding to a batch of size (N, C), where
-                  N = batch size, C = number of classes
+        :param x: a tensor corresponding to a batch of size (N, d), where
+                  N = batch size, d = dimension of the feature vectors
         :param y: a non one-hot label tensor corresponding to the batch x
         
         :return: the contrastive loss
