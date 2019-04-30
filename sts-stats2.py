@@ -62,37 +62,51 @@ def dup_stats(sents, dup_index, segment, partition):
     plt.savefig(f"./images/sts-dup-stats-{partition}-{segment.upper()}.jpg")
     
 
-def dump_sent_relations(sents, other_sents, scores, index, other_segment, filename):
+def dump_sent_relations(sents, other_sents, scores, global_index, index, other_segment, filename):
     with open(filename, 'w') as out:
         for i, s in index.index.items():
+            igeneral = global_index[s]
             original_indices = [j for j, x in enumerate(sents) if x == s]
-            out.write(f"{i}:\t'{s}'\n")
+            out.write(f"L{i}-G{igeneral}:\t'{s}'\n")
             out.write(f"Relates in {other_segment.upper()} to:\n")
             for j in original_indices:
-                out.write(f"\t{scores[j]:.3f}\t\t\t'{other_sents[j]}'\n")
+                other = other_sents[j]
+                out.write(f"\tG{global_index[other]:05d}\t\t{scores[j]:.3f}\t\t'{other}'\n")
             out.write('-' * 100 + '\n')
+
+
+def dump_index(index, filename):
+    with open(filename, 'w') as out:
+        for i, sent in index.index.items():
+            out.write(f"G{i:05d}: {sent}\n")
+        
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--partition', type=str, help='train / dev / test')
     parser.add_argument('-s', '--segment', type=str, help='a / b')
+    parser.add_argument('--dumpindex', type=bool, default=False, help='Dump the global index G for every sentence (A and B)')
     args = parser.parse_args()
+    base_path = f"../sts2017/{args.partition}/"
     other_segment = 'b' if args.segment == 'a' else 'a'
-    with open(f"../sts2017/{args.partition}/{args.segment}.toks", 'r') as file,\
-         open(f"../sts2017/{args.partition}/{other_segment}.toks", 'r') as other_file,\
-         open(f"../sts2017/{args.partition}/sim.txt", 'r') as score_file:
+    with open(f"{base_path}{args.segment}.toks", 'r') as file,\
+         open(f"{base_path}{other_segment}.toks", 'r') as other_file,\
+         open(f"{base_path}sim.txt", 'r') as score_file:
         sents = [line.strip() for line in file.readlines()]
         other_sents = [line.strip() for line in other_file.readlines()]
         scores = [float(line.strip()) for line in score_file.readlines()]
+        global_index = build_sentence_index(sents + other_sents if args.segment == 'a' else other_sents + sents)
         nondups, dups = partition_dups(sents)
         non_dup_index = build_sentence_index(nondups)
         dup_index = build_sentence_index(dups)
         dup_stats(sents, dup_index, args.segment, args.partition)
-        dump_sent_relations(sents, other_sents, scores, dup_index, other_segment,
-                            f"duplicate-dump-{args.partition}-{args.segment.upper()}.txt")
-        dump_sent_relations(sents, other_sents, scores, non_dup_index, other_segment,
-                            f"non-duplicate-dump-{args.partition}-{args.segment.upper()}.txt")
+        dump_sent_relations(sents, other_sents, scores, global_index, dup_index, other_segment,
+                            f"{base_path}duplicate-dump-{args.partition}-{args.segment.upper()}.txt")
+        dump_sent_relations(sents, other_sents, scores, global_index, non_dup_index, other_segment,
+                            f"{base_path}non-duplicate-dump-{args.partition}-{args.segment.upper()}.txt")
+        if args.dumpindex:
+            dump_index(global_index, f"{base_path}general-index.txt")
         
 
 
