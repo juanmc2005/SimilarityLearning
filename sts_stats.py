@@ -94,7 +94,7 @@ with open('../sts2017/train/a.toks', 'r') as a_file, open('../sts2017/train/b.to
     sentences = first + second
     dups = get_dups(sentences)
     
-    print_occurrence_stats(dups, first, second, verbose=False)
+    print_occurrence_stats(dups, first, second, verbose=True)
     
     print(f"Total Sentences:\t\t{len(sentences)}")
     print(f"Unique Duplicates:\t\t{len(dups)}")

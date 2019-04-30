@@ -223,6 +223,45 @@ class ContrastiveTrainer(BaseTrainer):
         return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - Euclidean Distance"
 
 
+class SoftmaxTrainer(BaseTrainer):
+    
+    def __init__(self, trainset, testset, device, batch_size=150):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
+        super(SoftmaxTrainer, self).__init__(
+                ContrastiveNet(),
+                device,
+                ContrastiveLoss(device, margin),
+                train_loader,
+                test_loader)
+        self.margin = margin
+        self.optimizers = [
+                optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
+        ]
+    
+    def batch_accuracy(self, logits, y):
+        return self.loss_fn.eval(logits, y)
+    
+    def feed_forward(self, x, y):
+        return self.embed(x)
+        
+    def embed(self, x):
+        return self.model(x)
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
+    
+    def get_best_acc_plot_title(self, epoch, accuracy):
+        # TODO ATTENTION !!!! Euclidean distance is hardcoded in the title ! It should be changed once we introduce other distances
+        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - Euclidean Distance"
+
+
 class CenterTrainer:
     
     def __init__(self, model, device, loss_weight=1):
