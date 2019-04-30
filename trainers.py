@@ -7,7 +7,7 @@ import torch.optim.lr_scheduler as lr_scheduler
 from  torch.utils.data import DataLoader
 from CenterLoss import CenterLoss
 from losses import ArcLinear, ContrastiveLoss
-from models import ArcNet, ContrastiveNet
+from models import ArcNet, ContrastiveNet, CenterNet
 import visual
 
 
@@ -155,11 +155,12 @@ class ArcTrainer(BaseTrainer):
         self.margin = margin
         self.s = s
         self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.model.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005),
                 optim.SGD(self.arc.parameters(), lr=0.01)
         ]
         self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.5)
+                lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2),
+                lr_scheduler.StepLR(self.optimizers[1], 8, gamma=0.2)
         ]
     
     def feed_forward(self, x, y):
@@ -225,16 +226,15 @@ class ContrastiveTrainer(BaseTrainer):
 
 class SoftmaxTrainer(BaseTrainer):
     
-    def __init__(self, trainset, testset, device, batch_size=150):
+    def __init__(self, trainset, testset, device, batch_size=100):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(SoftmaxTrainer, self).__init__(
-                ContrastiveNet(),
+                CenterNet(),
                 device,
-                ContrastiveLoss(device, margin),
+                nn.NLLLoss(),
                 train_loader,
                 test_loader)
-        self.margin = margin
         self.optimizers = [
                 optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
         ]
@@ -243,13 +243,14 @@ class SoftmaxTrainer(BaseTrainer):
         ]
     
     def batch_accuracy(self, logits, y):
-        return self.loss_fn.eval(logits, y)
+        _, predicted = torch.max(logits.data, 1)
+        return (predicted == y.data).sum(), y.size(0)
     
     def feed_forward(self, x, y):
-        return self.embed(x)
+        return self.model(x)[1]
         
     def embed(self, x):
-        return self.model(x)
+        return self.model(x)[0]
         
     def get_schedulers(self):
         return self.schedulers
@@ -258,8 +259,7 @@ class SoftmaxTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        # TODO ATTENTION !!!! Euclidean distance is hardcoded in the title ! It should be changed once we introduce other distances
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - Euclidean Distance"
+        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy"
 
 
 class CenterTrainer:
