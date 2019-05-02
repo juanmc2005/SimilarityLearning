@@ -3,8 +3,6 @@
 import numpy as np
 from collections import Counter
 import matplotlib.pyplot as plt
-import argparse
-
 
 def get_bar_data(indexed_items, counter):
     icounts, counts = [], []
@@ -36,12 +34,12 @@ def dups_in_both(dups, first, second):
     return result
 
 
-def plot_stats(sents, index, partition, segment, filename):
+def plot_stats(sents, index, partition, segment, filename, step=8):
     counter = Counter(sents)
     icounts, counts = get_bar_data(index.index.items(), counter)
     plt.figure(figsize=(15,5))
     plt.title(f"Partition: {partition[0].upper()}{partition[1:].lower()} - Segment: {segment}")
-    plt.xticks(np.arange(len(icounts), step=8))
+    plt.xticks(np.arange(len(icounts), step=step))
     plt.bar(icounts, counts, color='SkyBlue')
     plt.legend(['Occurrences'], loc='upper right')
     if filename is not None:
@@ -147,7 +145,7 @@ class MergeSegment:
                 out.write(f"{index.code}{i}-{global_index.code}{igeneral:05d}:\t'{s}'\n")
     
     def plot_dup_stats(self, partition, filename):
-        plot_stats(self.sents, self.dup_index, partition, self, filename)
+        plot_stats(self.sents, self.dup_index, partition, self, filename, step=16)
     
     def dump_dups(self, global_index, filename, verbose=True):
         if verbose:
@@ -158,63 +156,4 @@ class MergeSegment:
         if verbose:
             print(f"Dumping non-duplicate info to {filename}...")
         self._dump(self.non_dup_index, global_index, filename)
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-p', '--partition', type=str, help='train / dev / test')
-    parser.add_argument('-di', '--dumpindex', type=bool, default=False, help='Dump the global index G for every sentence (A and B)')
-    parser.add_argument('-si', '--saveplots', type=bool, default=False, help='Whether to save duplicate stats plots')
-    args = parser.parse_args()
-    
-    base_path = f"../../sts2017/{args.partition}/"
-    index_path = f"{base_path}general-index.txt"
-    
-    with open(f"{base_path}a.toks", 'r') as file_a,\
-             open(f"{base_path}b.toks", 'r') as file_b,\
-             open(f"{base_path}sim.txt", 'r') as score_file:
-
-        # Read sentences and create global index
-        sents_a = [line.strip() for line in file_a.readlines()]
-        sents_b = [line.strip() for line in file_b.readlines()]
-        sents_all = sents_a + sents_b
-        global_index = SentIndex('G', sents_all)
-        
-        # Extract duplicates which appear in A and B
-        segment_both = MergeSegment('a+b', sents_all, sents_a, sents_b)
-        
-        # Dump index if requested
-        if args.dumpindex:
-            global_index.dump(index_path)
-        
-        # Calculate stats and dump duplicate information
-        scores = [float(line.strip()) for line in score_file.readlines()]
-        segment_a = Segment('a', sents_a)
-        segment_b = Segment('b', sents_b)
-        for segment, other_segment in [(segment_a, segment_b), (segment_b, segment_a)]:
-            print(f"Analyzing segment {segment}...")
-            dup_dmp_path = f"{base_path}duplicate-dump-{args.partition}-{segment}.txt"
-            non_dup_dmp_path = f"{base_path}non-duplicate-dump-{args.partition}-{segment}.txt"
-            plot_path = f"./images/sts-dup-stats-{args.partition}-{segment}.jpg" if args.saveplots else None
-            segment.plot_dup_stats(args.partition, plot_path)
-            segment.compare_and_dump_dups(other_segment, global_index,
-                                          segment_both.dups, scores, dup_dmp_path)
-            segment.compare_and_dump_non_dups(other_segment, global_index,
-                                              segment_both.dups, scores, non_dup_dmp_path)
-
-        # Calculate joint stats and dump joint duplicate information
-        print(f"Analyzing segment {segment}...")
-        dup_dmp_path = f"{base_path}duplicate-dump-{args.partition}-{segment_both}.txt"
-        non_dup_dmp_path = f"{base_path}non-duplicate-dump-{args.partition}-{segment_both}.txt"
-        plot_path = f"./images/sts-dup-stats-{args.partition}-{segment_both}.jpg" if args.saveplots else None
-        segment_both.plot_dup_stats(args.partition, plot_path)
-        segment_both.dump_dups(global_index, dup_dmp_path)
-        segment_both.dump_non_dups(global_index, non_dup_dmp_path)
-
-
-
-
-
-
-
 
