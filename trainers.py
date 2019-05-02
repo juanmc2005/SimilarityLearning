@@ -198,6 +198,7 @@ class ContrastiveTrainer(BaseTrainer):
                 train_loader,
                 test_loader)
         self.margin = margin
+        self.distance = distance
         self.optimizers = [
                 optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
         ]
@@ -221,8 +222,7 @@ class ContrastiveTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        # TODO ATTENTION !!!! Euclidean distance is hardcoded in the title ! It should be changed once we introduce other distances
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - Euclidean Distance"
+        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
 
 
 class SoftmaxTrainer(BaseTrainer):

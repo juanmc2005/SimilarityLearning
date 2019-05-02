@@ -16,7 +16,7 @@ class CosineDistance(Distance):
         super(CosineDistance, self).__init__()
     
     def __str__(self):
-        return 'cosine distance'
+        return 'Cosine Distance'
     
     def pdist(self, x):
         nbatch, _ = x.size()
@@ -35,7 +35,7 @@ class EuclideanDistance(Distance):
         super(EuclideanDistance, self).__init__()
     
     def __str__(self):
-        return 'euclidean distance'
+        return 'Euclidean Distance'
     
     def pdist(self, x):
         return F.pdist(x)
