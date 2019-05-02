@@ -17,7 +17,7 @@ class ArcLinear(nn.Module):
     :param s: the scaling factor for the feature vector
     """
     
-    def __init__(self, nfeat, nclass, margin=0.2, s=7.0):
+    def __init__(self, nfeat, nclass, margin, s):
         super(ArcLinear, self).__init__()
         eps = 1e-4
         self.min_cos = eps - 1
@@ -70,10 +70,11 @@ class ContrastiveLoss(nn.Module):
     :param margin: the margin to separate feature vectors considered different
     """
     
-    def __init__(self, device, margin):
+    def __init__(self, device, margin, distance):
         super(ContrastiveLoss, self).__init__()
         self.device = device
         self.margin = margin
+        self.distance = distance
     
     def forward(self, x, y):
         """
@@ -87,7 +88,7 @@ class ContrastiveLoss(nn.Module):
         """
         # First calculate the (euclidean) distances between every sample in the batch
         nbatch = x.size(0)
-        dist = F.pdist(x).to(self.device)
+        dist = self.distance.pdist(x).to(self.device)
         # Calculate the ground truth Y corresponding to the pairs
         gt = []
         for i in range(nbatch-1):
@@ -101,7 +102,7 @@ class ContrastiveLoss(nn.Module):
     
     def eval(self, x, y):
         nbatch = x.size(0)
-        dist = F.pdist(x).to(self.device)
+        dist = self.distance.pdist(x).to(self.device)
         n = dist.size(0)
         gt = []
         for i in range(nbatch-1):
@@ -110,36 +111,3 @@ class ContrastiveLoss(nn.Module):
         gt = torch.Tensor(gt).float().to(self.device)
         correct = np.sum([1 for i in range(n) if (gt[i] == 0 and dist[i] < self.margin) or (gt[i] == 1 and dist[i] > self.margin)])
         return correct, n
-        
-
-
-class OldContrastiveLoss(nn.Module):
-    """
-    Contrastive loss module
-    Reference: http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
-    
-    :param margin: the margin to separate feature vectors considered different
-    :param distance: the base distance to use (either 'euclidean' or 'cosine')
-    """
-    
-    def __init__(self, distance, margin=1.0):
-        super(OldContrastiveLoss, self).__init__()
-        self.margin = margin
-        self.distance = distance
-    
-    def forward(self, x1, x2, y):
-        """
-        Calculate the contrastive loss measure
-        
-        :param x1: a tensor
-        :param x2: a tensor
-        :param y: a non one-hot label tensor
-        
-        :return: the contrastive loss
-        """
-        # Calculate the distance between x1 and x2
-        dist = self.distance(x1, x2)
-        # Calculate the loss
-        loss = (1-y) * torch.pow(dist, 2) + y * torch.pow(torch.clamp(self.margin - dist, min=0.0), 2)
-        # Return the mean loss for this batch
-        return torch.sum(loss) / 2.0 / x1.size(0)

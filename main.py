@@ -1,12 +1,13 @@
 import torch
 from torchvision import datasets, transforms
 from trainers import ContrastiveTrainer, ArcTrainer, SoftmaxTrainer
+from distances import CosineDistance
 
 def arc_trainer():
     return ArcTrainer(trainset, testset, device, nfeat=2, nclass=10)
 
 def contrastive_trainer():
-    return ContrastiveTrainer(trainset, testset, device, margin=2.0)
+    return ContrastiveTrainer(trainset, testset, device, margin=2.0, distance=CosineDistance())
 
 def softmax_trainer():
     return SoftmaxTrainer(trainset, testset, device)
@@ -14,7 +15,8 @@ def softmax_trainer():
 # Config
 use_cuda = torch.cuda.is_available() and True
 device = torch.device('cuda' if use_cuda else 'cpu')
-mnist_path = '/localHD/MNIST' if use_cuda else '../MNIST'
+# mnist_path = '/localHD/MNIST' if use_cuda else '../MNIST'
+mnist_path = '../MNIST'
 torch.manual_seed(999)
 
 # Load Dataset
@@ -25,6 +27,6 @@ trainset = datasets.MNIST(mnist_path, download=True, train=True, transform=trans
 testset = datasets.MNIST(mnist_path, download=True, train=False, transform=transform)
 
 # Train
-trainer = arc_trainer()
-trainer.train(epochs=50, log_interval=40, train_accuracy=True)
+trainer = contrastive_trainer()
+trainer.train(epochs=50, log_interval=40, train_accuracy=False)
 

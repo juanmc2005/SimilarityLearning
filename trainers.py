@@ -8,6 +8,7 @@ from  torch.utils.data import DataLoader
 from CenterLoss import CenterLoss
 from losses import ArcLinear, ContrastiveLoss
 from models import ArcNet, ContrastiveNet, CenterNet
+from distances import EuclideanDistance
 import visual
 
 
@@ -187,13 +188,13 @@ class ArcTrainer(BaseTrainer):
 
 class ContrastiveTrainer(BaseTrainer):
     
-    def __init__(self, trainset, testset, device, margin=2.0, batch_size=150):
+    def __init__(self, trainset, testset, device, margin=2.0, distance=EuclideanDistance(), batch_size=150):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
         super(ContrastiveTrainer, self).__init__(
                 ContrastiveNet(),
                 device,
-                ContrastiveLoss(device, margin),
+                ContrastiveLoss(device, margin, distance),
                 train_loader,
                 test_loader)
         self.margin = margin
