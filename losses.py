@@ -57,6 +57,7 @@ class ArcLinear(nn.Module):
         self.s = s
         self.W = nn.Parameter(torch.Tensor(nclass, nfeat))
         nn.init.xavier_uniform_(self.W)
+        self.last_logits, self.last_y = None, None
     
     def forward(self, x, y):
         """
@@ -86,7 +87,12 @@ class ArcLinear(nn.Module):
         cos_theta_j += one_hot * (cos_theta_yi_margin - cos_theta_yi)
         # Apply the scaling
         cos_theta_j = self.s * cos_theta_j
+        self.last_logits, self.last_y = cos_theta_j, y
         return cos_theta_j
+    
+    def eval_last_forward(self):
+        _, predicted = torch.max(self.last_logits.data, 1)
+        return (predicted == self.last_y.data).sum(), self.last_y.size(0)
     
 
 class ContrastiveLoss(nn.Module):
@@ -102,6 +108,7 @@ class ContrastiveLoss(nn.Module):
         self.device = device
         self.margin = margin
         self.distance = distance
+        self.last_pdist, self.last_gt = None, None
     
     def forward(self, x, y):
         """
@@ -120,10 +127,17 @@ class ContrastiveLoss(nn.Module):
             for j in range(i+1, nbatch):
                 gt.append(int(y[i] != y[j]))
         gt = torch.Tensor(gt).float().to(self.device)
+        self.last_pdist, self.last_gt = dist, gt
         # Calculate the losses as described in the paper
         loss = (1-gt) * torch.pow(dist, 2) + gt * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
         # Normalize by batch size
         return torch.sum(loss) / 2 / dist.size(0)
+    
+    def eval_last_forward(self):
+        dist = self.last_pdist
+        gt = self.last_gt
+        correct = torch.sum((gt == 0 and dist < self.margin) or (gt == 1 and dist >= self.margin))
+        return correct, self.last_pdist.size(0)
     
     def eval(self, x, y):
         nbatch = x.size(0)
@@ -145,8 +159,9 @@ class TripletLoss(nn.Module):
         self.device = device
         self.margin = margin
         self.distance = distance
+        self.last_dpos, self.last_dneg = None, None
     
-    def batch_triplets(self, y):
+    def batch_triplets(self, y, distance):
         anchors, positives, negatives = [], [], []
         for anchor, y_anchor in enumerate(y):
             for positive, y_positive in enumerate(y):
@@ -196,24 +211,28 @@ class TripletLoss(nn.Module):
             negatives.append(negative)
         return anchors, positives, negatives
     
-    def calculate_distances(self, x, y, train=True):
+    def calculate_distances(self, x, y, sampling_strategy):
         n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
-        if train:
-            anchors, positives, negatives = self.batch_hardest_triplets(y, dist)
-        else:
-            anchors, positives, negatives = self.batch_triplets(y)
+        anchors, positives, negatives = sampling_strategy(y, dist)
         pos = to_condensed(n, anchors, positives)
         neg = to_condensed(n, anchors, negatives)
         return dist[pos], dist[neg]
     
     def forward(self, x, y):
-        dpos, dneg = self.calculate_distances(x, y)
+        dpos, dneg = self.calculate_distances(x, y, self.batch_triplets)
         loss = dpos - dneg + self.margin
+        self.last_dpos = dpos
+        self.last_dneg = dneg
         return torch.mean(torch.clamp(loss, min=1e-8))
     
+    def eval_last_forward(self):
+        correct_positives = torch.sum(self.last_dpos < self.margin)
+        correct_negatives = torch.sum(self.last_dneg >= self.margin)
+        return correct_positives + correct_negatives, len(self.last_dpos) + len(self.last_dneg)
+    
     def eval(self, x, y):
-        dpos, dneg = self.calculate_distances(x, y, train=False)
+        dpos, dneg = self.calculate_distances(x, y, self.batch_triplets)
         correct_positives = torch.sum(dpos < self.margin)
         correct_negatives = torch.sum(dneg >= self.margin)
         return correct_positives + correct_negatives, len(dpos) + len(dneg)

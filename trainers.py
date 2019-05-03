@@ -59,9 +59,16 @@ class BaseTrainer:
     
     def batch_accuracy(self, logits, y):
         """
-        Return a pair containing the amount of corrected predictions and the total of examples
+        Return a pair containing the amount of correct predictions and the total of examples
         """
         raise NotImplementedError("The trainer must implement the method 'batch_accuracy'")
+    
+    def train_accuracy(self, logits, y):
+        """
+        Return a pair containing the amount of correct predictions and the total of examples
+          for the last model activation
+        """
+        raise NotImplementedError("The trainer must implement the method 'train_accuracy'")
         
     def train(self, epochs=10, log_interval=20, train_accuracy=True):
         for i in range(1, epochs+1):
@@ -88,7 +95,7 @@ class BaseTrainer:
             
             # Accuracy tracking
             if train_accuracy:
-                bcorrect, btotal = self.batch_accuracy(logits, y)
+                bcorrect, btotal = self.train_accuracy(logits, y)
                 correct += bcorrect
                 total += btotal
             
@@ -160,8 +167,8 @@ class ArcTrainer(BaseTrainer):
                 optim.SGD(self.arc.parameters(), lr=0.01)
         ]
         self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2),
-                lr_scheduler.StepLR(self.optimizers[1], 8, gamma=0.2)
+                lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.8),
+                lr_scheduler.StepLR(self.optimizers[1], 8, gamma=0.6)
         ]
     
     def feed_forward(self, x, y):
@@ -175,6 +182,9 @@ class ArcTrainer(BaseTrainer):
     def batch_accuracy(self, logits, y):
         _, predicted = torch.max(logits.data, 1)
         return (predicted == y.data).sum(), y.size(0)
+    
+    def train_accuracy(self, logits, y):
+        return self.arc.eval_last_forward()
         
     def get_schedulers(self):
         return self.schedulers
@@ -183,7 +193,7 @@ class ArcTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
+        return f"ArcFace (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
 
 
 class ContrastiveTrainer(BaseTrainer):
@@ -209,6 +219,9 @@ class ContrastiveTrainer(BaseTrainer):
     def batch_accuracy(self, logits, y):
         return self.loss_fn.eval(logits, y)
     
+    def train_accuracy(self, logits, y):
+        return self.loss_fn.eval_last_forward()
+    
     def feed_forward(self, x, y):
         return self.embed(x)
         
@@ -222,7 +235,7 @@ class ContrastiveTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
+        return f"Contrastive (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
 
 
 class SoftmaxTrainer(BaseTrainer):
@@ -247,6 +260,9 @@ class SoftmaxTrainer(BaseTrainer):
         _, predicted = torch.max(logits.data, 1)
         return (predicted == y.data).sum(), y.size(0)
     
+    def train_accuracy(self, logits, y):
+        return self.batch_accuracy(logits, y)
+    
     def feed_forward(self, x, y):
         return self.model(x)[1]
         
@@ -260,7 +276,7 @@ class SoftmaxTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy"
+        return f"Cross Entropy (Epoch {epoch}) - {accuracy:.0f}% Accuracy"
 
 
 class TripletTrainer(BaseTrainer):
@@ -286,6 +302,9 @@ class TripletTrainer(BaseTrainer):
     def batch_accuracy(self, logits, y):
         return self.loss_fn.eval(logits, y)
     
+    def train_accuracy(self, logits, y):
+        return self.loss_fn.eval_last_forward()
+    
     def feed_forward(self, x, y):
         return self.embed(x)
         
@@ -299,7 +318,7 @@ class TripletTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
+        return f"Triplet (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
 
 
 class CenterTrainer:
