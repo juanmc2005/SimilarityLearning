@@ -196,13 +196,10 @@ class TripletLoss(nn.Module):
             negatives.append(negative)
         return anchors, positives, negatives
     
-    def calculate_distances(self, x, y, train=True):
+    def calculate_distances(self, x, y):
         n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
-        if train:
-            anchors, positives, negatives = self.batch_hardest_triplets(y, dist)
-        else:
-            anchors, positives, negatives = self.batch_triplets(y)
+        anchors, positives, negatives = self.batch_triplets(y)
         pos = to_condensed(n, anchors, positives)
         neg = to_condensed(n, anchors, negatives)
         return dist[pos], dist[neg]
@@ -213,7 +210,7 @@ class TripletLoss(nn.Module):
         return torch.mean(torch.clamp(loss, min=1e-8))
     
     def eval(self, x, y):
-        dpos, dneg = self.calculate_distances(x, y, train=False)
+        dpos, dneg = self.calculate_distances(x, y)
         correct_positives = torch.sum(dpos < self.margin)
         correct_negatives = torch.sum(dneg >= self.margin)
         return correct_positives + correct_negatives, len(dpos) + len(dneg)
