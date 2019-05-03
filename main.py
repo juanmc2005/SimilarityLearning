@@ -8,10 +8,10 @@ def arc_trainer():
     return ArcTrainer(trainset, testset, device, nfeat=2, nclass=10)
 
 def contrastive_trainer():
-    return ContrastiveTrainer(trainset, testset, device, margin=0.3, distance=CosineDistance())
+    return ContrastiveTrainer(trainset, testset, device, margin=0.25, distance=CosineDistance())
 
 def triplet_trainer():
-    return TripletTrainer(trainset, testset, device, margin=1.0)
+    return TripletTrainer(trainset, testset, device, margin=0.25)
 
 def softmax_trainer():
     return SoftmaxTrainer(trainset, testset, device)
@@ -34,5 +34,5 @@ testset = datasets.MNIST(args.mnist, download=True, train=False, transform=trans
 
 # Train
 trainer = triplet_trainer()
-trainer.train(epochs=30, log_interval=40, train_accuracy=False)
+trainer.train(epochs=15, log_interval=60, train_accuracy=False)
 

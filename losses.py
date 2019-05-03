@@ -164,7 +164,7 @@ class TripletLoss(nn.Module):
     def batch_negative_triplets(self, y, distances):
         anchors, positives, negatives = [], [], []
         distances = squareform(distances.detach().cpu().numpy())
-        y = np.array(y)
+        y = y.cpu().numpy()
         for anchor, y_anchor in enumerate(y):
             # hardest negative
             d = distances[anchor]
