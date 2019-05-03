@@ -159,26 +159,27 @@ class TripletLoss(nn.Module):
                     positives.append(positive)
                     negatives.append(negative)
         return anchors, positives, negatives
-        
     
-    def forward(self, x, y):
-        n = x.size(0) ** 2
+    
+    def calculate_distances(self, x, y):
+        n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
         anchors, positives, negatives = self.batch_triplets(y)
         pos = to_condensed(n, anchors, positives)
         neg = to_condensed(n, anchors, negatives)
-        loss = dist[pos] - dist[neg] + self.margin
+        return dist[pos], dist[neg]
+        
+    
+    def forward(self, x, y):
+        dpos, dneg = self.calculate_distances(x, y)
+        loss = dpos - dneg + self.margin
         return torch.mean(torch.clamp(loss, min=1e-8))
     
     def eval(self, x, y):
-        n = x.size(0) ** 2
-        dist = self.distance.pdist(x).to(self.device)
-        anchors, positives, negatives = self.batch_triplets(y, dist)
-        pos = to_condensed(n, anchors, positives)
-        neg = to_condensed(n, anchors, negatives)
-        correct_positives = torch.sum(dist[pos] < self.margin)
-        correct_negatives = torch.sum(dist[neg] >= self.margin)
-        return correct_positives + correct_negatives, len(anchors) * 2
+        dpos, dneg = self.calculate_distances(x, y)
+        correct_positives = torch.sum(dpos < self.margin)
+        correct_negatives = torch.sum(dneg >= self.margin)
+        return correct_positives + correct_negatives, len(dpos) + len(dneg)
     
     
     

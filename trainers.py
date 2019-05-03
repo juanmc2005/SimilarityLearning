@@ -280,7 +280,7 @@ class TripletTrainer(BaseTrainer):
                 optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
         ]
         self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
+                lr_scheduler.StepLR(self.optimizers[0], 5, gamma=0.5)
         ]
     
     def batch_accuracy(self, logits, y):
