@@ -111,7 +111,7 @@ class ContrastiveLoss(nn.Module):
 class TripletLoss(nn.Module):
 
     def __init__(self, device, margin, distance):
-        super(ContrastiveLoss, self).__init__()
+        super(TripletLoss, self).__init__()
         self.device = device
         self.margin = margin
         self.distance = distance
