@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from scipy.spatial.distance import squareform
 
 
 def to_condensed(n, i, j):
@@ -160,15 +161,30 @@ class TripletLoss(nn.Module):
                     negatives.append(negative)
         return anchors, positives, negatives
     
+    def batch_negative_triplets(self, y, distances):
+        anchors, positives, negatives = [], [], []
+        distances = squareform(distances.detach().cpu().numpy())
+        y = np.array(y)
+        for anchor, y_anchor in enumerate(y):
+            # hardest negative
+            d = distances[anchor]
+            neg = np.where(y != y_anchor)[0]
+            negative = int(neg[np.argmin(d[neg])])
+            for positive in np.where(y == y_anchor)[0]:
+                if positive == anchor:
+                    continue
+                anchors.append(anchor)
+                positives.append(positive)
+                negatives.append(negative)
+        return anchors, positives, negatives
     
     def calculate_distances(self, x, y):
         n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
-        anchors, positives, negatives = self.batch_triplets(y)
+        anchors, positives, negatives = self.batch_negative_triplets(y, dist)
         pos = to_condensed(n, anchors, positives)
         neg = to_condensed(n, anchors, negatives)
         return dist[pos], dist[neg]
-        
     
     def forward(self, x, y):
         dpos, dneg = self.calculate_distances(x, y)

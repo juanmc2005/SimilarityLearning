@@ -93,7 +93,7 @@ class BaseTrainer:
                 total += btotal
             
             # Logging
-            if i != 0 and i % log_interval == 0:
+            if i % log_interval == 0 or i == self.n_batch-1:
                 print(f"Train Epoch: {epoch} [{100. * i / self.n_batch:.0f}%]\tLoss: {loss.item():.6f}")
         
         test_correct, test_total = self.test(log_interval // 3)
@@ -125,7 +125,7 @@ class BaseTrainer:
                 total += btotal
                 
                 # Logging
-                if i != 0 and i % log_interval == 0:
+                if i % log_interval == 0 or i == self.n_test_batch-1:
                     print(f"Testing [{100. * i / self.n_test_batch:.0f}%]")
         return correct, total
     
