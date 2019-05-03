@@ -1,6 +1,6 @@
 import torch
 from torchvision import datasets, transforms
-from trainers import ContrastiveTrainer, ArcTrainer, SoftmaxTrainer
+from trainers import ContrastiveTrainer, ArcTrainer, SoftmaxTrainer, TripletTrainer
 from distances import CosineDistance
 import argparse
 
@@ -9,6 +9,9 @@ def arc_trainer():
 
 def contrastive_trainer():
     return ContrastiveTrainer(trainset, testset, device, margin=0.3, distance=CosineDistance())
+
+def triplet_trainer():
+    return TripletTrainer(trainset, testset, device, margin=1.0)
 
 def softmax_trainer():
     return SoftmaxTrainer(trainset, testset, device)
@@ -30,6 +33,6 @@ trainset = datasets.MNIST(args.mnist, download=True, train=True, transform=trans
 testset = datasets.MNIST(args.mnist, download=True, train=False, transform=transform)
 
 # Train
-trainer = contrastive_trainer()
-trainer.train(epochs=50, log_interval=40, train_accuracy=False)
+trainer = triplet_trainer()
+trainer.train(epochs=30, log_interval=40, train_accuracy=False)
 

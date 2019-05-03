@@ -6,7 +6,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from  torch.utils.data import DataLoader
 from CenterLoss import CenterLoss
-from losses import ArcLinear, ContrastiveLoss
+from losses import ArcLinear, ContrastiveLoss, TripletLoss
 from models import ArcNet, ContrastiveNet, CenterNet
 from distances import EuclideanDistance
 import visual
@@ -261,6 +261,45 @@ class SoftmaxTrainer(BaseTrainer):
     
     def get_best_acc_plot_title(self, epoch, accuracy):
         return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy"
+
+
+class TripletTrainer(BaseTrainer):
+    
+    def __init__(self, trainset, testset, device, margin=0.2, distance=EuclideanDistance(), batch_size=50):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
+        super(TripletTrainer, self).__init__(
+                ContrastiveNet(),
+                device,
+                TripletLoss(device, margin, distance),
+                train_loader,
+                test_loader)
+        self.margin = margin
+        self.distance = distance
+        self.optimizers = [
+                optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
+        ]
+    
+    def batch_accuracy(self, logits, y):
+        return self.loss_fn.eval(logits, y)
+    
+    def feed_forward(self, x, y):
+        return self.embed(x)
+        
+    def embed(self, x):
+        return self.model(x)
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
+    
+    def get_best_acc_plot_title(self, epoch, accuracy):
+        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
 
 
 class CenterTrainer:

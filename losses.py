@@ -4,13 +4,13 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
+from scipy.spatial.distance import squareform
 
 
 class ArcLinear(nn.Module):
     """
     Additive Angular Margin loss module (ArcFace)
     Reference: https://arxiv.org/pdf/1801.07698.pdf
-    
     :param nfeat: the number of features in the embedding
     :param nclass: the number of classes
     :param margin: the margin to separate classes in angular space
@@ -31,10 +31,8 @@ class ArcLinear(nn.Module):
     def forward(self, x, y):
         """
         Apply the angular margin transformation
-        
         :param x: a feature vector batch
         :param y: a non one-hot label batch
-        
         :return: the value for the Additive Angular Margin loss
         """
         # Normalize the feature vectors and W
@@ -65,7 +63,6 @@ class ContrastiveLoss(nn.Module):
     """
     Contrastive loss module
     Reference: http://yann.lecun.com/exdb/publis/pdf/hadsell-chopra-lecun-06.pdf
-    
     :param device: a device where to execute the calculations
     :param margin: the margin to separate feature vectors considered different
     """
@@ -79,11 +76,9 @@ class ContrastiveLoss(nn.Module):
     def forward(self, x, y):
         """
         Calculate the contrastive loss
-        
         :param x: a tensor corresponding to a batch of size (N, d), where
                   N = batch size, d = dimension of the feature vectors
         :param y: a non one-hot label tensor corresponding to the batch x
-        
         :return: the contrastive loss
         """
         # First calculate the (euclidean) distances between every sample in the batch
@@ -109,5 +104,67 @@ class ContrastiveLoss(nn.Module):
             for j in range(i+1, nbatch):
                 gt.append(int(y[i] != y[j]))
         gt = torch.Tensor(gt).float().to(self.device)
-        correct = np.sum([1 for i in range(n) if (gt[i] == 0 and dist[i] < self.margin) or (gt[i] == 1 and dist[i] > self.margin)])
+        correct = np.sum([1 for i in range(n) if (gt[i] == 0 and dist[i] < self.margin) or (gt[i] == 1 and dist[i] >= self.margin)])
         return correct, n
+
+
+class TripletLoss(nn.Module):
+
+    def __init__(self, device, margin, distance):
+        super(ContrastiveLoss, self).__init__()
+        self.device = device
+        self.margin = margin
+        self.distance = distance
+    
+    def batch_triplets(self, y, distances):
+        anchors, positives, negatives = [], [], []
+        for anchor, y_anchor in enumerate(y):
+            for positive, y_positive in enumerate(y):
+                # if same embedding or different labels, skip
+                if (anchor == positive) or (y_anchor != y_positive):
+                    continue
+                for negative, y_negative in enumerate(y):
+                    if y_negative == y_anchor:
+                        continue
+                    anchors.append(anchor)
+                    positives.append(positive)
+                    negatives.append(negative)
+        return anchors, positives, negatives
+        
+    
+    def forward(self, x, y):
+        dist = torch.Tensor(squareform(self.distance.pdist(x).cpu().numpy())).to(self.device)
+        anchors, positives, negatives = self.batch_triplets(y, dist)
+        loss = dist[anchors, positives] - dist[anchors, negatives] + self.margin
+        return torch.sum(torch.clamp(loss, min=1e-8))
+    
+    def eval(self, x, y):
+        dist = torch.Tensor(squareform(self.distance.pdist(x).cpu().numpy())).to(self.device)
+        anchors, positives, negatives = self.batch_triplets(y, dist)
+        n = len(anchors) * 2
+        correct_positives = torch.sum(dist[anchors, positives] < self.margin)
+        correct_negatives = torch.sum(dist[anchors, negatives] >= self.margin)
+        return correct_positives + correct_negatives, n
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
+    
