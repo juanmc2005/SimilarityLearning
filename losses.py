@@ -178,11 +178,29 @@ class TripletLoss(nn.Module):
                 negatives.append(negative)
         return anchors, positives, negatives
     
+    def batch_hardest_triplets(self, y, distances):
+        anchors, positives, negatives = [], [], []
+        distances = squareform(distances.detach().cpu().numpy())
+        y = y.cpu().numpy()
+        for anchor, y_anchor in enumerate(y):
+            d = distances[anchor]
+            # hardest positive
+            pos = np.where(y == y_anchor)[0]
+            pos = [p for p in pos if p != anchor]
+            positive = int(pos[np.argmax(d[pos])])
+            # hardest negative
+            neg = np.where(y != y_anchor)[0]
+            negative = int(neg[np.argmin(d[neg])])
+            anchors.append(anchor)
+            positives.append(positive)
+            negatives.append(negative)
+        return anchors, positives, negatives
+    
     def calculate_distances(self, x, y, train=True):
         n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
         if train:
-            anchors, positives, negatives = self.batch_negative_triplets(y, dist)
+            anchors, positives, negatives = self.batch_hardest_triplets(y, dist)
         else:
             anchors, positives, negatives = self.batch_triplets(y)
         pos = to_condensed(n, anchors, positives)
