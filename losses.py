@@ -4,7 +4,36 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
-from scipy.spatial.distance import squareform
+
+
+def to_condensed(n, i, j):
+    """
+    Borrowed from pyannote: https://github.com/pyannote/pyannote-core
+    Compute index in condensed pdist matrix
+                V
+        0 | . 0 1 2 3
+     -> 1 | . . 4 5 6 <-   ==>   0 1 2 3 4 5 6 7 8 9
+        2 | . . . 7 8                    ^
+        3 | . . . . 9
+        4 | . . . . .
+           ----------
+            0 1 2 3 4
+    Parameters
+    ----------
+    n : int
+        Number of inputs in squared pdist matrix
+    i, j : `int` or `numpy.ndarray`
+        Indices in squared pdist matrix
+    Returns
+    -------
+    k : `int` or `numpy.ndarray`
+        Index in condensed pdist matrix
+    """
+    i, j = np.array(i), np.array(j)
+    if np.any(i == j):
+        raise ValueError('i and j should be different.')
+    i, j = np.minimum(i, j), np.maximum(i, j)
+    return np.int64(i * n - i * i / 2 - 3 * i / 2 + j - 1)
 
 
 class ArcLinear(nn.Module):
@@ -116,7 +145,7 @@ class TripletLoss(nn.Module):
         self.margin = margin
         self.distance = distance
     
-    def batch_triplets(self, y, distances):
+    def batch_triplets(self, y):
         anchors, positives, negatives = [], [], []
         for anchor, y_anchor in enumerate(y):
             for positive, y_positive in enumerate(y):
@@ -133,17 +162,23 @@ class TripletLoss(nn.Module):
         
     
     def forward(self, x, y):
-        dist = torch.Tensor(squareform(self.distance.pdist(x).cpu().numpy())).to(self.device)
-        anchors, positives, negatives = self.batch_triplets(y, dist)
-        loss = dist[anchors, positives] - dist[anchors, negatives] + self.margin
+        nbatch = x.size(0)
+        dist = self.distance.pdist(x).to(self.device)
+        anchors, positives, negatives = self.batch_triplets(y)
+        pos = to_condensed(nbatch, anchors, positives)
+        neg = to_condensed(nbatch, anchors, negatives)
+        loss = dist[pos] - dist[neg] + self.margin
         return torch.sum(torch.clamp(loss, min=1e-8))
     
     def eval(self, x, y):
-        dist = torch.Tensor(squareform(self.distance.pdist(x).cpu().numpy())).to(self.device)
+        nbatch = x.size(0)
+        dist = self.distance.pdist(x).to(self.device)
         anchors, positives, negatives = self.batch_triplets(y, dist)
         n = len(anchors) * 2
-        correct_positives = torch.sum(dist[anchors, positives] < self.margin)
-        correct_negatives = torch.sum(dist[anchors, negatives] >= self.margin)
+        pos = to_condensed(nbatch, anchors, positives)
+        neg = to_condensed(nbatch, anchors, negatives)
+        correct_positives = torch.sum(dist[pos] < self.margin)
+        correct_negatives = torch.sum(dist[neg] >= self.margin)
         return correct_positives + correct_negatives, n
     
     
