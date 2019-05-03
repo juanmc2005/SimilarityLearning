@@ -162,24 +162,23 @@ class TripletLoss(nn.Module):
         
     
     def forward(self, x, y):
-        nbatch = x.size(0)
+        n = torch.pow(x.size(0), 2)
         dist = self.distance.pdist(x).to(self.device)
         anchors, positives, negatives = self.batch_triplets(y)
-        pos = to_condensed(nbatch, anchors, positives)
-        neg = to_condensed(nbatch, anchors, negatives)
+        pos = to_condensed(n, anchors, positives)
+        neg = to_condensed(n, anchors, negatives)
         loss = dist[pos] - dist[neg] + self.margin
-        return torch.sum(torch.clamp(loss, min=1e-8))
+        return torch.mean(torch.clamp(loss, min=1e-8))
     
     def eval(self, x, y):
-        nbatch = x.size(0)
+        n = torch.pow(x.size(0), 2)
         dist = self.distance.pdist(x).to(self.device)
         anchors, positives, negatives = self.batch_triplets(y, dist)
-        n = len(anchors) * 2
-        pos = to_condensed(nbatch, anchors, positives)
-        neg = to_condensed(nbatch, anchors, negatives)
+        pos = to_condensed(n, anchors, positives)
+        neg = to_condensed(n, anchors, negatives)
         correct_positives = torch.sum(dist[pos] < self.margin)
         correct_negatives = torch.sum(dist[neg] >= self.margin)
-        return correct_positives + correct_negatives, n
+        return correct_positives + correct_negatives, len(anchors) * 2
     
     
     
