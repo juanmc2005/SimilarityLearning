@@ -33,6 +33,6 @@ trainset = datasets.MNIST(args.mnist, download=True, train=True, transform=trans
 testset = datasets.MNIST(args.mnist, download=True, train=False, transform=transform)
 
 # Train
-trainer = arc_trainer()
-trainer.train(epochs=15, log_interval=30)
+trainer = triplet_trainer()
+trainer.train(epochs=15, log_interval=90, train_accuracy=False)
 
