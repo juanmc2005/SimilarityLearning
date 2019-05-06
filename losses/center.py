@@ -1,8 +1,24 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
 from torch.autograd.function import Function
 
-# TODO clean and put in 'losses.py'
+class SoftmaxCenterLoss(nn.Module):
+    
+    def __init__(self, device, nfeat, nclass, loss_weight):
+        super(SoftmaxCenterLoss, self).__init__()
+        self.loss_weight = loss_weight
+        self.center = CenterLoss(nclass, nfeat).to(device)
+        self.nll = nn.NLLLoss().to(device)
+    
+    def forward(self, data, y):
+        feat, preds = data
+        return self.nll(preds, y) + self.loss_weight * self.center(y, feat)
+    
+    def center_parameters(self):
+        return self.center.parameters()
+
 
 class CenterLoss(nn.Module):
     def __init__(self, num_classes, feat_dim, size_average=True):
@@ -45,24 +61,3 @@ class CenterlossFunc(Function):
         grad_centers.scatter_add_(0, label.unsqueeze(1).expand(feature.size()).long(), diff)
         grad_centers = grad_centers/counts.view(-1, 1)
         return - grad_output * diff / batch_size, None, grad_centers / batch_size, None
-
-
-def main(test_cuda=False):
-    print('-'*80)
-    device = torch.device("cuda" if test_cuda else "cpu")
-    ct = CenterLoss(10,2,size_average=True).to(device)
-    y = torch.Tensor([0,0,2,1]).to(device)
-    feat = torch.zeros(4,2).to(device).requires_grad_()
-    print (list(ct.parameters()))
-    print (ct.centers.grad)
-    out = ct(y,feat)
-    print(out.item())
-    out.backward()
-    print(ct.centers.grad)
-    print(feat.grad)
-
-if __name__ == '__main__':
-    torch.manual_seed(999)
-    main(test_cuda=False)
-    if torch.cuda.is_available():
-        main(test_cuda=True)

@@ -5,7 +5,10 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from  torch.utils.data import DataLoader
-from losses import ArcLinear, ContrastiveLoss, TripletLoss, SoftmaxCenterLoss
+from losses.triplet import TripletLoss
+from losses.center import SoftmaxCenterLoss
+from losses.arcface import ArcLinear
+from losses.contrastive import ContrastiveLoss
 from models import ArcNet, ContrastiveNet, CenterNet
 from distances import EuclideanDistance
 import visual
