@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from  torch.utils.data import DataLoader
-from CenterLoss import CenterLoss
-from losses import ArcLinear, ContrastiveLoss, TripletLoss
+from losses import ArcLinear, ContrastiveLoss, TripletLoss, SoftmaxCenterLoss
 from models import ArcNet, ContrastiveNet, CenterNet
 from distances import EuclideanDistance
 import visual
@@ -183,7 +182,7 @@ class ArcTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
+        return f"ArcFace Loss (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} s={self.s}"
 
 
 class ContrastiveTrainer(BaseTrainer):
@@ -222,7 +221,7 @@ class ContrastiveTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
+        return f"Contrastive Loss (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
 
 
 class SoftmaxTrainer(BaseTrainer):
@@ -260,7 +259,7 @@ class SoftmaxTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy"
+        return f"Cross Entropy (Epoch {epoch}) - {accuracy:.0f}% Accuracy"
 
 
 class TripletTrainer(BaseTrainer):
@@ -299,42 +298,46 @@ class TripletTrainer(BaseTrainer):
         return self.optimizers
     
     def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Test Embeddings (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
+        return f"Triplet Loss (Epoch {epoch}) - {accuracy:.0f}% Accuracy - m={self.margin} - {self.distance}"
 
 
-class CenterTrainer:
+class CenterTrainer(BaseTrainer):
     
-    def __init__(self, model, device, loss_weight=1):
+    def __init__(self, trainset, testset, device, nfeat, nclass, loss_weight=1, batch_size=100):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
+        super(CenterTrainer, self).__init__(
+                CenterNet(),
+                device,
+                SoftmaxCenterLoss(device, nfeat, nclass, loss_weight),
+                train_loader,
+                test_loader)
         self.loss_weight = loss_weight
-        self.device = device
-        self.model = model.to(device)
-        self.nllloss = nn.NLLLoss().to(device)
-        self.centerloss = CenterLoss(10, 2).to(device)
-        self.optimizer4nn = optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
-        self.optimzer4center = optim.SGD(self.centerloss.parameters(), lr=0.5)
+        self.optimizers = [
+                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.loss_fn.center_parameters(), lr=0.5)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.8)
+        ]
     
-    def train(self, epoch, loader):
-        print("Training... Epoch = %d" % epoch)
-        ip1_loader = []
-        idx_loader = []
-        for i, (data, target) in enumerate(loader):
-            data, target = data.to(self.device), target.to(self.device)
+    def batch_accuracy(self, data, y):
+        _, logits = data
+        _, predicted = torch.max(logits.data, 1)
+        return (predicted == y.data).sum(), y.size(0)
     
-            ip1, pred = self.model(data)
-            loss = self.nllloss(pred, target) + self.loss_weight * self.centerloss(target, ip1)
+    def feed_forward(self, x, y):
+        return self.model(x)
+        
+    def embed(self, x):
+        embeddings, _ = self.model(x)
+        return embeddings
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
     
-            self.optimizer4nn.zero_grad()
-            self.optimzer4center.zero_grad()
-    
-            loss.backward()
-    
-            self.optimizer4nn.step()
-            self.optimzer4center.step()
-    
-            ip1_loader.append(ip1)
-            idx_loader.append((target))
-    
-        feat = torch.cat(ip1_loader, 0)
-        labels = torch.cat(idx_loader, 0)
-        visual.visualize(feat.data.cpu().numpy(), labels.data.cpu().numpy(),
-                         "Epoch = {}".format(epoch), "epoch={}".format(epoch))
+    def get_best_acc_plot_title(self, epoch, accuracy):
+        return f"Center Loss (Epoch {epoch}) - {accuracy:.0f}% Accuracy - λ={self.loss_weight}"

@@ -5,36 +5,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
 from scipy.spatial.distance import squareform
-
-
-def to_condensed(n, i, j):
-    """
-    Borrowed from pyannote: https://github.com/pyannote/pyannote-core
-    Compute index in condensed pdist matrix
-                V
-        0 | . 0 1 2 3
-     -> 1 | . . 4 5 6 <-   ==>   0 1 2 3 4 5 6 7 8 9
-        2 | . . . 7 8                    ^
-        3 | . . . . 9
-        4 | . . . . .
-           ----------
-            0 1 2 3 4
-    Parameters
-    ----------
-    n : int
-        Number of inputs in squared pdist matrix
-    i, j : `int` or `numpy.ndarray`
-        Indices in squared pdist matrix
-    Returns
-    -------
-    k : `int` or `numpy.ndarray`
-        Index in condensed pdist matrix
-    """
-    i, j = np.array(i), np.array(j)
-    if np.any(i == j):
-        raise ValueError('i and j should be different.')
-    i, j = np.minimum(i, j), np.maximum(i, j)
-    return np.int64(i * n - i * i / 2 - 3 * i / 2 + j - 1)
+from distances import to_condensed
+from CenterLoss import CenterLoss
 
 
 class ArcLinear(nn.Module):
@@ -215,8 +187,22 @@ class TripletLoss(nn.Module):
         correct_negatives = torch.sum(dneg >= self.margin)
         return correct_positives + correct_negatives, len(dpos) + len(dneg)
     
+
+class SoftmaxCenterLoss(nn.Module):
     
+    def __init__(self, device, nfeat, nclass, loss_weight):
+        super(SoftmaxCenterLoss, self).__init__()
+        self.loss_weight = loss_weight
+        self.center = CenterLoss(nclass, nfeat).to(device)
+        self.nll = nn.NLLLoss().to(device)
     
+    def forward(self, data, y):
+        feat, preds = data
+        return self.nll(preds, y) + self.loss_weight * self.center(y, feat)
+    
+    def center_parameters(self):
+        return self.center.parameters()
+        
     
     
     
