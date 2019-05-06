@@ -34,13 +34,14 @@ def dups_in_both(dups, first, second):
     return result
 
 
-def plot_stats(sents, index, partition, segment, filename, step=8):
+def plot_stats(sents, index, partition, segment, filename, step):
     counter = Counter(sents)
     icounts, counts = get_bar_data(index.index.items(), counter)
     plt.figure(figsize=(15,5))
     plt.title(f"Partition: {partition[0].upper()}{partition[1:].lower()} - Segment: {segment}")
-    plt.xticks(np.arange(len(icounts), step=step))
+    #plt.xticks(np.arange(len(icounts), step=step))
     plt.bar(icounts, counts, color='SkyBlue')
+    plt.plot(icounts, counts, color='orange')
     plt.legend(['Occurrences'], loc='upper right')
     if filename is not None:
         plt.savefig(filename)
@@ -107,8 +108,8 @@ class Segment:
     def __str__(self):
         return self.code.upper()
     
-    def plot_dup_stats(self, partition, filename):
-        plot_stats(self.sents, self.dup_index, partition, self, filename)
+    def plot_dup_stats(self, partition, filename, step=8):
+        plot_stats(self.sents, self.dup_index, partition, self, filename, step)
     
     def compare_and_dump_dups(self, other_segment, global_index,
                               both_dups, scores, filename, verbose=True):
@@ -144,8 +145,8 @@ class MergeSegment:
                 igeneral = global_index[s]
                 out.write(f"{index.code}{i}-{global_index.code}{igeneral:05d}:\t'{s}'\n")
     
-    def plot_dup_stats(self, partition, filename):
-        plot_stats(self.sents, self.dup_index, partition, self, filename, step=16)
+    def plot_dup_stats(self, partition, filename, step=16):
+        plot_stats(self.sents, self.dup_index, partition, self, filename, step)
     
     def dump_dups(self, global_index, filename, verbose=True):
         if verbose:

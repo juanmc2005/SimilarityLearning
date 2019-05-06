@@ -39,7 +39,7 @@ def print_duplicate_source(dups, first, second):
         else:
             b_dups += 1
     #print(f"Duplicated sentences:\n{str_list}")
-    print(f"Duplicates from A:\t\t{a_dups}\nDuplicates in B:\t\t{b_dups}\nDuplicates in both:\t\t{both_dups}")
+    print(f"Duplicates in A:\t\t{a_dups}\nDuplicates in B:\t\t{b_dups}\nDuplicates in both:\t\t{both_dups}")
 
 
 def print_occurrence_stats(dups, first, second, verbose=True):
@@ -88,13 +88,13 @@ def print_occurrence_stats(dups, first, second, verbose=True):
     print("-" * 77)
 
 
-with open('../sts2017/train/a.toks', 'r') as a_file, open('../sts2017/train/b.toks', 'r') as b_file:
+with open('../../sts-all/train/a.toks', 'r') as a_file, open('../../sts-all/train/b.toks', 'r') as b_file:
     first = a_file.readlines()
     second = b_file.readlines()
     sentences = first + second
     dups = get_dups(sentences)
     
-    print_occurrence_stats(dups, first, second, verbose=True)
+    print_occurrence_stats(dups, first, second, verbose=False)
     
     print(f"Total Sentences:\t\t{len(sentences)}")
     print(f"Unique Duplicates:\t\t{len(dups)}")

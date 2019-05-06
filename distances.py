@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn.functional as F
+import numpy as np
 
 
 def to_condensed(n, i, j):
@@ -37,7 +38,7 @@ def to_condensed(n, i, j):
 class Distance:
     
     def pdist(self, x):
-        raise NotImplementedError("a Distance should implement the method 'pdist'")
+        raise NotImplementedError("a Distance should implement 'pdist'")
 
 
 class CosineDistance(Distance):

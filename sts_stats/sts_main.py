@@ -10,7 +10,7 @@ parser.add_argument('-di', '--dumpindex', type=bool, default=False, help='Dump t
 parser.add_argument('-si', '--saveplots', type=bool, default=False, help='Whether to save duplicate stats plots')
 args = parser.parse_args()
 
-base_path = f"../../sts2017/{args.partition}/"
+base_path = f"../../sts-all/{args.partition}/"
 index_path = f"{base_path}general-index.txt"
 
 with open(f"{base_path}a.toks", 'r') as file_a,\
