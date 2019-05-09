@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import numpy as np
-from  torch.utils.data import DataLoader
+from torch.utils.data import DataLoader
 from losses.wrappers import LossWrapper
 from losses.triplet import TripletLoss
 from losses.center import SoftmaxCenterLoss
@@ -18,10 +18,11 @@ import visual
 
 class BaseTrainer:
     
-    def __init__(self, model, device, loss_fn, train_loader, test_loader):
+    def __init__(self, model, device, loss_fn, test_distance, train_loader, test_loader):
         self.model = model.to(device)
         self.device = device
         self.loss_fn = loss_fn
+        self.test_distance = test_distance
         self.train_loader = train_loader
         self.test_loader = test_loader
         self.n_batch = len(self.train_loader)
@@ -89,8 +90,7 @@ class BaseTrainer:
         
         feat_train = torch.cat(feat_train, 0).float().detach().cpu().numpy()
         y_train = torch.cat(y_train, 0).detach().cpu().numpy()
-        # FIXME cosine distance shouldn't be hardcoded here
-        acc_calc = AccuracyCalculator(feat_train, y_train, CosineDistance())
+        acc_calc = AccuracyCalculator(feat_train, y_train, self.test_distance)
         feat_test, y_test, test_correct, test_total = self.test(acc_calc, log_interval // 3)
         acc = 100 * test_correct / test_total
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
@@ -136,6 +136,7 @@ class ArcTrainer(BaseTrainer):
                 ArcNet(),
                 device,
                 LossWrapper(nn.CrossEntropyLoss().to(device)),
+                CosineDistance(),
                 train_loader,
                 test_loader)
         self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
@@ -174,6 +175,7 @@ class ContrastiveTrainer(BaseTrainer):
                 ContrastiveNet(),
                 device,
                 ContrastiveLoss(device, margin, distance),
+                distance,
                 train_loader,
                 test_loader)
         self.margin = margin
@@ -208,6 +210,7 @@ class SoftmaxTrainer(BaseTrainer):
                 CenterNet(),
                 device,
                 LossWrapper(nn.NLLLoss().to(device)),
+                CosineDistance(),
                 train_loader,
                 test_loader)
         self.optimizers = [
@@ -239,6 +242,7 @@ class TripletTrainer(BaseTrainer):
                 ContrastiveNet(),
                 device,
                 TripletLoss(device, margin, distance),
+                distance,
                 train_loader,
                 test_loader)
         self.margin = margin
@@ -273,6 +277,7 @@ class CenterTrainer(BaseTrainer):
                 CenterNet(),
                 device,
                 SoftmaxCenterLoss(device, nfeat, nclass, loss_weight),
+                EuclideanDistance(),
                 train_loader,
                 test_loader)
         self.loss_weight = loss_weight

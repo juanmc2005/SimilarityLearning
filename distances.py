@@ -37,15 +37,33 @@ def to_condensed(n, i, j):
 
 
 class Distance:
+    """
+    A distance function implementing pairwise distance
+    """
     
     def pdist(self, x):
+        """
+        Calculate the pairwise distance for a given batch
+        :param x: a tensor of shape (N, d), where
+            N = batch size
+            d = feature dimension
+        :return: a 1D tensor corresponding to the condensed triangular distance matrix
+        """
         raise NotImplementedError("a Distance should implement 'pdist'")
     
     def to_sklearn_metric(self):
+        """
+        Get the scikit-learn name for this function. This should return a string that
+            can be used with sklearn functions
+        :return: a string representing the metric that this Distance object implements
+        """
         raise NotImplementedError("a Distance should implement 'to_sklearn_metric'")
 
 
 class CosineDistance(Distance):
+    """
+    Cosine distance module using PyTorch's cosine_similarity to calculate pdist
+    """
     
     def __init__(self):
         super(CosineDistance, self).__init__()
@@ -68,6 +86,10 @@ class CosineDistance(Distance):
 
 
 class EuclideanDistance(Distance):
+    """
+    Euclidean distance module using PyTorch's pdist,
+        which already supports this distance
+    """
     
     def __init__(self):
         super(EuclideanDistance, self).__init__()
@@ -83,6 +105,16 @@ class EuclideanDistance(Distance):
 
 
 class AccuracyCalculator:
+    """
+    Abstracts the accuracy calculation strategy. It uses a K Nearest Neighbors
+        classifier fit with the embeddings produced for the training set,
+        to determine to which class a given test embedding is assigned to.
+    :param train_embeddings: a tensor of shape (N, d), where
+            N = training set size
+            d = embedding dimension
+    :param train_y: a non one-hot encoded tensor of labels for the train embeddings
+    :param distance: a Distance object for the KNN classifier
+    """
     
     def __init__(self, train_embeddings, train_y, distance):
         self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
