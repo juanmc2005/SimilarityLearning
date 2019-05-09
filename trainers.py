@@ -9,9 +9,8 @@ from torch.utils.data import DataLoader
 from losses.wrappers import LossWrapper
 from losses.triplet import TripletLoss
 from losses.center import SoftmaxCenterLoss
-from losses.arcface import ArcLinear
 from losses.contrastive import ContrastiveLoss
-from models import ArcNet, ContrastiveNet, CenterNet
+from models import CommonNet, ArcNet, CenterNet
 from distances import EuclideanDistance, CosineDistance, AccuracyCalculator
 import visual
 
@@ -31,13 +30,6 @@ class BaseTrainer:
         self.n_test = len(test_loader.dataset)
         self.best_acc = 0
         
-    def feed_forward(self, x, y):
-        """
-        FIXME this method could be removed. Feed forward differences between losses could be put in the models
-        Compute the output of the model for a mini-batch. Return the embeddings and logits
-        """
-        raise NotImplementedError("The trainer must implement the method 'feed_forward'")
-        
     def get_schedulers(self):
         """
         :return: a list of schedulers to use
@@ -52,7 +44,7 @@ class BaseTrainer:
     
     def get_best_acc_plot_title(self, epoch, accuracy):
         """
-        FIXME all titles are pretty much the same, this method can be split in 2: get_title and get_params_str
+        FIXME all titles are pretty much the same, this method can be split in 2: get_title (maybe __str__) and describe_params
         :return: a string representing the title for the plot of test embeddings with the best accuracy
         """
         raise NotImplementedError("The trainer must implement the method 'get_best_acc_plot_title'")
@@ -69,7 +61,7 @@ class BaseTrainer:
             x, y = x.to(self.device), y.to(self.device)
             
             # Feed Forward
-            feat, logits = self.feed_forward(x, y)
+            feat, logits = self.model(x, y)
             loss = self.loss_fn(feat, logits, y)
             
             # Backprop
@@ -110,7 +102,7 @@ class BaseTrainer:
                 x, y = x.to(self.device), y.to(self.device)
                 
                 # Feed Forward
-                feat, _ = self.feed_forward(x, y)
+                feat, _ = self.model(x, y)
                 feat = feat.detach().cpu().numpy()
                 y = y.detach().cpu().numpy()
                 
@@ -133,28 +125,22 @@ class ArcTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(ArcTrainer, self).__init__(
-                ArcNet(),
+                ArcNet(nfeat, nclass, margin, s),
                 device,
                 LossWrapper(nn.CrossEntropyLoss().to(device)),
                 CosineDistance(),
                 train_loader,
                 test_loader)
-        self.arc = ArcLinear(nfeat, nclass, margin, s).to(device)
         self.margin = margin
         self.s = s
         self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.005, momentum=0.9, weight_decay=0.0005),
-                optim.SGD(self.arc.parameters(), lr=0.01)
+                optim.SGD(self.model.common_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.model.arc_params(), lr=0.01)
         ]
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2),
                 lr_scheduler.StepLR(self.optimizers[1], 8, gamma=0.2)
         ]
-    
-    def feed_forward(self, x, y):
-        feat = self.model(x)
-        logits = self.arc(feat, y)
-        return feat, logits
         
     def get_schedulers(self):
         return self.schedulers
@@ -168,11 +154,11 @@ class ArcTrainer(BaseTrainer):
 
 class ContrastiveTrainer(BaseTrainer):
     
-    def __init__(self, trainset, testset, device, margin=2.0, distance=EuclideanDistance(), batch_size=80):
+    def __init__(self, trainset, testset, device, nfeat, margin=2.0, distance=EuclideanDistance(), batch_size=80):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
         super(ContrastiveTrainer, self).__init__(
-                ContrastiveNet(),
+                CommonNet(nfeat),
                 device,
                 ContrastiveLoss(device, margin, distance),
                 distance,
@@ -186,10 +172,6 @@ class ContrastiveTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 2, gamma=0.8)
         ]
-    
-    def feed_forward(self, x, y):
-        feat = self.model(x)
-        return feat, feat
         
     def get_schedulers(self):
         return self.schedulers
@@ -203,11 +185,11 @@ class ContrastiveTrainer(BaseTrainer):
 
 class SoftmaxTrainer(BaseTrainer):
     
-    def __init__(self, trainset, testset, device, batch_size=100):
+    def __init__(self, trainset, testset, device, nfeat, nclass, batch_size=100):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(SoftmaxTrainer, self).__init__(
-                CenterNet(),
+                CenterNet(nfeat, nclass),
                 device,
                 LossWrapper(nn.NLLLoss().to(device)),
                 CosineDistance(),
@@ -219,9 +201,6 @@ class SoftmaxTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
         ]
-    
-    def feed_forward(self, x, y):
-        return self.model(x)
         
     def get_schedulers(self):
         return self.schedulers
@@ -235,11 +214,11 @@ class SoftmaxTrainer(BaseTrainer):
 
 class TripletTrainer(BaseTrainer):
     
-    def __init__(self, trainset, testset, device, margin=0.2, distance=EuclideanDistance(), batch_size=25):
+    def __init__(self, trainset, testset, device, nfeat, margin=0.2, distance=EuclideanDistance(), batch_size=25):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
         super(TripletTrainer, self).__init__(
-                ContrastiveNet(),
+                CommonNet(nfeat),
                 device,
                 TripletLoss(device, margin, distance),
                 distance,
@@ -253,10 +232,6 @@ class TripletTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 3, gamma=0.5)
         ]
-    
-    def feed_forward(self, x, y):
-        feat = self.model(x)
-        return feat, feat
         
     def get_schedulers(self):
         return self.schedulers
@@ -274,7 +249,7 @@ class CenterTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(CenterTrainer, self).__init__(
-                CenterNet(),
+                CenterNet(nfeat, nclass),
                 device,
                 SoftmaxCenterLoss(device, nfeat, nclass, loss_weight),
                 EuclideanDistance(),
@@ -288,9 +263,6 @@ class CenterTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.8)
         ]
-    
-    def feed_forward(self, x, y):
-        return self.model(x)
         
     def get_schedulers(self):
         return self.schedulers

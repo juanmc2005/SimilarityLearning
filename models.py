@@ -2,9 +2,12 @@
 # -*- coding: utf-8 -*-
 from torch import nn
 import torch.nn.functional as F
+from losses.arcface import ArcLinear
+
 
 class CommonNet(nn.Module):
-    def __init__(self):
+    
+    def __init__(self, nfeat):
         super(CommonNet, self).__init__()
         self.out_dim = 128*3*3
         self.conv = nn.Sequential(
@@ -24,44 +27,43 @@ class CommonNet(nn.Module):
                 nn.PReLU(),
                 nn.MaxPool2d(2)
         )
+        self.dense = nn.Linear(self.out_dim, nfeat)
+        self.prelu = nn.PReLU()
     
-    def forward(self, x):
-        return self.conv(x).view(-1, self.out_dim)
+    def forward(self, x, y):
+        x = self.conv(x).view(-1, self.out_dim)
+        return self.prelu(self.dense(x)), None
+
+
+# FIXME this 2 models can be unified by parameterizing the classification layer
 
 class CenterNet(nn.Module):
-    def __init__(self):
+    
+    def __init__(self, nfeat, nclass):
         super(CenterNet, self).__init__()
-        self.common = CommonNet()
-        self.preluip1 = nn.PReLU()
-        self.ip1 = nn.Linear(self.common.out_dim, 2)
-        self.ip2 = nn.Linear(2, 10, bias=False)
+        self.common = CommonNet(nfeat)
+        self.linear = nn.Linear(nfeat, nclass, bias=False)
 
-    def forward(self, x):
-        x = self.common(x)
-        ip1 = self.preluip1(self.ip1(x))
-        ip2 = self.ip2(ip1)
-        return ip1, F.log_softmax(ip2, dim=1)
+    def forward(self, x, y):
+        feat, _ = self.common(x, y)
+        logits = self.linear(feat)
+        return feat, F.log_softmax(logits, dim=1)
 
-class ContrastiveNet(nn.Module):
-    def __init__(self):
-        super(ContrastiveNet, self).__init__()
-        self.common = CommonNet()
-        self.preluip1 = nn.PReLU()
-        self.ip1 = nn.Linear(self.common.out_dim, 10)
-        self.ip2 = nn.Linear(10, 2, bias=False)
-
-    def forward(self, x):
-        x = self.common(x)
-        x = self.preluip1(self.ip1(x))
-        return self.ip2(x)
 
 class ArcNet(nn.Module):
-    def __init__(self):
+    
+    def __init__(self, nfeat, nclass, margin, s):
         super(ArcNet, self).__init__()
-        self.common = CommonNet()
-        self.preluip1 = nn.PReLU()
-        self.ip1 = nn.Linear(self.common.out_dim, 2)
+        self.common = CommonNet(nfeat)
+        self.arc = ArcLinear(nfeat, nclass, margin, s)
 
-    def forward(self, x):
-        x = self.common(x)
-        return self.preluip1(self.ip1(x))
+    def forward(self, x, y):
+        feat, _ = self.common(x, y)
+        logits = self.arc(feat, y)
+        return feat, logits
+    
+    def common_params(self):
+        return self.common.parameters()
+    
+    def arc_params(self):
+        return self.arc.parameters()

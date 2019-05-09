@@ -8,6 +8,7 @@ import argparse
 # Constants and Config
 loss_options = 'softmax / contrastive / triplet / arcface / center'
 use_cuda = torch.cuda.is_available() and True
+nfeat, nclass = 2, 10
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
 parser.add_argument('--mnist', type=str, help='Path to MNIST dataset')
@@ -17,15 +18,15 @@ parser.add_argument('--epochs', type=int, help='The number of epochs to run the 
 
 def get_trainer(loss):
     if loss == 'softmax':
-        return tr.SoftmaxTrainer(trainset, testset, device)
+        return tr.SoftmaxTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'contrastive':
-        return tr.ContrastiveTrainer(trainset, testset, device, margin=0.2, distance=CosineDistance())
+        return tr.ContrastiveTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
     elif loss == 'triplet':
-        return tr.TripletTrainer(trainset, testset, device, margin=0.2, distance=CosineDistance())
+        return tr.TripletTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
     elif loss == 'arcface':
-        return tr.ArcTrainer(trainset, testset, device, nfeat=2, nclass=10)
+        return tr.ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
-        return tr.CenterTrainer(trainset, testset, device, nfeat=2, nclass=10)
+        return tr.CenterTrainer(trainset, testset, device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
