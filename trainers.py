@@ -32,31 +32,27 @@ class BaseTrainer:
         
     def feed_forward(self, x, y):
         """
-        Compute the output of the model for a mini-batch and return the logits
+        FIXME this method could be removed. Feed forward differences between losses could be put in the models
+        Compute the output of the model for a mini-batch. Return the embeddings and logits
         """
         raise NotImplementedError("The trainer must implement the method 'feed_forward'")
         
-    def embed(self, x):
-        """
-        Compute the output of the model for a mini-batch and return the embeddings
-        """
-        raise NotImplementedError("The trainer must implement the method 'embed'")
-        
     def get_schedulers(self):
         """
-        Return the list of schedulers to use
+        :return: a list of schedulers to use
         """
         raise NotImplementedError("The trainer must implement the method 'get_schedulers'")
         
     def get_optimizers(self):
         """
-        Return the list of optimizers to use
+        :return: a list of optimizers to use
         """
         raise NotImplementedError("The trainer must implement the method 'get_optimizers'")
     
     def get_best_acc_plot_title(self, epoch, accuracy):
         """
-        Return the desired title for the plot of test embeddings with the best accuracy
+        FIXME all titles are pretty much the same, this method can be split in 2: get_title and get_params_str
+        :return: a string representing the title for the plot of test embeddings with the best accuracy
         """
         raise NotImplementedError("The trainer must implement the method 'get_best_acc_plot_title'")
         
@@ -159,13 +155,6 @@ class ArcTrainer(BaseTrainer):
         logits = self.arc(feat, y)
         return feat, logits
         
-    def embed(self, x):
-        return self.model(x)
-    
-    def batch_accuracy(self, embeddings, y):
-        _, predicted = torch.max(embeddings.data, 1)
-        return (predicted == y.data).sum(), y.size(0)
-        
     def get_schedulers(self):
         return self.schedulers
         
@@ -196,15 +185,9 @@ class ContrastiveTrainer(BaseTrainer):
                 lr_scheduler.StepLR(self.optimizers[0], 2, gamma=0.8)
         ]
     
-    def batch_accuracy(self, logits, y):
-        return self.loss_fn.eval(logits, y)
-    
     def feed_forward(self, x, y):
-        feat = self.embed(x)
+        feat = self.model(x)
         return feat, feat
-        
-    def embed(self, x):
-        return self.model(x)
         
     def get_schedulers(self):
         return self.schedulers
@@ -234,15 +217,8 @@ class SoftmaxTrainer(BaseTrainer):
                 lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
         ]
     
-    def batch_accuracy(self, logits, y):
-        _, predicted = torch.max(logits.data, 1)
-        return (predicted == y.data).sum(), y.size(0)
-    
     def feed_forward(self, x, y):
         return self.model(x)
-        
-    def embed(self, x):
-        return self.model(x)[0]
         
     def get_schedulers(self):
         return self.schedulers
@@ -274,15 +250,9 @@ class TripletTrainer(BaseTrainer):
                 lr_scheduler.StepLR(self.optimizers[0], 3, gamma=0.5)
         ]
     
-    def batch_accuracy(self, logits, y):
-        return self.loss_fn.eval(logits, y)
-    
     def feed_forward(self, x, y):
-        feat = self.embed(x)
+        feat = self.model(x)
         return feat, feat
-        
-    def embed(self, x):
-        return self.model(x)
         
     def get_schedulers(self):
         return self.schedulers
@@ -314,17 +284,8 @@ class CenterTrainer(BaseTrainer):
                 lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.8)
         ]
     
-    def batch_accuracy(self, data, y):
-        _, logits = data
-        _, predicted = torch.max(logits.data, 1)
-        return (predicted == y.data).sum(), y.size(0)
-    
     def feed_forward(self, x, y):
         return self.model(x)
-        
-    def embed(self, x):
-        embeddings, _ = self.model(x)
-        return embeddings
         
     def get_schedulers(self):
         return self.schedulers

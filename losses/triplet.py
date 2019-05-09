@@ -78,9 +78,3 @@ class TripletLoss(nn.Module):
         loss = dpos - dneg + self.margin
         return torch.mean(torch.clamp(loss, min=1e-8))
     
-    def eval(self, x, y):
-        dpos, dneg = self.calculate_distances(x, y)
-        correct_positives = torch.sum(dpos < self.margin)
-        correct_negatives = torch.sum(dneg >= self.margin)
-        return correct_positives + correct_negatives, len(dpos) + len(dneg)
-    
