@@ -73,7 +73,7 @@ class TripletLoss(nn.Module):
         neg = to_condensed(n, anchors, negatives)
         return dist[pos], dist[neg]
     
-    def forward(self, x, y):
+    def forward(self, feat, x, y):
         dpos, dneg = self.calculate_distances(x, y)
         loss = dpos - dneg + self.margin
         return torch.mean(torch.clamp(loss, min=1e-8))

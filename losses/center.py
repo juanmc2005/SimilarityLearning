@@ -12,9 +12,8 @@ class SoftmaxCenterLoss(nn.Module):
         self.center = CenterLoss(nclass, nfeat).to(device)
         self.nll = nn.NLLLoss().to(device)
     
-    def forward(self, data, y):
-        feat, preds = data
-        return self.nll(preds, y) + self.loss_weight * self.center(y, feat)
+    def forward(self, feat, logits, y):
+        return self.nll(logits, y) + self.loss_weight * self.center(y, feat)
     
     def center_parameters(self):
         return self.center.parameters()

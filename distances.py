@@ -3,6 +3,7 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
+from sklearn.neighbors import KNeighborsClassifier
 
 
 def to_condensed(n, i, j):
@@ -39,6 +40,9 @@ class Distance:
     
     def pdist(self, x):
         raise NotImplementedError("a Distance should implement 'pdist'")
+    
+    def to_sklearn_metric(self):
+        raise NotImplementedError("a Distance should implement 'to_sklearn_metric'")
 
 
 class CosineDistance(Distance):
@@ -48,6 +52,9 @@ class CosineDistance(Distance):
     
     def __str__(self):
         return 'Cosine Distance'
+    
+    def to_sklearn_metric(self):
+        return 'cosine'
     
     def pdist(self, x):
         nbatch, _ = x.size()
@@ -68,5 +75,19 @@ class EuclideanDistance(Distance):
     def __str__(self):
         return 'Euclidean Distance'
     
+    def to_sklearn_metric(self):
+        return 'euclidean'
+    
     def pdist(self, x):
         return F.pdist(x)
+
+
+class AccuracyCalculator:
+    
+    def __init__(self, train_embeddings, train_y, distance):
+        self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
+        self.knn.fit(train_embeddings, train_y)
+    
+    def calculate_batch(self, embeddings, y):
+        predicted = self.knn.predict(embeddings)
+        return (predicted == y).sum(), y.shape[0]

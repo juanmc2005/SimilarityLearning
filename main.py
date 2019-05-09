@@ -43,5 +43,5 @@ testset = datasets.MNIST(args.mnist, download=True, train=False, transform=trans
 
 # Train
 trainer = get_trainer(args.loss)
-trainer.train(args.epochs, log_interval=60, train_accuracy=False)
+trainer.train(args.epochs, log_interval=30, train_accuracy=False)
 

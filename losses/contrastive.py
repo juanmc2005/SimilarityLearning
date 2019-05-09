@@ -19,7 +19,7 @@ class ContrastiveLoss(nn.Module):
         self.margin = margin
         self.distance = distance
     
-    def forward(self, x, y):
+    def forward(self, feat, x, y):
         """
         Calculate the contrastive loss
         :param x: a tensor corresponding to a batch of size (N, d), where
