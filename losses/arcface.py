@@ -3,6 +3,13 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+import torch.optim as optim
+from torch.optim import lr_scheduler
+from losses.base import BaseTrainer
+from models import MNISTNet
+from losses.wrappers import LossWrapper
+from distances import CosineDistance
 
 
 class ArcLinear(nn.Module):
@@ -55,3 +62,39 @@ class ArcLinear(nn.Module):
         # Apply the scaling
         cos_theta_j = self.s * cos_theta_j
         return cos_theta_j
+
+
+class ArcTrainer(BaseTrainer):
+
+    def __init__(self, trainset, testset, device, nfeat, nclass, margin=0.2, s=7.0, batch_size=100):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
+        super(ArcTrainer, self).__init__(
+                MNISTNet(nfeat, loss_module=ArcLinear(nfeat, nclass, margin, s)),
+                device,
+                LossWrapper(nn.CrossEntropyLoss().to(device)),
+                CosineDistance(),
+                train_loader,
+                test_loader)
+        self.margin = margin
+        self.s = s
+        self.optimizers = [
+                optim.SGD(self.model.net_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.model.loss_params(), lr=0.01)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2),
+                lr_scheduler.StepLR(self.optimizers[1], 8, gamma=0.2)
+        ]
+    
+    def __str__(self):
+        return 'ArcFace Loss'
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
+    
+    def describe_params(self):
+        return f"m={self.margin} s={self.s}"

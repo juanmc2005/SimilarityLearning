@@ -1,16 +1,20 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 from torch import nn
-import torch.nn.functional as F
-from losses.arcface import ArcLinear
 
 
-class CommonNet(nn.Module):
+class Flatten(nn.Module):
+    def forward(self, x):
+        return x.view(x.size(0), -1)
+
+
+class MNISTNet(nn.Module):
     
-    def __init__(self, nfeat):
-        super(CommonNet, self).__init__()
+    def __init__(self, nfeat, loss_module=None):
+        super(MNISTNet, self).__init__()
+        self.loss_module = loss_module
         self.out_dim = 128*3*3
-        self.conv = nn.Sequential(
+        self.net = nn.Sequential(
                 nn.Conv2d(1, 32, kernel_size=5, padding=2),
                 nn.PReLU(),
                 nn.Conv2d(32, 32, kernel_size=5, padding=2),
@@ -25,45 +29,19 @@ class CommonNet(nn.Module):
                 nn.PReLU(),
                 nn.Conv2d(128, 128, kernel_size=5, padding=2),
                 nn.PReLU(),
-                nn.MaxPool2d(2)
+                nn.MaxPool2d(2),
+                Flatten(),
+                nn.Linear(self.out_dim, nfeat),
+                nn.PReLU()
         )
-        self.dense = nn.Linear(self.out_dim, nfeat)
-        self.prelu = nn.PReLU()
     
     def forward(self, x, y):
-        x = self.conv(x).view(-1, self.out_dim)
-        return self.prelu(self.dense(x)), None
-
-
-# FIXME this 2 models can be unified by parameterizing the classification layer
-
-class CenterNet(nn.Module):
-    
-    def __init__(self, nfeat, nclass):
-        super(CenterNet, self).__init__()
-        self.common = CommonNet(nfeat)
-        self.linear = nn.Linear(nfeat, nclass, bias=False)
-
-    def forward(self, x, y):
-        feat, _ = self.common(x, y)
-        logits = self.linear(feat)
-        return feat, F.log_softmax(logits, dim=1)
-
-
-class ArcNet(nn.Module):
-    
-    def __init__(self, nfeat, nclass, margin, s):
-        super(ArcNet, self).__init__()
-        self.common = CommonNet(nfeat)
-        self.arc = ArcLinear(nfeat, nclass, margin, s)
-
-    def forward(self, x, y):
-        feat, _ = self.common(x, y)
-        logits = self.arc(feat, y)
+        feat = self.net(x)
+        logits = self.loss_module(feat, y) if self.loss_module is not None else None
         return feat, logits
     
-    def common_params(self):
-        return self.common.parameters()
+    def net_params(self):
+        return self.net.parameters()
     
-    def arc_params(self):
-        return self.arc.parameters()
+    def loss_params(self):
+        return self.loss_module.parameters()
