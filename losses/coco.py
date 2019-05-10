@@ -2,6 +2,13 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
+from torch.utils.data import DataLoader
+import torch.optim as optim
+from torch.optim import lr_scheduler
+from models import CocoNet
+from losses.base import BaseTrainer
+from losses.wrappers import LossWrapper
+from distances import CosineDistance
 
 class CocoLinear(nn.Module):
     
@@ -15,3 +22,37 @@ class CocoLinear(nn.Module):
         xnorm = self.alpha * F.normalize(x)
         logits = torch.matmul(xnorm, torch.transpose(cnorm, 0, 1))
         return logits
+
+
+class CocoTrainer(BaseTrainer):
+
+    def __init__(self, trainset, testset, device, nfeat, nclass, alpha=6.25, batch_size=100):
+        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
+        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
+        super(CocoTrainer, self).__init__(
+                CocoNet(nfeat, nclass, alpha),
+                device,
+                LossWrapper(nn.CrossEntropyLoss().to(device)),
+                CosineDistance(),
+                train_loader,
+                test_loader)
+        self.alpha = alpha
+        self.optimizers = [
+                optim.SGD(self.model.common_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.model.arc_params(), lr=0.01)
+        ]
+        self.schedulers = [
+                lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2)
+        ]
+    
+    def __str__(self):
+        return 'CoCo Loss'
+        
+    def get_schedulers(self):
+        return self.schedulers
+        
+    def get_optimizers(self):
+        return self.optimizers
+    
+    def describe_params(self):
+        return f"α={self.alpha}"

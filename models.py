@@ -3,6 +3,7 @@
 from torch import nn
 import torch.nn.functional as F
 from losses.arcface import ArcLinear
+from losses.coco import CocoLinear
 
 
 class CommonNet(nn.Module):
@@ -35,7 +36,7 @@ class CommonNet(nn.Module):
         return self.prelu(self.dense(x)), None
 
 
-# FIXME this 2 models can be unified by parameterizing the classification layer
+# FIXME these models can be unified by parameterizing the classification layer
 
 class CenterNet(nn.Module):
     
@@ -67,3 +68,22 @@ class ArcNet(nn.Module):
     
     def arc_params(self):
         return self.arc.parameters()
+
+
+class CocoNet(nn.Module):
+    
+    def __init__(self, nfeat, nclass, alpha):
+        super(CocoNet, self).__init__()
+        self.common = CommonNet(nfeat)
+        self.coco = CocoLinear(nfeat, nclass, alpha)
+
+    def forward(self, x, y):
+        feat, _ = self.common(x, y)
+        logits = self.coco(feat, y)
+        return feat, logits
+    
+    def common_params(self):
+        return self.common.parameters()
+    
+    def coco_params(self):
+        return self.coco.parameters()
