@@ -5,7 +5,7 @@ import torch.nn.functional as F
 from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from models import CocoNet
+from models import MNISTNet
 from losses.base import BaseTrainer
 from losses.wrappers import LossWrapper
 from distances import CosineDistance
@@ -30,7 +30,7 @@ class CocoTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(CocoTrainer, self).__init__(
-                CocoNet(nfeat, nclass, alpha),
+                MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha)),
                 device,
                 LossWrapper(nn.CrossEntropyLoss().to(device)),
                 CosineDistance(),
@@ -38,11 +38,11 @@ class CocoTrainer(BaseTrainer):
                 test_loader)
         self.alpha = alpha
         self.optimizers = [
-                optim.SGD(self.model.common_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
-                optim.SGD(self.model.arc_params(), lr=0.01)
+                optim.SGD(self.model.net_params(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.model.loss_params(), lr=0.01, momentum=0.9)
         ]
         self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2)
+                lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
         ]
     
     def __str__(self):

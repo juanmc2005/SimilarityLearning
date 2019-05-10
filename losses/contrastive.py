@@ -6,7 +6,7 @@ import torch.optim as optim
 from torch.optim import lr_scheduler
 from torch.utils.data import DataLoader
 from losses.base import BaseTrainer
-from models import CommonNet
+from models import MNISTNet
 from distances import EuclideanDistance
 
 
@@ -56,7 +56,7 @@ class ContrastiveTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
         super(ContrastiveTrainer, self).__init__(
-                CommonNet(nfeat),
+                MNISTNet(nfeat),
                 device,
                 ContrastiveLoss(device, margin, distance),
                 distance,

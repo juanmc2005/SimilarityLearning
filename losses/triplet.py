@@ -9,7 +9,7 @@ import numpy as np
 from scipy.spatial.distance import squareform
 from losses.base import BaseTrainer
 from distances import to_condensed, EuclideanDistance
-from models import CommonNet
+from models import MNISTNet
 
 
 class TripletLoss(nn.Module):
@@ -90,7 +90,7 @@ class TripletTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
         super(TripletTrainer, self).__init__(
-                CommonNet(nfeat),
+                MNISTNet(nfeat),
                 device,
                 TripletLoss(device, margin, distance),
                 distance,

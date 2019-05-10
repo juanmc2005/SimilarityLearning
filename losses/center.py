@@ -2,12 +2,13 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 from torch.autograd.function import Function
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from losses.base import BaseTrainer
-from models import CenterNet
+from models import MNISTNet
 from distances import EuclideanDistance
 
 class SoftmaxCenterLoss(nn.Module):
@@ -68,13 +69,22 @@ class CenterlossFunc(Function):
         return - grad_output * diff / batch_size, None, grad_centers / batch_size, None
 
 
+class CenterLinear(nn.Module):
+    
+    def __init__(self, nfeat, nclass):
+        self.linear = nn.Linear(nfeat, nclass, bias=False)
+    
+    def forward(self, x, y):
+        return F.log_softmax(self.linear(x), dim=1)
+
+
 class CenterTrainer(BaseTrainer):
     
     def __init__(self, trainset, testset, device, nfeat, nclass, loss_weight=1, batch_size=100):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(CenterTrainer, self).__init__(
-                CenterNet(nfeat, nclass),
+                MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass)),
                 device,
                 SoftmaxCenterLoss(device, nfeat, nclass, loss_weight),
                 EuclideanDistance(),

@@ -4,7 +4,8 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
 from losses.base import BaseTrainer
-from models import CenterNet
+from losses.center import CenterLinear
+from models import MNISTNet
 from distances import CosineDistance
 
 
@@ -24,7 +25,7 @@ class SoftmaxTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(SoftmaxTrainer, self).__init__(
-                CenterNet(nfeat, nclass),
+                MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass)),
                 device,
                 LossWrapper(nn.NLLLoss().to(device)),
                 CosineDistance(),

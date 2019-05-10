@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from losses.base import BaseTrainer
-from models import ArcNet
+from models import MNISTNet
 from losses.wrappers import LossWrapper
 from distances import CosineDistance
 
@@ -70,7 +70,7 @@ class ArcTrainer(BaseTrainer):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
         super(ArcTrainer, self).__init__(
-                ArcNet(nfeat, nclass, margin, s),
+                MNISTNet(nfeat, loss_module=ArcLinear(nfeat, nclass, margin, s)),
                 device,
                 LossWrapper(nn.CrossEntropyLoss().to(device)),
                 CosineDistance(),
@@ -79,8 +79,8 @@ class ArcTrainer(BaseTrainer):
         self.margin = margin
         self.s = s
         self.optimizers = [
-                optim.SGD(self.model.common_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
-                optim.SGD(self.model.arc_params(), lr=0.01)
+                optim.SGD(self.model.net_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
+                optim.SGD(self.model.loss_params(), lr=0.01)
         ]
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2),
