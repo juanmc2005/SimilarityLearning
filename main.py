@@ -6,11 +6,12 @@ from losses.contrastive import ContrastiveTrainer
 from losses.triplet import TripletTrainer
 from losses.softmax import SoftmaxTrainer
 from losses.center import CenterTrainer
+from losses.coco import CocoTrainer
 import argparse
 
 
 # Constants and Config
-loss_options = 'softmax / contrastive / triplet / arcface / center'
+loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
 nfeat, nclass = 2, 10
 device = torch.device('cuda' if use_cuda else 'cpu')
@@ -31,6 +32,8 @@ def get_trainer(loss):
         return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
         return CenterTrainer(trainset, testset, device, nfeat, nclass)
+    elif loss == 'coco':
+        return CocoTrainer(trainset, testset, device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
@@ -49,4 +52,3 @@ testset = datasets.MNIST(args.mnist, download=True, train=False, transform=trans
 # Train
 trainer = get_trainer(args.loss)
 trainer.train(args.epochs, log_interval=30, train_accuracy=False)
-
