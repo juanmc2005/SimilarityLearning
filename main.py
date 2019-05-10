@@ -1,11 +1,11 @@
 import torch
 from torchvision import datasets, transforms
 from distances import CosineDistance
-from trainers.arcface import ArcTrainer
-from trainers.contrastive import ContrastiveTrainer
-from trainers.triplet import TripletTrainer
-from trainers.softmax import SoftmaxTrainer
-from trainers.center import CenterTrainer
+from losses.arcface import ArcTrainer
+from losses.contrastive import ContrastiveTrainer
+from losses.triplet import TripletTrainer
+from losses.softmax import SoftmaxTrainer
+from losses.center import CenterTrainer
 import argparse
 
 
@@ -26,7 +26,7 @@ def get_trainer(loss):
     elif loss == 'contrastive':
         return ContrastiveTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
     elif loss == 'triplet':
-        return TripletTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
+        return TripletTrainer(trainset, testset, device, nfeat, margin=2.0)
     elif loss == 'arcface':
         return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
