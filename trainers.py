@@ -42,12 +42,11 @@ class BaseTrainer:
         """
         raise NotImplementedError("The trainer must implement the method 'get_optimizers'")
     
-    def get_best_acc_plot_title(self, epoch, accuracy):
+    def describe_params(self):
         """
-        FIXME all titles are pretty much the same, this method can be split in 2: get_title (maybe __str__) and describe_params
-        :return: a string representing the title for the plot of test embeddings with the best accuracy
+        :return: a string with the relevant parameter information for this trainer
         """
-        raise NotImplementedError("The trainer must implement the method 'get_best_acc_plot_title'")
+        return None
         
     def train(self, epochs=10, log_interval=20, train_accuracy=True):
         for i in range(1, epochs+1):
@@ -90,9 +89,13 @@ class BaseTrainer:
         print("------------------------------------------------")
         if test_correct > self.best_acc:
             plot_name = f"test-feat-epoch-{epoch}"
+            plot_title = f"{self} (Epoch {epoch}) - {acc:.1f}% Accuracy"
+            desc = self.describe_params()
+            if desc is not None:
+                plot_title += f" - {desc}"
             print(f"New Best Test Accuracy! Saving plot as {plot_name}")
             self.best_acc = test_correct
-            visual.visualize(feat_test, y_test, self.get_best_acc_plot_title(epoch, acc), plot_name)
+            visual.visualize(feat_test, y_test, plot_title, plot_name)
     
     def test(self, acc_calc, log_interval):
         correct, total = 0, 0
@@ -141,6 +144,9 @@ class ArcTrainer(BaseTrainer):
                 lr_scheduler.StepLR(self.optimizers[0], 8, gamma=0.2),
                 lr_scheduler.StepLR(self.optimizers[1], 8, gamma=0.2)
         ]
+    
+    def __str__(self):
+        return 'ArcFace Loss'
         
     def get_schedulers(self):
         return self.schedulers
@@ -148,8 +154,8 @@ class ArcTrainer(BaseTrainer):
     def get_optimizers(self):
         return self.optimizers
     
-    def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"ArcFace Loss (Epoch {epoch}) - {accuracy:.1f}% Accuracy - m={self.margin} s={self.s}"
+    def describe_params(self):
+        return f"m={self.margin} s={self.s}"
 
 
 class ContrastiveTrainer(BaseTrainer):
@@ -172,6 +178,9 @@ class ContrastiveTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 2, gamma=0.8)
         ]
+    
+    def __str__(self):
+        return 'Contrastive Loss'
         
     def get_schedulers(self):
         return self.schedulers
@@ -179,8 +188,8 @@ class ContrastiveTrainer(BaseTrainer):
     def get_optimizers(self):
         return self.optimizers
     
-    def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Contrastive Loss (Epoch {epoch}) - {accuracy:.1f}% Accuracy - m={self.margin} - {self.distance}"
+    def describe_params(self):
+        return f"m={self.margin} - {self.distance}"
 
 
 class SoftmaxTrainer(BaseTrainer):
@@ -201,15 +210,15 @@ class SoftmaxTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
         ]
+    
+    def __str__(self):
+        return 'Cross Entropy'
         
     def get_schedulers(self):
         return self.schedulers
         
     def get_optimizers(self):
         return self.optimizers
-    
-    def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Cross Entropy (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
 
 
 class TripletTrainer(BaseTrainer):
@@ -232,6 +241,9 @@ class TripletTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 3, gamma=0.5)
         ]
+    
+    def __str__(self):
+        return 'Triplet Loss'
         
     def get_schedulers(self):
         return self.schedulers
@@ -239,8 +251,8 @@ class TripletTrainer(BaseTrainer):
     def get_optimizers(self):
         return self.optimizers
     
-    def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Triplet Loss (Epoch {epoch}) - {accuracy:.1f}% Accuracy - m={self.margin} - {self.distance}"
+    def describe_params(self):
+        return f"m={self.margin} - {self.distance}"
 
 
 class CenterTrainer(BaseTrainer):
@@ -263,6 +275,9 @@ class CenterTrainer(BaseTrainer):
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.8)
         ]
+    
+    def __str__(self):
+        return 'Center Loss'
         
     def get_schedulers(self):
         return self.schedulers
@@ -270,5 +285,5 @@ class CenterTrainer(BaseTrainer):
     def get_optimizers(self):
         return self.optimizers
     
-    def get_best_acc_plot_title(self, epoch, accuracy):
-        return f"Center Loss (Epoch {epoch}) - {accuracy:.1f}% Accuracy - λ={self.loss_weight}"
+    def describe_params(self):
+        return f"λ={self.loss_weight}"
