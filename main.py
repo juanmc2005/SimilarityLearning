@@ -1,7 +1,11 @@
 import torch
 from torchvision import datasets, transforms
 from distances import CosineDistance
-import trainers as tr
+from trainers.arcface import ArcTrainer
+from trainers.contrastive import ContrastiveTrainer
+from trainers.triplet import TripletTrainer
+from trainers.softmax import SoftmaxTrainer
+from trainers.center import CenterTrainer
 import argparse
 
 
@@ -18,15 +22,15 @@ parser.add_argument('--epochs', type=int, help='The number of epochs to run the 
 
 def get_trainer(loss):
     if loss == 'softmax':
-        return tr.SoftmaxTrainer(trainset, testset, device, nfeat, nclass)
+        return SoftmaxTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'contrastive':
-        return tr.ContrastiveTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
+        return ContrastiveTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
     elif loss == 'triplet':
-        return tr.TripletTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
+        return TripletTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
     elif loss == 'arcface':
-        return tr.ArcTrainer(trainset, testset, device, nfeat, nclass)
+        return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
-        return tr.CenterTrainer(trainset, testset, device, nfeat, nclass)
+        return CenterTrainer(trainset, testset, device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
