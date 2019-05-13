@@ -14,7 +14,7 @@ from distances import CosineDistance
 
 class ArcLinear(nn.Module):
     """
-    Additive Angular Margin loss module (ArcFace)
+    Additive Angular Margin linear layer module (ArcFace)
     Reference: https://arxiv.org/pdf/1801.07698.pdf
     :param nfeat: the number of features in the embedding
     :param nclass: the number of classes
@@ -38,7 +38,7 @@ class ArcLinear(nn.Module):
         Apply the angular margin transformation
         :param x: a feature vector batch
         :param y: a non one-hot label batch
-        :return: the value for the Additive Angular Margin loss
+        :return: a tensor of logits with the angular margin transformation
         """
         # Normalize the feature vectors and W
         xnorm = F.normalize(x)

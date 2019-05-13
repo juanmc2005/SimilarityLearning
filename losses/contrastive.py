@@ -32,7 +32,7 @@ class ContrastiveLoss(nn.Module):
             N = batch size
             d = dimension of the feature vectors
         :param logits: unused, it's been kept for compatibility purposes
-        :param y: a non one-hot label tensor corresponding to the batch x
+        :param y: a non one-hot label tensor corresponding to the batch
         :return: the contrastive loss
         """
         # First calculate the (euclidean) distances between every sample in the batch

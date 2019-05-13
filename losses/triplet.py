@@ -73,7 +73,7 @@ class TripletLoss(nn.Module):
     def calculate_distances(self, x, y):
         n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
-        anchors, positives, negatives = self.batch_triplets(y)
+        anchors, positives, negatives = self.batch_negative_triplets(y)
         pos = to_condensed(n, anchors, positives)
         neg = to_condensed(n, anchors, negatives)
         return dist[pos], dist[neg]
