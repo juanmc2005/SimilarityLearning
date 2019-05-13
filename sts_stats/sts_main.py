@@ -4,10 +4,21 @@ import argparse
 from sts import SentIndex, Segment, MergeSegment
 
 
+def unique_pairs(xs, ys):
+    seen = set()
+    unique = []
+    for x, y in zip(xs, ys):
+        if (x, y) not in seen:
+            seen.add((x, y))
+            seen.add((y, x))
+            unique.append((x, y))
+    return [x for x, _ in unique], [y for _, y in unique]
+
+
 parser = argparse.ArgumentParser()
 parser.add_argument('-p', '--partition', type=str, help='train / dev / test')
 parser.add_argument('-di', '--dumpindex', type=bool, default=False, help='Dump the global index G for every sentence (A and B)')
-parser.add_argument('-si', '--saveplots', type=bool, default=False, help='Whether to save duplicate stats plots')
+parser.add_argument('-sp', '--saveplots', type=bool, default=False, help='Whether to save duplicate stats plots')
 args = parser.parse_args()
 
 base_path = f"../../sts-all/{args.partition}/"
@@ -20,6 +31,7 @@ with open(f"{base_path}a.toks", 'r') as file_a,\
     # Read sentences and create global index
     sents_a = [line.strip() for line in file_a.readlines()]
     sents_b = [line.strip() for line in file_b.readlines()]
+    sents_a, sents_b = unique_pairs(sents_a, sents_b)
     sents_all = sents_a + sents_b
     global_index = SentIndex('G', sents_all)
     

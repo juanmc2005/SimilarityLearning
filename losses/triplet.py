@@ -5,6 +5,7 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 import numpy as np
 from scipy.spatial.distance import squareform
 from losses.base import BaseTrainer
@@ -61,32 +62,33 @@ class TripletLoss(nn.Module):
             # hardest positive
             pos = np.where(y == y_anchor)[0]
             pos = [p for p in pos if p != anchor]
-            positive = int(pos[np.argmax(d[pos])])
             # hardest negative
             neg = np.where(y != y_anchor)[0]
-            negative = int(neg[np.argmin(d[neg])])
-            anchors.append(anchor)
-            positives.append(positive)
-            negatives.append(negative)
+            if d[pos].size > 0 and d[neg].size > 0:
+                positive = int(pos[np.argmax(d[pos])])
+                negative = int(neg[np.argmin(d[neg])])
+                anchors.append(anchor)
+                positives.append(positive)
+                negatives.append(negative)
         return anchors, positives, negatives
     
     def calculate_distances(self, x, y):
         n = x.size(0)
         dist = self.distance.pdist(x).to(self.device)
-        anchors, positives, negatives = self.batch_negative_triplets(y)
+        anchors, positives, negatives = self.batch_triplets(y)
         pos = to_condensed(n, anchors, positives)
         neg = to_condensed(n, anchors, negatives)
         return dist[pos], dist[neg]
     
     def forward(self, feat, logits, y):
-        dpos, dneg = self.calculate_distances(feat, y)
+        dpos, dneg = self.calculate_distances(F.normalize(feat), y)
         loss = dpos - dneg + self.margin
         return torch.mean(torch.clamp(loss, min=1e-8))
 
 
 class TripletTrainer(BaseTrainer):
     
-    def __init__(self, trainset, testset, device, nfeat, margin=0.2, distance=EuclideanDistance(), batch_size=25):
+    def __init__(self, trainset, testset, device, nfeat, margin=0.2, distance=EuclideanDistance(), batch_size=150):
         train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
         test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
         super(TripletTrainer, self).__init__(
@@ -99,10 +101,10 @@ class TripletTrainer(BaseTrainer):
         self.margin = margin
         self.distance = distance
         self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)
+                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
         ]
         self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 3, gamma=0.8)
+                lr_scheduler.StepLR(self.optimizers[0], 5, gamma=0.8)
         ]
     
     def __str__(self):
