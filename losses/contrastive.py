@@ -68,7 +68,7 @@ class ContrastiveTrainer(BaseTrainer):
                 optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
         ]
         self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 2, gamma=0.8)
+                lr_scheduler.StepLR(self.optimizers[0], 4, gamma=0.8)
         ]
     
     def __str__(self):

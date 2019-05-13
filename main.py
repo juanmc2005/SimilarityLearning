@@ -25,13 +25,13 @@ def get_trainer(loss):
     if loss == 'softmax':
         return SoftmaxTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'contrastive':
-        return ContrastiveTrainer(trainset, testset, device, nfeat, margin=0.2, distance=CosineDistance())
+        return ContrastiveTrainer(trainset, testset, device, nfeat, margin=2.0)
     elif loss == 'triplet':
         return TripletTrainer(trainset, testset, device, nfeat, margin=0.15, distance=CosineDistance())
     elif loss == 'arcface':
         return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
-        return CenterTrainer(trainset, testset, device, nfeat, nclass)
+        return CenterTrainer(trainset, testset, device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
         return CocoTrainer(trainset, testset, device, nfeat, nclass)
     else:

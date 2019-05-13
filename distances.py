@@ -51,6 +51,19 @@ class Distance:
         """
         raise NotImplementedError("a Distance should implement 'pdist'")
     
+    def sqdist_sum(self, x, y):
+        """
+        Calculate the squared distance between 2 batches and then return the sum
+        :param x: a tensor of shape (N, d), where
+            N = batch size
+            d = feature dimension
+        :param y: a tensor of shape (N, d), where
+            N = batch size
+            d = feature dimension
+        :return: a tensor with a single value, the sum of the squared distances
+        """
+        raise NotImplementedError("a Distance should implement 'sqdist_sum'")
+    
     def to_sklearn_metric(self):
         """
         Get the scikit-learn name for this function. This should return a string that
@@ -73,6 +86,10 @@ class CosineDistance(Distance):
     
     def to_sklearn_metric(self):
         return 'cosine'
+    
+    def sqdist_sum(self, x, y):
+        d = 1 - F.cosine_similarity(x, y, dim=1, eps=1e-8)
+        return d.pow(2).sum()
     
     def pdist(self, x):
         nbatch, _ = x.size()
@@ -99,6 +116,9 @@ class EuclideanDistance(Distance):
     
     def to_sklearn_metric(self):
         return 'euclidean'
+    
+    def sqdist_sum(self, x, y):
+        return (x - y).pow(2).sum()
     
     def pdist(self, x):
         return F.pdist(x)
