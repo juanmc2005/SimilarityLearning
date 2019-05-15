@@ -46,11 +46,15 @@ with open(f"{base_path}a.toks", 'r') as file_a,\
         global_index.dump(index_path)
     
     # Calculate stats and dump duplicate information
-    print(f"A size : {len(sents_a)}")
-    print(f"B size : {len(sents_b)}")
-    print(f"Scores size : {len(scores)}")
     segment_a = Segment('a', sents_a)
     segment_b = Segment('b', sents_b)
+    pos, neg = segment_a.pos_neg_pairs(segment_b, scores)
+    print(f"Total Positive Pairs: {len(pos)}")
+    print(f"Total Negative Pairs: {len(neg)}")
+    print(f"Mean Positive Pairs by Sentence: {pos / len(sents_a)}")
+    print(f"Mean Negative Pairs by Sentence: {neg / len(sents_a)}")
+    print(pos[1000:1010])
+    print(neg[1000:1010])
     for segment, other_segment in [(segment_a, segment_b), (segment_b, segment_a)]:
         print(f"Analyzing segment {segment}...")
         dup_dmp_path = f"{base_path}duplicate-dump-{args.partition}-{segment}.txt"

@@ -146,13 +146,12 @@ class TripletLoss(nn.Module):
         :return: the triplet loss value
         """
         # Calculate the distances to positives and negatives for each anchor
-        # Using the normalized features
+        # using the normalized features
         dpos, dneg = self.calculate_distances(feat, y)
         # Calculate the loss using the margin
-        loss = dpos - dneg + self.margin
-        # Keep only positive values
-        # Return the batch mean
-        return torch.mean(torch.clamp(loss, min=0.0))
+        loss = dpos.pow(2) - dneg.pow(2) + self.margin
+        # Keep only positive values and return the normalized mean
+        return torch.clamp(loss, min=0.0).mean()
 
 
 class TripletTrainer(BaseTrainer):
@@ -170,7 +169,7 @@ class TripletTrainer(BaseTrainer):
         self.margin = margin
         self.distance = distance
         self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
+                optim.SGD(self.model.parameters(), lr=0.0001, momentum=0.9, weight_decay=0.0005)
         ]
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 5, gamma=0.8)

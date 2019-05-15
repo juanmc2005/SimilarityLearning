@@ -1,7 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-from collections import Counter
+from collections import Counter, deque
 import matplotlib.pyplot as plt
+import numpy as np
+from tqdm import tqdm
 
 def get_bar_data(indexed_items, counter):
     icounts, counts = [], []
@@ -104,15 +106,39 @@ class Segment:
                     out.write(f"\t{global_id}\t\tDuplicate: {dup_category}\t\t{scores[j]:.3f}\t\t'{other}'\n")
                 out.write('-' * 100 + '\n')
     
-    """
-    def _pos_neg_pairs(self, index, other_segment, global_index, scores):
-        for i, s in index.index.items():
-            igeneral = global_index[s]
-            original_indices = [j for j, x in enumerate(self.sents) if x == s]
-            for j in original_indices:
-                other = other_segment.sents[j]
-                jglobal = global_index[other]
-    """
+    def pos_neg_pairs(self, other_segment, scores):
+        pos, neg = [], []
+        for i, s in tqdm(enumerate(self.sents), total=len(self.sents)):
+            added = set([(i, self)])
+            stack = deque()
+            for j, x in enumerate(self.sents):
+                if j != i and x == s:
+                    stack.append((j, other_segment, self, True))
+                    added.add((j, other_segment))
+            while stack: # is not empty
+                # Retrieve next sentence from the stack
+                j, seg, other_seg, equals_last = stack.popleft()
+                other_sent = seg.sents[j]
+                # Create the pair
+                equals_this = False
+                if scores[j] > 4:
+                    if equals_last:
+                        # A = B = C --> A = C
+                        pos.append((s, other_sent))
+                        equals_this = True
+                    else:
+                        # A != B and B = C --> A != C
+                        neg.append((s, other_sent))
+                elif equals_last:
+                    # A = B and B != C --> A != C
+                    neg.append((s, other_sent))
+                # Add dependencies
+                for k, x in enumerate(seg.sents):
+                    if k != j and (k, other_seg) not in added and x == other_sent:
+                        stack.append((k, other_seg, seg, equals_this))
+                        added.add((k, other_seg))
+        return pos, neg
+                    
     
     def __str__(self):
         return self.code.upper()

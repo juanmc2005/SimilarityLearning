@@ -27,7 +27,7 @@ def get_trainer(loss):
     elif loss == 'contrastive':
         return ContrastiveTrainer(trainset, testset, device, nfeat, margin=2.0)
     elif loss == 'triplet':
-        return TripletTrainer(trainset, testset, device, nfeat, margin=0.15, distance=CosineDistance())
+        return TripletTrainer(trainset, testset, device, nfeat, margin=6e-5, distance=CosineDistance())
     elif loss == 'arcface':
         return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
