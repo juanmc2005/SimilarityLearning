@@ -3,7 +3,7 @@ from torchvision import datasets, transforms
 from distances import CosineDistance
 from losses.arcface import ArcTrainer
 from losses.contrastive import ContrastiveTrainer
-from losses.triplet import TripletTrainer, HardestPositiveNegative
+from losses.triplet import TripletTrainer
 from losses.wrappers import SoftmaxTrainer
 from losses.center import CenterTrainer
 from losses.coco import CocoTrainer
@@ -27,7 +27,7 @@ def get_trainer(loss):
     elif loss == 'contrastive':
         return ContrastiveTrainer(trainset, testset, device, nfeat, margin=2.0)
     elif loss == 'triplet':
-        return TripletTrainer(trainset, testset, device, nfeat, margin=0.15, distance=CosineDistance(), sampling=HardestPositiveNegative())
+        return TripletTrainer(trainset, testset, device, nfeat, margin=0.15, distance=CosineDistance())
     elif loss == 'arcface':
         return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':

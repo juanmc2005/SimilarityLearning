@@ -104,6 +104,16 @@ class Segment:
                     out.write(f"\t{global_id}\t\tDuplicate: {dup_category}\t\t{scores[j]:.3f}\t\t'{other}'\n")
                 out.write('-' * 100 + '\n')
     
+    """
+    def _pos_neg_pairs(self, index, other_segment, global_index, scores):
+        for i, s in index.index.items():
+            igeneral = global_index[s]
+            original_indices = [j for j, x in enumerate(self.sents) if x == s]
+            for j in original_indices:
+                other = other_segment.sents[j]
+                jglobal = global_index[other]
+    """
+    
     def __str__(self):
         return self.code.upper()
     

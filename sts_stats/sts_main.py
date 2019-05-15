@@ -4,15 +4,17 @@ import argparse
 from sts import SentIndex, Segment, MergeSegment
 
 
-def unique_pairs(xs, ys):
+def unique_pairs(xs, ys, scores):
     seen = set()
-    unique = []
-    for x, y in zip(xs, ys):
+    xunique, yunique, sunique = [], [], []
+    for x, y, score in zip(xs, ys, scores):
         if (x, y) not in seen:
             seen.add((x, y))
             seen.add((y, x))
-            unique.append((x, y))
-    return [x for x, _ in unique], [y for _, y in unique]
+            xunique.append(x)
+            yunique.append(y)
+            sunique.append(score)
+    return xunique, yunique, sunique
 
 
 parser = argparse.ArgumentParser()
@@ -31,7 +33,8 @@ with open(f"{base_path}a.toks", 'r') as file_a,\
     # Read sentences and create global index
     sents_a = [line.strip() for line in file_a.readlines()]
     sents_b = [line.strip() for line in file_b.readlines()]
-    sents_a, sents_b = unique_pairs(sents_a, sents_b)
+    scores = [float(line.strip()) for line in score_file.readlines()]
+    sents_a, sents_b, scores = unique_pairs(sents_a, sents_b, scores)
     sents_all = sents_a + sents_b
     global_index = SentIndex('G', sents_all)
     
@@ -43,7 +46,9 @@ with open(f"{base_path}a.toks", 'r') as file_a,\
         global_index.dump(index_path)
     
     # Calculate stats and dump duplicate information
-    scores = [float(line.strip()) for line in score_file.readlines()]
+    print(f"A size : {len(sents_a)}")
+    print(f"B size : {len(sents_b)}")
+    print(f"Scores size : {len(scores)}")
     segment_a = Segment('a', sents_a)
     segment_b = Segment('b', sents_b)
     for segment, other_segment in [(segment_a, segment_b), (segment_b, segment_a)]:

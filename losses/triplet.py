@@ -5,7 +5,6 @@ import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from torch.utils.data import DataLoader
-import torch.nn.functional as F
 import numpy as np
 from scipy.spatial.distance import squareform
 from losses.base import BaseTrainer
@@ -150,7 +149,7 @@ class TripletLoss(nn.Module):
         # Using the normalized features
         dpos, dneg = self.calculate_distances(feat, y)
         # Calculate the loss using the margin
-        loss = dpos.pow(2) - dneg.pow(2) + self.margin
+        loss = dpos - dneg + self.margin
         # Keep only positive values
         # Return the batch mean
         return torch.mean(torch.clamp(loss, min=0.0))
@@ -171,7 +170,7 @@ class TripletTrainer(BaseTrainer):
         self.margin = margin
         self.distance = distance
         self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=1e-5, momentum=0.9, weight_decay=0.0005)
+                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
         ]
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 5, gamma=0.8)
