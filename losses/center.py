@@ -101,6 +101,7 @@ class CenterLinear(nn.Module):
         return F.log_softmax(self.linear(x), dim=1)
 
 
+# FIXME adapt to add logger, Optimizer and Evaluator
 def center_trainer(train_loader, test_loader, device, nfeat, nclass, callbacks, loss_weight=1, distance=EuclideanDistance()):
     model = MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass))
     loss_fn = SoftmaxCenterLoss(device, nfeat, nclass, loss_weight, distance)

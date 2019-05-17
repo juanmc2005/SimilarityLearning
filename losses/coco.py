@@ -23,6 +23,7 @@ class CocoLinear(nn.Module):
         return logits
 
 
+# FIXME adapt to add logger, Optimizer and Evaluator
 def coco_trainer(train_loader, test_loader, device, nfeat, nclass, callbacks, alpha=6.25):
     model = MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha))
     loss_fn = LossWrapper(nn.CrossEntropyLoss().to(device))

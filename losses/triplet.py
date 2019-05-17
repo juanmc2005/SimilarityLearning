@@ -153,6 +153,7 @@ class TripletLoss(nn.Module):
         return torch.clamp(loss, min=0).mean()
     
 
+# FIXME adapt to add logger, Optimizer and Evaluator
 def triplet_trainer(train_loader, test_loader, device, nfeat, callbacks, margin=0.2, distance=EuclideanDistance(), sampling=BatchAll()):
     model = MNISTNet(nfeat)
     optimizers = [optim.SGD(model.parameters(), lr=1e-6, momentum=0.9, weight_decay=0.0005)]

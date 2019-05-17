@@ -49,6 +49,7 @@ class ContrastiveLoss(nn.Module):
         return torch.sum(loss) / 2 / dist.size(0)
 
 
+# FIXME adapt to add logger, Optimizer and Evaluator
 def contrastive_trainer(train_loader, test_loader, device, nfeat, callbacks, margin=2, distance=EuclideanDistance()):
     model = MNISTNet(nfeat)
     optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
