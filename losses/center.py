@@ -101,7 +101,7 @@ class CenterLinear(nn.Module):
         return F.log_softmax(self.linear(x), dim=1)
 
 
-def center_trainer(train_loader, test_loader, device, nfeat, nclass, loss_weight=1, distance=EuclideanDistance()):
+def center_trainer(train_loader, test_loader, device, nfeat, nclass, callbacks, loss_weight=1, distance=EuclideanDistance()):
     model = MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass))
     loss_fn = SoftmaxCenterLoss(device, nfeat, nclass, loss_weight, distance)
     optimizers = [
@@ -112,4 +112,5 @@ def center_trainer(train_loader, test_loader, device, nfeat, nclass, loss_weight
             optimizers=optimizers,
             schedulers=[lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)],
             param_description=f"λ={loss_weight} - {distance}")
-    return BaseTrainer(model, device, loss_fn, distance, train_loader, test_loader, config)
+    return BaseTrainer(model, device, loss_fn, distance,
+                       train_loader, test_loader, config, callbacks)

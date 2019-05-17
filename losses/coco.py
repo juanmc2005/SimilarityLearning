@@ -23,7 +23,7 @@ class CocoLinear(nn.Module):
         return logits
 
 
-def coco_trainer(train_loader, test_loader, device, nfeat, nclass, alpha=6.25):
+def coco_trainer(train_loader, test_loader, device, nfeat, nclass, callbacks, alpha=6.25):
     model = MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha))
     loss_fn = LossWrapper(nn.CrossEntropyLoss().to(device))
     optimizers = [
@@ -34,4 +34,5 @@ def coco_trainer(train_loader, test_loader, device, nfeat, nclass, alpha=6.25):
             optimizers=optimizers,
             schedulers=[lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)],
             param_description=f"α={alpha}")
-    return BaseTrainer(model, device, loss_fn, CosineDistance(), train_loader, test_loader, config)
+    return BaseTrainer(model, device, loss_fn, CosineDistance(),
+                       train_loader, test_loader, config, callbacks)

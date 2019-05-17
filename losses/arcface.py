@@ -63,7 +63,7 @@ class ArcLinear(nn.Module):
         return cos_theta_j
 
 
-def arc_trainer(train_loader, test_loader, device, nfeat, nclass, margin=0.2, s=0.7):
+def arc_trainer(train_loader, test_loader, device, nfeat, nclass, callbacks, margin=0.2, s=0.7):
     model = MNISTNet(nfeat, loss_module=ArcLinear(nfeat, nclass, margin, s))
     optimizers = [
             optim.SGD(model.net_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
@@ -75,11 +75,5 @@ def arc_trainer(train_loader, test_loader, device, nfeat, nclass, margin=0.2, s=
                     lr_scheduler.StepLR(optimizers[0], 8, gamma=0.2),
                     lr_scheduler.StepLR(optimizers[1], 8, gamma=0.2)],
             param_description=f"m={margin} s={s}")
-    return BaseTrainer(
-            model,
-            device,
-            LossWrapper(nn.CrossEntropyLoss().to(device)),
-            CosineDistance(),
-            train_loader,
-            test_loader,
-            config)
+    return BaseTrainer(model, device, LossWrapper(nn.CrossEntropyLoss().to(device)),
+                       CosineDistance(), train_loader, test_loader, config, callbacks)
