@@ -39,11 +39,12 @@ class BaseTrainer:
         """
         return None
         
-    def train(self, epochs=10, log_interval=20, train_accuracy=True):
+    def train(self, epochs, log_interval):
         for i in range(1, epochs+1):
-            self.train_epoch(i, log_interval, train_accuracy)
+            self.train_epoch(i, log_interval)
         
-    def train_epoch(self, epoch, log_interval, train_accuracy):
+    def train_epoch(self, epoch, log_interval):
+        last_log = -1
         feat_train, y_train = [], []
         for sch in self.get_schedulers():
             sch.step()
@@ -67,13 +68,15 @@ class BaseTrainer:
             y_train.append(y)
             
             # Logging
-            if i % log_interval == 0 or i == self.n_batch-1:
-                print(f"Train Epoch: {epoch} [{100. * i / self.n_batch:.0f}%]\tLoss: {loss.item():.6f}")
+            progress = int(100. * (i+1) / self.n_batch)
+            if progress > last_log and progress % log_interval == 0:
+                last_log = progress
+                print(f"Train Epoch: {epoch} [{progress}%]\tLoss: {loss.item():.6f}")
         
         feat_train = torch.cat(feat_train, 0).float().detach().cpu().numpy()
         y_train = torch.cat(y_train, 0).detach().cpu().numpy()
         acc_calc = AccuracyCalculator(feat_train, y_train, self.test_distance)
-        feat_test, y_test, test_correct, test_total = self.test(acc_calc, log_interval // 3)
+        feat_test, y_test, test_correct, test_total = self.test(acc_calc, log_interval)
         acc = 100 * test_correct / test_total
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.2f}%)")
@@ -89,6 +92,7 @@ class BaseTrainer:
             visual.visualize(feat_test, y_test, plot_title, plot_name)
     
     def test(self, acc_calc, log_interval):
+        last_log = -1
         correct, total = 0, 0
         feat_test, y_test = [], []
         with torch.no_grad():
@@ -108,6 +112,8 @@ class BaseTrainer:
                 total += btotal
                 
                 # Logging
-                if i % log_interval == 0 or i == self.n_test_batch-1:
-                    print(f"Testing [{100. * i / self.n_test_batch:.0f}%]")
+                progress = int(100. * (i+1) / self.n_test_batch)
+                if progress > last_log and progress % log_interval == 0:
+                    last_log = progress
+                    print(f"Testing [{progress}%]")
         return np.concatenate(feat_test), np.concatenate(y_test), correct, total

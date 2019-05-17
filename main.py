@@ -19,6 +19,8 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mnist', type=str, help='Path to MNIST dataset')
 parser.add_argument('--loss', type=str, help=loss_options)
 parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
+parser.add_argument('-c', '--controlled', type=bool, default=True, help='Whether to set a fixed seed to control the training environment. Default value: True')
+parser.add_argument('--log-interval', type=int, default=10, help='Steps (in percentage) to show epoch progress. Default value: 10')
 
 
 def get_trainer(loss):
@@ -27,7 +29,7 @@ def get_trainer(loss):
     elif loss == 'contrastive':
         return ContrastiveTrainer(trainset, testset, device, nfeat, margin=2.0)
     elif loss == 'triplet':
-        return TripletTrainer(trainset, testset, device, nfeat, margin=6e-5, distance=CosineDistance())
+        return TripletTrainer(trainset, testset, device, nfeat, margin=0, distance=CosineDistance())
     elif loss == 'arcface':
         return ArcTrainer(trainset, testset, device, nfeat, nclass)
     elif loss == 'center':
@@ -40,7 +42,8 @@ def get_trainer(loss):
 
 # Init
 args = parser.parse_args()
-torch.manual_seed(999)
+if args.controlled:
+    torch.manual_seed(999)
 
 # Load Dataset
 transform = transforms.Compose([
@@ -51,4 +54,4 @@ testset = datasets.MNIST(args.mnist, download=True, train=False, transform=trans
 
 # Train
 trainer = get_trainer(args.loss)
-trainer.train(args.epochs, log_interval=30, train_accuracy=False)
+trainer.train(args.epochs, log_interval=args.log_interval)

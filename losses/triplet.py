@@ -169,7 +169,7 @@ class TripletTrainer(BaseTrainer):
         self.margin = margin
         self.distance = distance
         self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.0001, momentum=0.9, weight_decay=0.0005)
+                optim.SGD(self.model.parameters(), lr=0.00001, momentum=0.9, weight_decay=0.0005)
         ]
         self.schedulers = [
                 lr_scheduler.StepLR(self.optimizers[0], 5, gamma=0.8)
