@@ -4,10 +4,9 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.data import DataLoader
 import numpy as np
 from scipy.spatial.distance import squareform
-from losses.base import BaseTrainer
+from losses.base import BaseTrainer, TrainingConfig
 from distances import to_condensed, EuclideanDistance
 from models import MNISTNet
 
@@ -151,39 +150,23 @@ class TripletLoss(nn.Module):
         # Calculate the loss using the margin
         loss = dpos.pow(2) - dneg.pow(2) + self.margin
         # Keep only positive values and return the normalized mean
-        return torch.clamp(loss, min=0.0).mean()
+        return torch.clamp(loss, min=0).mean()
+    
 
-
-class TripletTrainer(BaseTrainer):
-    
-    def __init__(self, trainset, testset, device, nfeat, margin=0.2, distance=EuclideanDistance(), sampling=BatchAll(), batch_size=100):
-        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
-        super(TripletTrainer, self).__init__(
-                MNISTNet(nfeat),
-                device,
-                TripletLoss(device, margin, distance, sampling),
-                distance,
-                train_loader,
-                test_loader)
-        self.margin = margin
-        self.distance = distance
-        self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.00001, momentum=0.9, weight_decay=0.0005)
-        ]
-        self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 5, gamma=0.8)
-        ]
-    
-    def __str__(self):
-        return 'Triplet Loss'
-        
-    def get_schedulers(self):
-        return self.schedulers
-        
-    def get_optimizers(self):
-        return self.optimizers
-    
-    def describe_params(self):
-        return f"m={self.margin} - {self.distance}"
+def triplet_trainer(train_loader, test_loader, device, nfeat, margin=0.2, distance=EuclideanDistance(), sampling=BatchAll()):
+    model = MNISTNet(nfeat)
+    optimizers = [optim.SGD(model.parameters(), lr=1e-6, momentum=0.9, weight_decay=0.0005)]
+    config = TrainingConfig(
+            name='Triplet Loss',
+            optimizers=optimizers,
+            schedulers=[lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)],
+            param_description=f"m={margin} - {distance}")
+    return BaseTrainer(
+            model,
+            device,
+            TripletLoss(device, margin, distance, sampling),
+            distance,
+            train_loader,
+            test_loader,
+            config)
     

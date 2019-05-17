@@ -5,8 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from torch.utils.data import DataLoader
-from losses.base import BaseTrainer
+from losses.base import BaseTrainer, TrainingConfig
 from models import MNISTNet
 from distances import EuclideanDistance
 
@@ -102,36 +101,15 @@ class CenterLinear(nn.Module):
         return F.log_softmax(self.linear(x), dim=1)
 
 
-class CenterTrainer(BaseTrainer):
-    
-    def __init__(self, trainset, testset, device, nfeat, nclass, loss_weight=1, distance=EuclideanDistance(), batch_size=100):
-        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
-        super(CenterTrainer, self).__init__(
-                MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass)),
-                device,
-                SoftmaxCenterLoss(device, nfeat, nclass, loss_weight, distance),
-                distance,
-                train_loader,
-                test_loader)
-        self.loss_weight = loss_weight
-        self.distance = distance
-        self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
-                optim.SGD(self.loss_fn.center_parameters(), lr=0.5)
-        ]
-        self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 20, gamma=0.8)
-        ]
-    
-    def __str__(self):
-        return 'Center Loss'
-        
-    def get_schedulers(self):
-        return self.schedulers
-        
-    def get_optimizers(self):
-        return self.optimizers
-    
-    def describe_params(self):
-        return f"λ={self.loss_weight} - {self.distance}"
+def center_trainer(train_loader, test_loader, device, nfeat, nclass, loss_weight=1, distance=EuclideanDistance()):
+    model = MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass))
+    loss_fn = SoftmaxCenterLoss(device, nfeat, nclass, loss_weight, distance)
+    optimizers = [
+            optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+            optim.SGD(loss_fn.center_parameters(), lr=0.5)]
+    config = TrainingConfig(
+            name='Center Loss',
+            optimizers=optimizers,
+            schedulers=[lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)],
+            param_description=f"λ={loss_weight} - {distance}")
+    return BaseTrainer(model, device, loss_fn, distance, train_loader, test_loader, config)

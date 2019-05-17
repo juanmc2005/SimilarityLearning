@@ -4,8 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from torch.utils.data import DataLoader
-from losses.base import BaseTrainer
+from losses.base import BaseTrainer, TrainingConfig
 from models import MNISTNet
 from distances import EuclideanDistance
 
@@ -50,35 +49,19 @@ class ContrastiveLoss(nn.Module):
         return torch.sum(loss) / 2 / dist.size(0)
 
 
-class ContrastiveTrainer(BaseTrainer):
-    
-    def __init__(self, trainset, testset, device, nfeat, margin=2.0, distance=EuclideanDistance(), batch_size=80):
-        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
-        super(ContrastiveTrainer, self).__init__(
-                MNISTNet(nfeat),
-                device,
-                ContrastiveLoss(device, margin, distance),
-                distance,
-                train_loader,
-                test_loader)
-        self.margin = margin
-        self.distance = distance
-        self.optimizers = [
-                optim.SGD(self.model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)
-        ]
-        self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 4, gamma=0.8)
-        ]
-    
-    def __str__(self):
-        return 'Contrastive Loss'
-        
-    def get_schedulers(self):
-        return self.schedulers
-        
-    def get_optimizers(self):
-        return self.optimizers
-    
-    def describe_params(self):
-        return f"m={self.margin} - {self.distance}"
+def contrastive_trainer(train_loader, test_loader, device, nfeat, margin=2, distance=EuclideanDistance()):
+    model = MNISTNet(nfeat)
+    optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
+    config = TrainingConfig(
+            name='Contrastive Loss',
+            optimizers=optimizers,
+            schedulers=[lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)],
+            param_description=f"m={margin} - {distance}")
+    return BaseTrainer(
+            model,
+            device,
+            ContrastiveLoss(device, margin, distance),
+            distance,
+            train_loader,
+            test_loader,
+            config)

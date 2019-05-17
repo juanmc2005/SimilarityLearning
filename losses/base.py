@@ -6,38 +6,35 @@ from distances import AccuracyCalculator
 import visual
 
 
+class TrainingConfig:
+    """
+    Abstracts the configuration of a Trainer.
+    :param optimizers: a list of optimizers
+    :param schedulers: a list of schedulers
+    :param param_description: a string describing the relevant parameters of this trainer
+    """
+    def __init__(self, name, optimizers, schedulers, param_description=None):
+        self.name = name
+        self.optimizers = optimizers
+        self.schedulers = schedulers
+        self.param_description = param_description
+
+
 class BaseTrainer:
     
-    def __init__(self, model, device, loss_fn, test_distance, train_loader, test_loader):
+    def __init__(self, model, device, loss_fn, test_distance, train_loader, test_loader, config):
         self.model = model.to(device)
         self.device = device
         self.loss_fn = loss_fn
         self.test_distance = test_distance
         self.train_loader = train_loader
         self.test_loader = test_loader
+        self.config = config
         self.n_batch = len(self.train_loader)
         self.n_test_batch = len(self.test_loader)
         self.n_train = len(train_loader.dataset)
         self.n_test = len(test_loader.dataset)
         self.best_acc = 0
-        
-    def get_schedulers(self):
-        """
-        :return: a list of schedulers to use
-        """
-        raise NotImplementedError("The trainer must implement the method 'get_schedulers'")
-        
-    def get_optimizers(self):
-        """
-        :return: a list of optimizers to use
-        """
-        raise NotImplementedError("The trainer must implement the method 'get_optimizers'")
-    
-    def describe_params(self):
-        """
-        :return: a string with the relevant parameter information for this trainer
-        """
-        return None
         
     def train(self, epochs, log_interval):
         for i in range(1, epochs+1):
@@ -46,7 +43,7 @@ class BaseTrainer:
     def train_epoch(self, epoch, log_interval):
         last_log = -1
         feat_train, y_train = [], []
-        for sch in self.get_schedulers():
+        for sch in self.config.schedulers:
             sch.step()
         for i, (x, y) in enumerate(self.train_loader):
             x, y = x.to(self.device), y.to(self.device)
@@ -56,11 +53,10 @@ class BaseTrainer:
             loss = self.loss_fn(feat, logits, y)
             
             # Backprop
-            optims = self.get_optimizers()
-            for op in optims:
+            for op in self.config.optimizers:
                 op.zero_grad()
             loss.backward()
-            for op in optims:
+            for op in self.config.optimizers:
                 op.step()
             
             # For accuracy tracking
@@ -83,10 +79,9 @@ class BaseTrainer:
         print("------------------------------------------------")
         if test_correct > self.best_acc:
             plot_name = f"test-feat-epoch-{epoch}"
-            plot_title = f"{self} (Epoch {epoch}) - {acc:.1f}% Accuracy"
-            desc = self.describe_params()
-            if desc is not None:
-                plot_title += f" - {desc}"
+            plot_title = f"{self.config.name} (Epoch {epoch}) - {acc:.1f}% Accuracy"
+            if self.config.param_description is not None:
+                plot_title += f" - {self.config.param_description}"
             print(f"New Best Test Accuracy! Saving plot as {plot_name}")
             self.best_acc = test_correct
             visual.visualize(feat_test, y_test, plot_title, plot_name)

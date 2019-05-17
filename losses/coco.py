@@ -2,11 +2,10 @@
 import torch
 from torch import nn
 import torch.nn.functional as F
-from torch.utils.data import DataLoader
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from models import MNISTNet
-from losses.base import BaseTrainer
+from losses.base import BaseTrainer, TrainingConfig
 from losses.wrappers import LossWrapper
 from distances import CosineDistance
 
@@ -24,35 +23,15 @@ class CocoLinear(nn.Module):
         return logits
 
 
-class CocoTrainer(BaseTrainer):
-
-    def __init__(self, trainset, testset, device, nfeat, nclass, alpha=6.25, batch_size=100):
-        train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        test_loader = DataLoader(testset, batch_size=1000, shuffle=False, num_workers=4)
-        super(CocoTrainer, self).__init__(
-                MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha)),
-                device,
-                LossWrapper(nn.CrossEntropyLoss().to(device)),
-                CosineDistance(),
-                train_loader,
-                test_loader)
-        self.alpha = alpha
-        self.optimizers = [
-                optim.SGD(self.model.net_params(), lr=0.001, momentum=0.9, weight_decay=0.0005),
-                optim.SGD(self.model.loss_params(), lr=0.01, momentum=0.9)
-        ]
-        self.schedulers = [
-                lr_scheduler.StepLR(self.optimizers[0], 10, gamma=0.5)
-        ]
-    
-    def __str__(self):
-        return 'CoCo Loss'
-        
-    def get_schedulers(self):
-        return self.schedulers
-        
-    def get_optimizers(self):
-        return self.optimizers
-    
-    def describe_params(self):
-        return f"α={self.alpha}"
+def coco_trainer(train_loader, test_loader, device, nfeat, nclass, alpha=6.25):
+    model = MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha))
+    loss_fn = LossWrapper(nn.CrossEntropyLoss().to(device))
+    optimizers = [
+            optim.SGD(model.net_params(), lr=0.001, momentum=0.9, weight_decay=0.0005),
+            optim.SGD(model.loss_params(), lr=0.01, momentum=0.9)]
+    config = TrainingConfig(
+            name='CoCo Loss',
+            optimizers=optimizers,
+            schedulers=[lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)],
+            param_description=f"α={alpha}")
+    return BaseTrainer(model, device, loss_fn, CosineDistance(), train_loader, test_loader, config)

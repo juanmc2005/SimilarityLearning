@@ -1,12 +1,13 @@
 import torch
 from torchvision import datasets, transforms
+from torch.utils.data import DataLoader
 from distances import CosineDistance
-from losses.arcface import ArcTrainer
-from losses.contrastive import ContrastiveTrainer
-from losses.triplet import TripletTrainer
-from losses.wrappers import SoftmaxTrainer
-from losses.center import CenterTrainer
-from losses.coco import CocoTrainer
+from losses.arcface import arc_trainer
+from losses.contrastive import contrastive_trainer
+from losses.triplet import triplet_trainer
+from losses.wrappers import softmax_trainer
+from losses.center import center_trainer
+from losses.coco import coco_trainer
 import argparse
 
 
@@ -21,21 +22,22 @@ parser.add_argument('--loss', type=str, help=loss_options)
 parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
 parser.add_argument('-c', '--controlled', type=bool, default=True, help='Whether to set a fixed seed to control the training environment. Default value: True')
 parser.add_argument('--log-interval', type=int, default=10, help='Steps (in percentage) to show epoch progress. Default value: 10')
+parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
 
 
 def get_trainer(loss):
     if loss == 'softmax':
-        return SoftmaxTrainer(trainset, testset, device, nfeat, nclass)
+        return softmax_trainer(train_loader, test_loader, device, nfeat, nclass)
     elif loss == 'contrastive':
-        return ContrastiveTrainer(trainset, testset, device, nfeat, margin=2.0)
+        return contrastive_trainer(train_loader, test_loader, device, nfeat)
     elif loss == 'triplet':
-        return TripletTrainer(trainset, testset, device, nfeat, margin=0, distance=CosineDistance())
+        return triplet_trainer(train_loader, test_loader, device, nfeat, margin=0, distance=CosineDistance())
     elif loss == 'arcface':
-        return ArcTrainer(trainset, testset, device, nfeat, nclass)
+        return arc_trainer(train_loader, test_loader, device, nfeat, nclass)
     elif loss == 'center':
-        return CenterTrainer(trainset, testset, device, nfeat, nclass, distance=CosineDistance())
+        return center_trainer(train_loader, test_loader, device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
-        return CocoTrainer(trainset, testset, device, nfeat, nclass)
+        return coco_trainer(train_loader, test_loader, device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
@@ -51,6 +53,8 @@ transform = transforms.Compose([
     transforms.Normalize((0.1307,), (0.3081,))])
 trainset = datasets.MNIST(args.mnist, download=True, train=True, transform=transform)
 testset = datasets.MNIST(args.mnist, download=True, train=False, transform=transform)
+train_loader = DataLoader(trainset, args.batch_size, shuffle=True, num_workers=4)
+test_loader = DataLoader(testset, args.batch_size, shuffle=False, num_workers=4)
 
 # Train
 trainer = get_trainer(args.loss)
