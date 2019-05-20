@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from losses.base import BaseTrainer, TrainingConfig
+from losses.base import BaseTrainer, Optimizer, Evaluator
 from models import MNISTNet
 from distances import EuclideanDistance
 
@@ -49,14 +49,13 @@ class ContrastiveLoss(nn.Module):
         return torch.sum(loss) / 2 / dist.size(0)
 
 
-# FIXME adapt to add logger, Optimizer and Evaluator
-def contrastive_trainer(train_loader, test_loader, device, nfeat, callbacks, margin=2, distance=EuclideanDistance()):
+def contrastive_trainer(train_loader, test_loader, device, nfeat, logger, margin=2, distance=EuclideanDistance()):
     model = MNISTNet(nfeat)
+    loss_fn = ContrastiveLoss(device, margin, distance)
     optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
-    config = TrainingConfig(
-            name='Contrastive Loss',
-            optimizers=optimizers,
-            schedulers=[lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)],
-            param_description=f"m={margin} - {distance}")
-    return BaseTrainer(model, device, ContrastiveLoss(device, margin, distance), distance,
-            train_loader, test_loader, config, callbacks)
+    schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
+    callbacks = [
+            logger,
+            Optimizer(optimizers, schedulers),
+            Evaluator(device, test_loader, distance, loss_name='Contrastive Loss', param_desc=f"m={margin} - {distance}", logger=logger)]
+    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)

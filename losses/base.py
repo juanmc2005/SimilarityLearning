@@ -6,20 +6,6 @@ from distances import AccuracyCalculator
 import visual
 
 
-class TrainingConfig:
-    """
-    Abstracts the configuration of a Trainer.
-    :param optimizers: a list of optimizers
-    :param schedulers: a list of schedulers
-    :param param_description: a string describing the relevant parameters of this trainer
-    """
-    def __init__(self, name, optimizers, schedulers, param_description=None):
-        self.name = name
-        self.optimizers = optimizers
-        self.schedulers = schedulers
-        self.param_description = param_description
-
-
 class TrainingListener:
     """
     A listener for the training process.

@@ -16,6 +16,7 @@ import argparse
 loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
 nfeat, nclass = 2, 10
+seed = 999
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
 parser.add_argument('--mnist', type=str, help='Path to MNIST dataset')
@@ -32,7 +33,7 @@ def get_trainer(loss, logger):
     elif loss == 'contrastive':
         return contrastive_trainer(train_loader, test_loader, device, nfeat, logger)
     elif loss == 'triplet':
-        return triplet_trainer(train_loader, test_loader, device, nfeat, logger, margin=0, distance=CosineDistance())
+        return triplet_trainer(train_loader, test_loader, device, nfeat, logger)
     elif loss == 'arcface':
         return arc_trainer(train_loader, test_loader, device, nfeat, nclass, logger)
     elif loss == 'center':
@@ -46,7 +47,6 @@ def get_trainer(loss, logger):
 # Init
 args = parser.parse_args()
 if args.controlled:
-    seed = 999
     print(f"Training with seed: {seed}")
     torch.manual_seed(seed)
 

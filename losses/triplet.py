@@ -6,7 +6,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 import numpy as np
 from scipy.spatial.distance import squareform
-from losses.base import BaseTrainer, TrainingConfig
+from losses.base import BaseTrainer, Optimizer, Evaluator
 from distances import to_condensed, EuclideanDistance
 from models import MNISTNet
 
@@ -153,15 +153,14 @@ class TripletLoss(nn.Module):
         return torch.clamp(loss, min=0).mean()
     
 
-# FIXME adapt to add logger, Optimizer and Evaluator
-def triplet_trainer(train_loader, test_loader, device, nfeat, callbacks, margin=0.2, distance=EuclideanDistance(), sampling=BatchAll()):
+def triplet_trainer(train_loader, test_loader, device, nfeat, logger, margin=0.2, distance=EuclideanDistance(), sampling=BatchAll()):
     model = MNISTNet(nfeat)
+    loss_fn = TripletLoss(device, margin, distance, sampling)
     optimizers = [optim.SGD(model.parameters(), lr=1e-6, momentum=0.9, weight_decay=0.0005)]
-    config = TrainingConfig(
-            name='Triplet Loss',
-            optimizers=optimizers,
-            schedulers=[lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)],
-            param_description=f"m={margin} - {distance}")
-    return BaseTrainer(model, device, TripletLoss(device, margin, distance, sampling), distance,
-            train_loader, test_loader, config, callbacks)
+    schedulers = [lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)]
+    callbacks = [
+            logger,
+            Optimizer(optimizers, schedulers),
+            Evaluator(device, test_loader, distance, loss_name='Triplet Loss', param_desc=f"m={margin} - {distance}", logger=logger)]
+    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)
     

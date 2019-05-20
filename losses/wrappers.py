@@ -25,6 +25,5 @@ def softmax_trainer(train_loader, test_loader, device, nfeat, nclass, logger):
     callbacks = [
             logger,
             Optimizer(optimizers, schedulers),
-            Evaluator(device, test_loader, CosineDistance(), loss_name='Cross Entropy', logger=logger)
-    ]
+            Evaluator(device, test_loader, CosineDistance(), loss_name='Cross Entropy', logger=logger)]
     return BaseTrainer(model, device, LossWrapper(nn.NLLLoss().to(device)), train_loader, callbacks)
