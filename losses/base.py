@@ -26,13 +26,18 @@ class TrainingListener:
     def on_after_epoch(self, epoch, model):
         pass
     
-    def on_before_test(self, n_batch):
+
+class TestListener:
+    """
+    A listener for the training process
+    """
+    def on_before_test(self):
         pass
     
     def on_batch_tested(self, ibatch, feat, correct, total):
         pass
     
-    def on_after_test(self, n_batch):
+    def on_after_test(self):
         pass
 
 
@@ -56,50 +61,73 @@ class Optimizer(TrainingListener):
             o.step()
 
 
-class Logger(TrainingListener):
+class Logger:
     
-    def __init__(self, interval):
+    def __init__(self, interval, n_batch):
         super(Logger, self).__init__()
         self.interval = interval
-        self.last_log = None
-        self.last_test_log = None
-        self.n_batch = None
-        self.n_test_batch = None
-    
-    def on_before_train(self, n_batch):
         self.n_batch = n_batch
-    
-    def on_before_epoch(self, epoch):
+        self.train_log_ft = "Train Epoch: {epoch} [{progress}%]\tLoss: {loss:.6f}"
+        self.test_log_ft = "Testing [{progress}%]"
         self.last_log = -1
     
-    def on_before_test(self, n_batch):
-        self.n_test_batch = n_batch
-        self.last_test_log = -1
+    def _progress(self, i):
+        progress = int(100. * (i+1) / self.n_batch)
+        should_log = progress > self.last_log and progress % self.interval == 0
+        return progress, should_log
+    
+    def restart(self):
+        self.last_log = -1
+        
+    def on_train_batch(self, i, epoch, loss):
+        progress, should_log = self._progress(i)
+        if should_log:
+            self.last_log = progress
+            print(self.train_log_ft.format(epoch=epoch, progress=progress, loss=loss.item()))
+    
+    def on_test_batch(self, i):
+        progress, should_log = self._progress(i)
+        if should_log:
+            self.last_log = progress
+            print(self.test_log_ft.format(progress=progress))
+
+
+class TrainLogger(TrainingListener):
+    
+    def __init__(self, interval, n_batch):
+        super(TrainLogger, self).__init__()
+        self.logger = Logger(interval, n_batch)
+    
+    def on_before_epoch(self, epoch):
+        self.logger.restart()
     
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
-        progress = int(100. * (ibatch+1) / self.n_batch)
-        if progress > self.last_log and progress % self.interval == 0:
-            self.last_log = progress
-            print(f"Train Epoch: {epoch} [{progress}%]\tLoss: {loss.item():.6f}")
+        self.logger.on_train_batch(ibatch, epoch, loss)
+
+
+class TestLogger(TestListener):
+
+    def __init__(self, interval, n_batch):
+        super(TestLogger, self).__init__()
+        self.logger = Logger(interval, n_batch)
+    
+    def on_before_test(self):
+        self.logger.restart()
     
     def on_batch_tested(self, ibatch, feat, correct, total):
-        progress = int(100. * (ibatch+1) / self.n_test_batch)
-        if progress > self.last_test_log and progress % self.interval == 0:
-            self.last_test_log = progress
-            print(f"Testing [{progress}%]")
+        self.logger.on_test_batch(ibatch)
 
 
 class Evaluator(TrainingListener):
     # FIXME split this enormous class
     # TODO visualization stuff should be a listener of this class
-    # TODO logger should be a listener for this class. In that case, also simplify Logger class and TrainingListener
-    def __init__(self, device, test_loader, distance, loss_name, param_desc=None, logger=None):
+    def __init__(self, device, test_loader, distance, loss_name, param_desc=None, callbacks=[]):
         self.device = device
         self.test_loader = test_loader
         self.distance = distance
         self.loss_name = loss_name
         self.param_desc = param_desc
-        self.logger = logger
+        self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
         self.best_acc = 0
         self.n_batch = len(test_loader)
@@ -108,8 +136,8 @@ class Evaluator(TrainingListener):
         model.eval()
         correct, total = 0, 0
         feat_test, y_test = [], []
-        if self.logger is not None:
-            self.logger.on_before_test(self.n_batch)
+        for cb in self.callbacks:
+            cb.on_before_test()
         with torch.no_grad():
             for i, (x, y) in enumerate(self.test_loader):
                 x, y = x.to(self.device), y.to(self.device)
@@ -126,11 +154,11 @@ class Evaluator(TrainingListener):
                 correct += bcorrect
                 total += btotal
                 
-                if self.logger is not None:
-                    self.logger.on_batch_tested(i, feat, correct, total)
+                for cb in self.callbacks:
+                    cb.on_batch_tested(i, feat, correct, total)
                 
-        if self.logger is not None:
-            self.logger.on_after_test(self.n_batch)
+        for cb in self.callbacks:
+            cb.on_after_test()
         return np.concatenate(feat_test), np.concatenate(y_test), correct, total
     
     def on_before_epoch(self, epoch):

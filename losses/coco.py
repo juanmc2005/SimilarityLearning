@@ -5,7 +5,7 @@ import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim import lr_scheduler
 from models import MNISTNet
-from losses.base import BaseTrainer, Optimizer, Evaluator
+from losses.base import Optimizer
 from losses.wrappers import LossWrapper
 from distances import CosineDistance
 
@@ -23,15 +23,18 @@ class CocoLinear(nn.Module):
         return logits
 
 
-def coco_trainer(train_loader, test_loader, device, nfeat, nclass, logger, alpha=6.25):
+def coco_config(device, nfeat, nclass, alpha=6.25):
     model = MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha))
-    loss_fn = LossWrapper(nn.CrossEntropyLoss().to(device))
+    loss = LossWrapper(nn.CrossEntropyLoss().to(device))
     optimizers = [
             optim.SGD(model.net_params(), lr=0.001, momentum=0.9, weight_decay=0.0005),
             optim.SGD(model.loss_params(), lr=0.01, momentum=0.9)]
     schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
-    callbacks = [
-            logger,
-            Optimizer(optimizers, schedulers),
-            Evaluator(device, test_loader, CosineDistance(), loss_name='CoCo Loss', param_desc=f"α={alpha}", logger=logger)]
-    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)
+    return {
+            'name': 'CoCo Loss',
+            'param_desc': f"α={alpha}",
+            'model': model,
+            'loss': loss,
+            'optim': Optimizer(optimizers, schedulers),
+            'test_distance': CosineDistance()
+    }

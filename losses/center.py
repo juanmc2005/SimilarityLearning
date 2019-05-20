@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
-from losses.base import BaseTrainer, Optimizer, Evaluator
+from losses.base import Optimizer
 from models import MNISTNet
 from distances import EuclideanDistance
 
@@ -101,15 +101,18 @@ class CenterLinear(nn.Module):
         return F.log_softmax(self.linear(x), dim=1)
 
 
-def center_trainer(train_loader, test_loader, device, nfeat, nclass, logger, loss_weight=1, distance=EuclideanDistance()):
+def center_config(device, nfeat, nclass, lweight=1, distance=EuclideanDistance()):
     model = MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass))
-    loss_fn = SoftmaxCenterLoss(device, nfeat, nclass, loss_weight, distance)
+    loss = SoftmaxCenterLoss(device, nfeat, nclass, lweight, distance)
     optimizers = [
             optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
-            optim.SGD(loss_fn.center_parameters(), lr=0.5)]
+            optim.SGD(loss.center_parameters(), lr=0.5)]
     schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
-    callbacks = [
-            logger,
-            Optimizer(optimizers, schedulers),
-            Evaluator(device, test_loader, distance, loss_name='Center Loss', param_desc=f"λ={loss_weight} - {distance}", logger=logger)]
-    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)
+    return {
+            'name': 'Center Loss',
+            'param_desc': f"λ={lweight} - {distance}",
+            'model': model,
+            'loss': loss,
+            'optim': Optimizer(optimizers, schedulers),
+            'test_distance': distance
+    }

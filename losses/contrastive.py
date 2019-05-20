@@ -49,13 +49,15 @@ class ContrastiveLoss(nn.Module):
         return torch.sum(loss) / 2 / dist.size(0)
 
 
-def contrastive_trainer(train_loader, test_loader, device, nfeat, logger, margin=2, distance=EuclideanDistance()):
+def contrastive_config(device, nfeat, margin=2, distance=EuclideanDistance()):
     model = MNISTNet(nfeat)
-    loss_fn = ContrastiveLoss(device, margin, distance)
     optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
     schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
-    callbacks = [
-            logger,
-            Optimizer(optimizers, schedulers),
-            Evaluator(device, test_loader, distance, loss_name='Contrastive Loss', param_desc=f"m={margin} - {distance}", logger=logger)]
-    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)
+    return {
+            'name': 'Contrastive Loss',
+            'param_desc': f"m={margin} - {distance}",
+            'model': model,
+            'loss': ContrastiveLoss(device, margin, distance),
+            'optim': Optimizer(optimizers, schedulers),
+            'test_distance': distance
+    }

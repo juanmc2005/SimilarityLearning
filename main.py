@@ -2,13 +2,13 @@ import torch
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from distances import CosineDistance
-from losses.base import Logger
-from losses.arcface import arc_trainer
-from losses.contrastive import contrastive_trainer
-from losses.triplet import triplet_trainer
-from losses.wrappers import softmax_trainer
-from losses.center import center_trainer
-from losses.coco import coco_trainer
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator
+from losses.arcface import arc_config
+from losses.contrastive import contrastive_config
+from losses.triplet import triplet_config
+from losses.wrappers import softmax_config
+from losses.center import center_config
+from losses.coco import coco_config
 import argparse
 
 
@@ -27,19 +27,19 @@ parser.add_argument('--log-interval', type=int, default=10, help='Steps (in perc
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
 
 
-def get_trainer(loss, logger):
+def get_config(loss):
     if loss == 'softmax':
-        return softmax_trainer(train_loader, test_loader, device, nfeat, nclass, logger)
+        return softmax_config(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return contrastive_trainer(train_loader, test_loader, device, nfeat, logger)
+        return contrastive_config(device, nfeat)
     elif loss == 'triplet':
-        return triplet_trainer(train_loader, test_loader, device, nfeat, logger)
+        return triplet_config(device, nfeat)
     elif loss == 'arcface':
-        return arc_trainer(train_loader, test_loader, device, nfeat, nclass, logger)
+        return arc_config(device, nfeat, nclass)
     elif loss == 'center':
-        return center_trainer(train_loader, test_loader, device, nfeat, nclass, logger, distance=CosineDistance())
+        return center_config(device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
-        return coco_trainer(train_loader, test_loader, device, nfeat, nclass, logger)
+        return coco_config(device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
@@ -60,5 +60,13 @@ train_loader = DataLoader(trainset, args.batch_size, shuffle=True, num_workers=4
 test_loader = DataLoader(testset, args.batch_size, shuffle=False, num_workers=4)
 
 # Train
-trainer = get_trainer(args.loss, Logger(args.log_interval))
+config = get_config(args.loss)
+test_logger = TestLogger(args.log_interval, len(test_loader))
+trainer = BaseTrainer(config['model'], device, config['loss'], train_loader, callbacks=[
+        TrainLogger(args.log_interval, len(train_loader)),
+        config['optim'],
+        Evaluator(device, test_loader, config['test_distance'],
+                  config['name'], config['param_desc'], callbacks=[test_logger])
+])
+
 trainer.train(args.epochs)

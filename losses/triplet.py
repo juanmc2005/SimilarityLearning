@@ -151,16 +151,19 @@ class TripletLoss(nn.Module):
         loss = dpos.pow(2) - dneg.pow(2) + self.margin
         # Keep only positive values and return the normalized mean
         return torch.clamp(loss, min=0).mean()
-    
 
-def triplet_trainer(train_loader, test_loader, device, nfeat, logger, margin=0.2, distance=EuclideanDistance(), sampling=BatchAll()):
+
+def triplet_config(device, nfeat, margin=2, distance=EuclideanDistance(), sampling=BatchAll()):
     model = MNISTNet(nfeat)
-    loss_fn = TripletLoss(device, margin, distance, sampling)
-    optimizers = [optim.SGD(model.parameters(), lr=1e-6, momentum=0.9, weight_decay=0.0005)]
+    loss = TripletLoss(device, margin, distance, sampling)
+    optimizers = [optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=0.0005)]
     schedulers = [lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)]
-    callbacks = [
-            logger,
-            Optimizer(optimizers, schedulers),
-            Evaluator(device, test_loader, distance, loss_name='Triplet Loss', param_desc=f"m={margin} - {distance}", logger=logger)]
-    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)
+    return {
+            'name': 'Triplet Loss',
+            'param_desc': f"m={margin} - {distance}",
+            'model': model,
+            'loss': loss,
+            'optim': Optimizer(optimizers, schedulers),
+            'test_distance': distance
+    }
     

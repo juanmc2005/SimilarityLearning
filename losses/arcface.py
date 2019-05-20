@@ -5,7 +5,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 from torch.optim import lr_scheduler
-from losses.base import BaseTrainer, Optimizer, Evaluator
+from losses.base import Optimizer
 from models import MNISTNet
 from losses.wrappers import LossWrapper
 from distances import CosineDistance
@@ -63,16 +63,17 @@ class ArcLinear(nn.Module):
         return cos_theta_j
 
 
-def arc_trainer(train_loader, test_loader, device, nfeat, nclass, logger, margin=0.2, s=0.7):
+def arc_config(device, nfeat, nclass, margin=0.2, s=7.0):
     model = MNISTNet(nfeat, loss_module=ArcLinear(nfeat, nclass, margin, s))
-    loss_fn = LossWrapper(nn.CrossEntropyLoss().to(device))
     optimizers = [optim.SGD(model.net_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
                   optim.SGD(model.loss_params(), lr=0.01)]
-    schedulers=[lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
-                lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
-    callbacks = [
-            logger,
-            Optimizer(optimizers, schedulers),
-            Evaluator(device, test_loader, CosineDistance(), loss_name='ArcFace Loss', param_desc=f"m={margin} s={s}", logger=logger)
-    ]
-    return BaseTrainer(model, device, loss_fn, train_loader, callbacks)
+    schedulers = [lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
+                  lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
+    return {
+            'name': 'ArcFace Loss',
+            'param_desc': f"m={margin} s={s}",
+            'model': model,
+            'loss': LossWrapper(nn.CrossEntropyLoss().to(device)),
+            'optim': Optimizer(optimizers, schedulers),
+            'test_distance': CosineDistance()
+    }
