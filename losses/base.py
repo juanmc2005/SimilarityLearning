@@ -11,7 +11,7 @@ class TrainingListener:
     A listener for the training process.
     """
     
-    def on_before_train(self, n_batch):
+    def on_before_train(self):
         pass
     
     def on_before_epoch(self, epoch):
@@ -38,6 +38,9 @@ class TestListener:
         pass
     
     def on_after_test(self):
+        pass
+    
+    def on_best_accuracy(self, epoch, accuracy, feat, y):
         pass
 
 
@@ -118,19 +121,32 @@ class TestLogger(TestListener):
         self.logger.on_test_batch(ibatch)
 
 
+class Visualizer(TestListener):
+    
+    def __init__(self, loss_name, param_desc=None):
+        super(Visualizer, self).__init__()
+        self.loss_name = loss_name
+        self.param_desc = param_desc
+    
+    def on_best_accuracy(self, epoch, accuracy, feat, y):
+        plot_name = f"embeddings-epoch-{epoch}"
+        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
+        if self.param_desc is not None:
+            plot_title += f" - {self.param_desc}"
+        print(f"New Best Test Accuracy! Saving plot as {plot_name}")
+        visual.visualize(feat, y, plot_title, plot_name)
+
+
 class Evaluator(TrainingListener):
-    # FIXME split this enormous class
-    # TODO visualization stuff should be a listener of this class
-    def __init__(self, device, test_loader, distance, loss_name, param_desc=None, callbacks=[]):
+    
+    def __init__(self, device, test_loader, distance, callbacks=[]):
+        super(Evaluator, self).__init__()
         self.device = device
         self.test_loader = test_loader
         self.distance = distance
-        self.loss_name = loss_name
-        self.param_desc = param_desc
         self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
         self.best_acc = 0
-        self.n_batch = len(test_loader)
     
     def _eval(self, model, acc_calc):
         model.eval()
@@ -178,28 +194,23 @@ class Evaluator(TrainingListener):
         print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.2f}%)")
         print("------------------------------------------------")
         if test_correct > self.best_acc:
-            plot_name = f"test-feat-epoch-{epoch}"
-            plot_title = f"{self.loss_name} (Epoch {epoch}) - {acc:.1f}% Accuracy"
-            if self.param_desc is not None:
-                plot_title += f" - {self.param_desc}"
-            print(f"New Best Test Accuracy! Saving plot as {plot_name}")
             self.best_acc = test_correct
-            visual.visualize(feat_test, y_test, plot_title, plot_name)
+            for cb in self.callbacks:
+                cb.on_best_accuracy(epoch, acc, feat_test, y_test)
 
 
 class BaseTrainer:
     
-    def __init__(self, model, device, loss_fn, train_loader, callbacks=[]):
+    def __init__(self, model, device, loss_fn, loader, callbacks=[]):
         self.model = model.to(device)
         self.device = device
         self.loss_fn = loss_fn
-        self.train_loader = train_loader
+        self.loader = loader
         self.callbacks = callbacks
-        self.n_batch = len(self.train_loader)
         
     def train(self, epochs):
         for cb in self.callbacks:
-            cb.on_before_train(self.n_batch)
+            cb.on_before_train()
         for i in range(1, epochs+1):
             self.train_epoch(i)
         
@@ -207,7 +218,7 @@ class BaseTrainer:
         self.model.train()
         for cb in self.callbacks:
             cb.on_before_epoch(epoch)
-        for i, (x, y) in enumerate(self.train_loader):
+        for i, (x, y) in enumerate(self.loader):
             x, y = x.to(self.device), y.to(self.device)
             
             # Feed Forward

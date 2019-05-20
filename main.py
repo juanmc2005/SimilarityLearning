@@ -1,13 +1,12 @@
 import torch
 import argparse
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
 from distances import CosineDistance
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer
 from losses import config as cf
+from datasets import mnist
 
 
-# Constants and Config
+# Constants and script arguments
 loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
 nfeat, nclass = 2, 10
@@ -39,29 +38,28 @@ def get_config(loss):
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
 
-# Init
+# Parse arguments and set custom seed if requested
 args = parser.parse_args()
 if args.controlled:
     print(f"Training with seed: {seed}")
     torch.manual_seed(seed)
 
 # Load Dataset
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.1307,), (0.3081,))])
-trainset = datasets.MNIST(args.mnist, download=True, train=True, transform=transform)
-testset = datasets.MNIST(args.mnist, download=True, train=False, transform=transform)
-train_loader = DataLoader(trainset, args.batch_size, shuffle=True, num_workers=4)
-test_loader = DataLoader(testset, args.batch_size, shuffle=False, num_workers=4)
+train_loader, test_loader = mnist(args.mnist, args.batch_size)
 
-# Train
+# Get loss dependent configuration
 config = get_config(args.loss)
-test_logger = TestLogger(args.log_interval, len(test_loader))
+
+# Create trainer with plugins
+test_callbacks = [
+        TestLogger(args.log_interval, len(test_loader)),
+        Visualizer(config['name'], config['param_desc'])
+]
 trainer = BaseTrainer(config['model'], device, config['loss'], train_loader, callbacks=[
         TrainLogger(args.log_interval, len(train_loader)),
         config['optim'],
-        Evaluator(device, test_loader, config['test_distance'],
-                  config['name'], config['param_desc'], callbacks=[test_logger])
+        Evaluator(device, test_loader, config['test_distance'], test_callbacks)
 ])
 
+# Start training
 trainer.train(args.epochs)
