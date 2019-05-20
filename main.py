@@ -1,20 +1,16 @@
 import torch
-from torchvision import datasets, transforms
-from torch.utils.data import DataLoader
-from distances import CosineDistance
-from losses.arcface import arc_trainer
-from losses.contrastive import contrastive_trainer
-from losses.triplet import triplet_trainer
-from losses.wrappers import softmax_trainer
-from losses.center import center_trainer
-from losses.coco import coco_trainer
 import argparse
+from distances import CosineDistance
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer
+from losses import config as cf
+from datasets import mnist
 
 
-# Constants and Config
+# Constants and script arguments
 loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
 nfeat, nclass = 2, 10
+seed = 999
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
 parser.add_argument('--mnist', type=str, help='Path to MNIST dataset')
@@ -25,37 +21,45 @@ parser.add_argument('--log-interval', type=int, default=10, help='Steps (in perc
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
 
 
-def get_trainer(loss):
+def get_config(loss):
     if loss == 'softmax':
-        return softmax_trainer(train_loader, test_loader, device, nfeat, nclass)
+        return cf.softmax(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return contrastive_trainer(train_loader, test_loader, device, nfeat)
+        return cf.contrastive(device, nfeat)
     elif loss == 'triplet':
-        return triplet_trainer(train_loader, test_loader, device, nfeat, margin=0, distance=CosineDistance())
+        return cf.triplet(device, nfeat)
     elif loss == 'arcface':
-        return arc_trainer(train_loader, test_loader, device, nfeat, nclass)
+        return cf.arcface(device, nfeat, nclass)
     elif loss == 'center':
-        return center_trainer(train_loader, test_loader, device, nfeat, nclass, distance=CosineDistance())
+        return cf.center(device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
-        return coco_trainer(train_loader, test_loader, device, nfeat, nclass)
+        return cf.coco(device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
 
-# Init
+# Parse arguments and set custom seed if requested
 args = parser.parse_args()
 if args.controlled:
-    torch.manual_seed(999)
+    print(f"Training with seed: {seed}")
+    torch.manual_seed(seed)
 
 # Load Dataset
-transform = transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.1307,), (0.3081,))])
-trainset = datasets.MNIST(args.mnist, download=True, train=True, transform=transform)
-testset = datasets.MNIST(args.mnist, download=True, train=False, transform=transform)
-train_loader = DataLoader(trainset, args.batch_size, shuffle=True, num_workers=4)
-test_loader = DataLoader(testset, args.batch_size, shuffle=False, num_workers=4)
+train_loader, test_loader = mnist(args.mnist, args.batch_size)
 
-# Train
-trainer = get_trainer(args.loss)
-trainer.train(args.epochs, log_interval=args.log_interval)
+# Get loss dependent configuration
+config = get_config(args.loss)
+
+# Create trainer with plugins
+test_callbacks = [
+        TestLogger(args.log_interval, len(test_loader)),
+        Visualizer(config['name'], config['param_desc'])
+]
+trainer = BaseTrainer(config['model'], device, config['loss'], train_loader, callbacks=[
+        TrainLogger(args.log_interval, len(train_loader)),
+        config['optim'],
+        Evaluator(device, test_loader, config['test_distance'], test_callbacks)
+])
+
+# Start training
+trainer.train(args.epochs)

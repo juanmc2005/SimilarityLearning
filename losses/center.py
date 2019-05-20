@@ -3,11 +3,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-import torch.optim.lr_scheduler as lr_scheduler
-from losses.base import BaseTrainer, TrainingConfig
-from models import MNISTNet
-from distances import EuclideanDistance
 
 class SoftmaxCenterLoss(nn.Module):
     """
@@ -99,17 +94,3 @@ class CenterLinear(nn.Module):
         :return: a tensor with class probabilities for this batch
         """
         return F.log_softmax(self.linear(x), dim=1)
-
-
-def center_trainer(train_loader, test_loader, device, nfeat, nclass, loss_weight=1, distance=EuclideanDistance()):
-    model = MNISTNet(nfeat, loss_module=CenterLinear(nfeat, nclass))
-    loss_fn = SoftmaxCenterLoss(device, nfeat, nclass, loss_weight, distance)
-    optimizers = [
-            optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
-            optim.SGD(loss_fn.center_parameters(), lr=0.5)]
-    config = TrainingConfig(
-            name='Center Loss',
-            optimizers=optimizers,
-            schedulers=[lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)],
-            param_description=f"λ={loss_weight} - {distance}")
-    return BaseTrainer(model, device, loss_fn, distance, train_loader, test_loader, config)
