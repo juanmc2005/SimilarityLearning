@@ -3,12 +3,6 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import torch.optim as optim
-from torch.optim import lr_scheduler
-from losses.base import Optimizer
-from models import MNISTNet
-from losses.wrappers import LossWrapper
-from distances import CosineDistance
 
 
 class ArcLinear(nn.Module):
@@ -61,19 +55,3 @@ class ArcLinear(nn.Module):
         # Apply the scaling
         cos_theta_j = self.s * cos_theta_j
         return cos_theta_j
-
-
-def arc_config(device, nfeat, nclass, margin=0.2, s=7.0):
-    model = MNISTNet(nfeat, loss_module=ArcLinear(nfeat, nclass, margin, s))
-    optimizers = [optim.SGD(model.net_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
-                  optim.SGD(model.loss_params(), lr=0.01)]
-    schedulers = [lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
-                  lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
-    return {
-            'name': 'ArcFace Loss',
-            'param_desc': f"m={margin} s={s}",
-            'model': model,
-            'loss': LossWrapper(nn.CrossEntropyLoss().to(device)),
-            'optim': Optimizer(optimizers, schedulers),
-            'test_distance': CosineDistance()
-    }

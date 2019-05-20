@@ -2,11 +2,6 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from torch.optim import lr_scheduler
-from losses.base import BaseTrainer, Optimizer, Evaluator
-from models import MNISTNet
-from distances import EuclideanDistance
 
 
 class ContrastiveLoss(nn.Module):
@@ -47,17 +42,3 @@ class ContrastiveLoss(nn.Module):
         loss = (1-gt) * torch.pow(dist, 2) + gt * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
         # Normalize by batch size
         return torch.sum(loss) / 2 / dist.size(0)
-
-
-def contrastive_config(device, nfeat, margin=2, distance=EuclideanDistance()):
-    model = MNISTNet(nfeat)
-    optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
-    schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
-    return {
-            'name': 'Contrastive Loss',
-            'param_desc': f"m={margin} - {distance}",
-            'model': model,
-            'loss': ContrastiveLoss(device, margin, distance),
-            'optim': Optimizer(optimizers, schedulers),
-            'test_distance': distance
-    }

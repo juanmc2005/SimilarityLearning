@@ -1,15 +1,10 @@
 import torch
+import argparse
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator
-from losses.arcface import arc_config
-from losses.contrastive import contrastive_config
-from losses.triplet import triplet_config
-from losses.wrappers import softmax_config
-from losses.center import center_config
-from losses.coco import coco_config
-import argparse
+from losses import config as cf
 
 
 # Constants and Config
@@ -29,17 +24,17 @@ parser.add_argument('--batch-size', type=int, default=100, help='Batch size for 
 
 def get_config(loss):
     if loss == 'softmax':
-        return softmax_config(device, nfeat, nclass)
+        return cf.softmax(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return contrastive_config(device, nfeat)
+        return cf.contrastive(device, nfeat)
     elif loss == 'triplet':
-        return triplet_config(device, nfeat)
+        return cf.triplet(device, nfeat)
     elif loss == 'arcface':
-        return arc_config(device, nfeat, nclass)
+        return cf.arcface(device, nfeat, nclass)
     elif loss == 'center':
-        return center_config(device, nfeat, nclass, distance=CosineDistance())
+        return cf.center(device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
-        return coco_config(device, nfeat, nclass)
+        return cf.coco(device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
