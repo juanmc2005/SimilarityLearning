@@ -4,7 +4,6 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from models import MNISTNet
 from distances import CosineDistance, EuclideanDistance
-from losses.base import Optimizer
 from losses.center import CenterLinear, SoftmaxCenterLoss
 from losses.wrappers import LossWrapper
 from losses.arcface import ArcLinear
@@ -19,7 +18,8 @@ def config(name, param_desc, model, loss, optims, scheds, test_dist):
             'param_desc': param_desc,
             'model': model,
             'loss': loss,
-            'optim': Optimizer(optims, scheds),
+            'optim': optims,
+            'sched': scheds,
             'test_distance': test_dist
     }
 

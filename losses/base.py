@@ -45,22 +45,25 @@ class TestListener:
 
 
 class Optimizer:
-    # TODO remove Optimizer as callback and add it as separate parameter in main, etc
     
     def __init__(self, optimizers, schedulers):
         super(Optimizer, self).__init__()
+        self.OPTIM_KEY = 'optimizers'
+        self.SCHED_KEY = 'schedulers'
         self.optimizers = optimizers
         self.schedulers = schedulers
         
     def state_dict(self):
         return {
-                'optimizers': [op.state_dict() for op in self.optimizers],
-                'schedulers': [s.state_dict() for s in self.schedulers]
-                }
+                self.OPTIM_KEY: [op.state_dict() for op in self.optimizers],
+                self.SCHED_KEY: [s.state_dict() for s in self.schedulers]
+        }
     
-    def load_state_dict(self):
-        # TODO
-        pass
+    def load_state_dict(self, checkpoint):
+        for i, op in enumerate(self.optimizers):
+            op.load_state_dict(checkpoint[self.OPTIM_KEY][i])
+        for i, s in enumerate(self.schedulers):
+            s.load_state_dict(checkpoint[self.SCHED_KEY][i])
     
     def scheduler_step(self):
         for s in self.schedulers:
@@ -144,24 +147,24 @@ class Visualizer(TestListener):
         plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
-        print(f"New Best Test Accuracy! Saving plot as {plot_name}")
+        print(f"Saving plot as {plot_name}")
         visual.visualize(feat, y, plot_title, plot_name)
 
 
 class ModelSaver(TestListener):
     
     def __init__(self, path):
-        super(Visualizer, self).__init__()
+        super(ModelSaver, self).__init__()
         self.path = path
     
     def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
-        # TODO
+        print(f"Saving model to {self.path}")
         torch.save({
             'epoch': epoch,
             'model_state_dict': model.state_dict(),
             'optim_state_dict': optim.state_dict(),
             'accuracy': accuracy
-            }, self.path)
+        }, self.path)
 
 
 class Evaluator(TrainingListener):
@@ -222,6 +225,7 @@ class Evaluator(TrainingListener):
         print("------------------------------------------------")
         if test_correct > self.best_acc:
             self.best_acc = test_correct
+            print('New Best Test Accuracy!')
             for cb in self.callbacks:
                 cb.on_best_accuracy(epoch, model, optim, acc, feat_test, y_test)
 

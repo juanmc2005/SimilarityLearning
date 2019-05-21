@@ -1,7 +1,7 @@
 import torch
 import argparse
 from distances import CosineDistance
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, Optimizer, ModelSaver
 from losses import config as cf
 from datasets import mnist
 
@@ -53,13 +53,16 @@ config = get_config(args.loss)
 # Create trainer with plugins
 test_callbacks = [
         TestLogger(args.log_interval, len(test_loader)),
-        Visualizer(config['name'], config['param_desc'])
+        Visualizer(config['name'], config['param_desc']),
+        ModelSaver(f"images/{args.loss}-best.pt")
 ]
-trainer = BaseTrainer(config['model'], device, config['loss'], train_loader, callbacks=[
+train_callbacks = [
         TrainLogger(args.log_interval, len(train_loader)),
-        config['optim'],
         Evaluator(device, test_loader, config['test_distance'], test_callbacks)
-])
+]
+trainer = BaseTrainer(config['model'], device, config['loss'], train_loader,
+                      Optimizer(config['optim'], config['sched']),
+                      callbacks=train_callbacks)
 
 # Start training
 trainer.train(args.epochs)
