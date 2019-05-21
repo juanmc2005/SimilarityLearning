@@ -23,7 +23,7 @@ class TrainingListener:
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
         pass
     
-    def on_after_epoch(self, epoch, model):
+    def on_after_epoch(self, epoch, model, optim):
         pass
     
 
@@ -40,26 +40,37 @@ class TestListener:
     def on_after_test(self):
         pass
     
-    def on_best_accuracy(self, epoch, accuracy, feat, y):
+    def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
         pass
 
 
-class Optimizer(TrainingListener):
+class Optimizer:
+    # TODO remove Optimizer as callback and add it as separate parameter in main, etc
     
     def __init__(self, optimizers, schedulers):
         super(Optimizer, self).__init__()
         self.optimizers = optimizers
         self.schedulers = schedulers
+        
+    def state_dict(self):
+        return {
+                'optimizers': [op.state_dict() for op in self.optimizers],
+                'schedulers': [s.state_dict() for s in self.schedulers]
+                }
     
-    def on_before_epoch(self, epoch):
+    def load_state_dict(self):
+        # TODO
+        pass
+    
+    def scheduler_step(self):
         for s in self.schedulers:
             s.step()
     
-    def on_before_gradients(self, epoch, ibatch, feat, logits, y, loss):
+    def zero_grad(self):
         for o in self.optimizers:
             o.zero_grad()
     
-    def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
+    def step(self):
         for o in self.optimizers:
             o.step()
 
@@ -128,13 +139,29 @@ class Visualizer(TestListener):
         self.loss_name = loss_name
         self.param_desc = param_desc
     
-    def on_best_accuracy(self, epoch, accuracy, feat, y):
+    def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
         plot_name = f"embeddings-epoch-{epoch}"
         plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
         print(f"New Best Test Accuracy! Saving plot as {plot_name}")
         visual.visualize(feat, y, plot_title, plot_name)
+
+
+class ModelSaver(TestListener):
+    
+    def __init__(self, path):
+        super(Visualizer, self).__init__()
+        self.path = path
+    
+    def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
+        # TODO
+        torch.save({
+            'epoch': epoch,
+            'model_state_dict': model.state_dict(),
+            'optim_state_dict': optim.state_dict(),
+            'accuracy': accuracy
+            }, self.path)
 
 
 class Evaluator(TrainingListener):
@@ -184,7 +211,7 @@ class Evaluator(TrainingListener):
         self.feat_train.append(feat)
         self.y_train.append(y)
     
-    def on_after_epoch(self, epoch, model):
+    def on_after_epoch(self, epoch, model, optim):
         feat_train = torch.cat(self.feat_train, 0).float().detach().cpu().numpy()
         y_train = torch.cat(self.y_train, 0).detach().cpu().numpy()
         acc_calc = AccuracyCalculator(feat_train, y_train, self.distance)
@@ -196,16 +223,17 @@ class Evaluator(TrainingListener):
         if test_correct > self.best_acc:
             self.best_acc = test_correct
             for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, acc, feat_test, y_test)
+                cb.on_best_accuracy(epoch, model, optim, acc, feat_test, y_test)
 
 
 class BaseTrainer:
     
-    def __init__(self, model, device, loss_fn, loader, callbacks=[]):
+    def __init__(self, model, device, loss_fn, loader, optim, callbacks=[]):
         self.model = model.to(device)
         self.device = device
         self.loss_fn = loss_fn
         self.loader = loader
+        self.optim = optim
         self.callbacks = callbacks
         
     def train(self, epochs):
@@ -218,6 +246,7 @@ class BaseTrainer:
         self.model.train()
         for cb in self.callbacks:
             cb.on_before_epoch(epoch)
+        self.optim.scheduler_step()
         for i, (x, y) in enumerate(self.loader):
             x, y = x.to(self.device), y.to(self.device)
             
@@ -229,10 +258,12 @@ class BaseTrainer:
             for cb in self.callbacks:
                 cb.on_before_gradients(epoch, i, feat, logits, y, loss)
                 
+            self.optim.zero_grad()
             loss.backward()
+            self.optim.step()
             
             for cb in self.callbacks:
                 cb.on_after_gradients(epoch, i, feat, logits, y, loss)
         
         for cb in self.callbacks:
-            cb.on_after_epoch(epoch, self.model)
+            cb.on_after_epoch(epoch, self.model, self.optim)
