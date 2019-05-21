@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
+import matplotlib.pyplot as plt
 from sts import SentIndex, Segment, MergeSegment
 
 
@@ -15,6 +16,22 @@ def unique_pairs(xs, ys, scores):
             yunique.append(y)
             sunique.append(score)
     return xunique, yunique, sunique
+
+
+def plot_scores(scores, filename=None):
+    sorted_scores = sorted(scores)
+    plt.figure(figsize=(15,5))
+    plt.title('Golden Rating Distribution')
+    plt.plot(sorted_scores, color='DarkGreen')
+    plt.axhline(y=1, color='LightBlue', linestyle='--')
+    plt.axhline(y=2, color='yellow', linestyle='--')
+    plt.axhline(y=3, color='orange', linestyle='--')
+    plt.axhline(y=4, color='red', linestyle='--')
+    plt.legend(['Rating'], loc='upper left')
+    plt.xlabel('Sentence Pairs')
+    plt.ylabel('Golden Rating')
+    if filename is not None:
+        plt.savefig(filename)
 
 
 parser = argparse.ArgumentParser()
@@ -48,13 +65,18 @@ with open(f"{base_path}a.toks", 'r') as file_a,\
     # Calculate stats and dump duplicate information
     segment_a = Segment('a', sents_a)
     segment_b = Segment('b', sents_b)
+    
+    # Plot score distribution
+    print('Plotting score distribution...')
+    plot_scores(scores, f"../images/{args.partition}-score-dist.jpg" if args.saveplots else None)
+    
+    # Generate positive and negative pairs
     pos, neg = segment_a.pos_neg_pairs(segment_b, scores)
     print(f"Total Positive Pairs: {len(pos)}")
     print(f"Total Negative Pairs: {len(neg)}")
     print(f"Mean Positive Pairs by Sentence: {pos / len(sents_a)}")
     print(f"Mean Negative Pairs by Sentence: {neg / len(sents_a)}")
-    print(pos[1000:1010])
-    print(neg[1000:1010])
+    
     for segment, other_segment in [(segment_a, segment_b), (segment_b, segment_a)]:
         print(f"Analyzing segment {segment}...")
         dup_dmp_path = f"{base_path}duplicate-dump-{args.partition}-{segment}.txt"
