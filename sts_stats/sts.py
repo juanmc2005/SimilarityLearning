@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 from collections import Counter, deque
 import matplotlib.pyplot as plt
-import numpy as np
 from tqdm import tqdm
 
 def get_bar_data(indexed_items, counter):
@@ -106,7 +105,11 @@ class Segment:
                     out.write(f"\t{global_id}\t\tDuplicate: {dup_category}\t\t{scores[j]:.3f}\t\t'{other}'\n")
                 out.write('-' * 100 + '\n')
     
-    def pos_neg_pairs(self, other_segment, scores):
+    def pos_neg_pairs(self, other_segment, scores, threshold=2.5):
+        """
+        Consider scores as edge weights in a graph of sentences.
+        Search for positive and negative pairs Breadth First Search
+        """
         pos, neg = [], []
         for i, s in tqdm(enumerate(self.sents), total=len(self.sents)):
             added = set([(i, self)])
@@ -121,7 +124,7 @@ class Segment:
                 other_sent = seg.sents[j]
                 # Create the pair
                 equals_this = False
-                if scores[j] > 4:
+                if scores[j] > threshold:
                     if equals_last:
                         # A = B = C --> A = C
                         pos.append((s, other_sent))
