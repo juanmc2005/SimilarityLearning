@@ -110,6 +110,11 @@ class Segment:
         Consider scores as edge weights in a graph of sentences.
         Search for positive and negative pairs Breadth First Search
         """
+        if isinstance(threshold, tuple):
+            tlow, thigh = threshold
+        else:
+            tlow = threshold
+            thigh = threshold
         pos, neg = [], []
         for i, s in tqdm(enumerate(self.sents), total=len(self.sents)):
             added = set([(i, self)])
@@ -124,7 +129,7 @@ class Segment:
                 other_sent = seg.sents[j]
                 # Create the pair
                 equals_this = False
-                if scores[j] > threshold:
+                if scores[j] >= thigh:
                     if equals_last:
                         # A = B = C --> A = C
                         pos.append((s, other_sent))
@@ -132,7 +137,7 @@ class Segment:
                     else:
                         # A != B and B = C --> A != C
                         neg.append((s, other_sent))
-                elif equals_last:
+                elif scores[j] <= tlow and equals_last:
                     # A = B and B != C --> A != C
                     neg.append((s, other_sent))
                 # Add dependencies

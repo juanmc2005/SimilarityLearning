@@ -2,6 +2,9 @@
 # -*- coding: utf-8 -*-
 import argparse
 import matplotlib.pyplot as plt
+import random
+from random import randint
+from tqdm import tqdm
 from sts import SentIndex, Segment, MergeSegment
 
 
@@ -32,6 +35,28 @@ def plot_scores(scores, filename=None):
     plt.ylabel('Golden Rating')
     if filename is not None:
         plt.savefig(filename)
+
+
+def anchor_related_sents(anchor, pairs):
+    anchor_pairs = [(x, y) for x, y in pairs if x == anchor or y == anchor]
+    related = []
+    for pos1, pos2 in anchor_pairs:
+        if pos1 != anchor:
+            related.append(pos1)
+        else:
+            related.append(pos2)
+    return related
+
+
+def triplets(sents, pos_pairs, neg_pairs):
+    anchors, positives, negatives = [], [], []
+    for anchor in tqdm(sents):
+        for positive in anchor_related_sents(anchor, pos_pairs):
+            for negative in anchor_related_sents(anchor, neg_pairs):
+                anchors.append(anchor)
+                positives.append(positive)
+                negatives.append(negative)
+    return anchors, positives, negatives
 
 
 parser = argparse.ArgumentParser()
@@ -71,11 +96,20 @@ with open(f"{base_path}a.toks", 'r') as file_a,\
     plot_scores(scores, f"../images/{args.partition}-score-dist.jpg" if args.saveplots else None)
     
     # Generate positive and negative pairs
-    pos, neg = segment_a.pos_neg_pairs(segment_b, scores)
+    pos, neg = segment_a.pos_neg_pairs(segment_b, scores, threshold=(2, 3))
     print(f"Total Positive Pairs: {len(pos)}")
     print(f"Total Negative Pairs: {len(neg)}")
-    print(f"Mean Positive Pairs by Sentence: {pos / len(sents_a)}")
-    print(f"Mean Negative Pairs by Sentence: {neg / len(sents_a)}")
+    print(f"Mean Positive Pairs by Sentence: {len(pos) / len(sents_a)}")
+    print(f"Mean Negative Pairs by Sentence: {len(neg) / len(sents_a)}")
+    print(f"\nPositive Example: {random.choice(pos)}")
+    print(f"\nNegative Example: {random.choice(neg)}\n")
+    
+    # Generate Triplets
+    anchors, positives, negatives = triplets(sents_all, pos, neg)
+    print(f"Total Triplets: {len(anchors)}")
+    for choice in [randint(0, len(anchors)) for _ in range(5)]:
+        print(f"\nTriplet Example: ({anchors[choice]}, {positives[choice]}, {negatives[choice]})")
+    print()
     
     for segment, other_segment in [(segment_a, segment_b), (segment_b, segment_a)]:
         print(f"Analyzing segment {segment}...")
