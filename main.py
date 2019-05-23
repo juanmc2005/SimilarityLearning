@@ -21,6 +21,16 @@ parser.add_argument('-c', '--controlled', type=bool, default=True,
 parser.add_argument('--log-interval', type=int, default=10,
                     help='Steps (in percentage) to show epoch progress. Default value: 10')
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
+parser.add_argument('--plot', dest='plot', action='store_true', help='Plot best accuracy dev embeddings')
+parser.add_argument('--no-plot', dest='plot', action='store_false', help='Do NOT plot best accuracy dev embeddings')
+parser.set_defaults(plot=True)
+parser.add_argument('--save', dest='save', action='store_true', help='Save best accuracy models')
+parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT save best accuracy models')
+parser.set_defaults(save=True)
+
+
+def enabled_str(value):
+    return 'ENABLED' if value else 'DISABLED'
 
 
 def get_config(loss):
@@ -43,7 +53,7 @@ def get_config(loss):
 # Parse arguments and set custom seed if requested
 args = parser.parse_args()
 if args.controlled:
-    print(f"Training with seed: {seed}")
+    print(f"[Seed: {seed}]")
     torch.manual_seed(seed)
 
 # Load Dataset
@@ -52,19 +62,31 @@ train_loader, test_loader = mnist(args.mnist, args.batch_size)
 # Get loss dependent configuration
 config = get_config(args.loss)
 
-# Create trainer with plugins
-test_callbacks = [
-        TestLogger(args.log_interval, len(test_loader)),
-        Visualizer(config['name'], config['param_desc']),
-        ModelSaver(f"images/{args.loss}-best.pt")
-]
-train_callbacks = [
-        TrainLogger(args.log_interval, len(train_loader)),
-        Evaluator(device, test_loader, config['test_distance'], test_callbacks)
-]
+# Create plugins
+test_callbacks = []
+train_callbacks = []
+if args.log_interval in range(1, 101):
+    print(f"[Logging: every {args.log_interval}%]")
+    test_callbacks.append(TestLogger(args.log_interval, len(test_loader)))
+    train_callbacks.append(TrainLogger(args.log_interval, len(train_loader)))
+else:
+    print(f"[Logging: {enabled_str(False)}]")
+
+print(f"[Plots: {enabled_str(args.plot)}]")
+if args.plot:
+    test_callbacks.append(Visualizer(config['name'], config['param_desc']))
+
+print(f"[Model Saving: {enabled_str(args.save)}]")
+if args.save:
+    test_callbacks.append(ModelSaver(f"images/{args.loss}-best.pt"))
+train_callbacks.append(Evaluator(device, test_loader, config['test_distance'], test_callbacks))
+
+# Configure trainer
 trainer = BaseTrainer(config['model'], device, config['loss'], train_loader,
                       Optimizer(config['optim'], config['sched']),
                       callbacks=train_callbacks)
+
+print()
 
 # Start training
 trainer.train(args.epochs)
