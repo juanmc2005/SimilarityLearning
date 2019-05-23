@@ -16,8 +16,10 @@ parser = argparse.ArgumentParser()
 parser.add_argument('--mnist', type=str, help='Path to MNIST dataset')
 parser.add_argument('--loss', type=str, help=loss_options)
 parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
-parser.add_argument('-c', '--controlled', type=bool, default=True, help='Whether to set a fixed seed to control the training environment. Default value: True')
-parser.add_argument('--log-interval', type=int, default=10, help='Steps (in percentage) to show epoch progress. Default value: 10')
+parser.add_argument('-c', '--controlled', type=bool, default=True,
+                    help='Whether to set a fixed seed to control the training environment. Default value: True')
+parser.add_argument('--log-interval', type=int, default=10,
+                    help='Steps (in percentage) to show epoch progress. Default value: 10')
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
 
 
