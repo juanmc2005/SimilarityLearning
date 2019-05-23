@@ -3,7 +3,7 @@ import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, Optimizer, ModelSaver
 from losses import config as cf
-from datasets import mnist
+from datasets import MNIST
 
 
 # Constants and script arguments
@@ -57,7 +57,9 @@ if args.controlled:
     torch.manual_seed(seed)
 
 # Load Dataset
-train_loader, test_loader = mnist(args.mnist, args.batch_size)
+mnist = MNIST(args.mnist, args.batch_size)
+test = mnist.test_partition()
+train = mnist.training_partition()
 
 # Get loss dependent configuration
 config = get_config(args.loss)
@@ -67,8 +69,8 @@ test_callbacks = []
 train_callbacks = []
 if args.log_interval in range(1, 101):
     print(f"[Logging: every {args.log_interval}%]")
-    test_callbacks.append(TestLogger(args.log_interval, len(test_loader)))
-    train_callbacks.append(TrainLogger(args.log_interval, len(train_loader)))
+    test_callbacks.append(TestLogger(args.log_interval, test.nbatches()))
+    train_callbacks.append(TrainLogger(args.log_interval, train.nbatches()))
 else:
     print(f"[Logging: {enabled_str(False)}]")
 
@@ -79,10 +81,10 @@ if args.plot:
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
     test_callbacks.append(ModelSaver(f"images/{args.loss}-best.pt"))
-train_callbacks.append(Evaluator(device, test_loader, config['test_distance'], test_callbacks))
+train_callbacks.append(Evaluator(device, test, config['test_distance'], test_callbacks))
 
 # Configure trainer
-trainer = BaseTrainer(config['model'], device, config['loss'], train_loader,
+trainer = BaseTrainer(config['model'], device, config['loss'], train,
                       Optimizer(config['optim'], config['sched']),
                       callbacks=train_callbacks)
 

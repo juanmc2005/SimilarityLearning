@@ -169,10 +169,10 @@ class ModelSaver(TestListener):
 
 class Evaluator(TrainingListener):
     
-    def __init__(self, device, test_loader, distance, callbacks=[]):
+    def __init__(self, device, loader, distance, callbacks=[]):
         super(Evaluator, self).__init__()
         self.device = device
-        self.test_loader = test_loader
+        self.loader = loader
         self.distance = distance
         self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
@@ -185,7 +185,8 @@ class Evaluator(TrainingListener):
         for cb in self.callbacks:
             cb.on_before_test()
         with torch.no_grad():
-            for i, (x, y) in enumerate(self.test_loader):
+            for i in range(self.loader.nbatches()):
+                x, y = next(self.loader)
                 x, y = x.to(self.device), y.to(self.device)
                 
                 # Feed Forward
@@ -251,7 +252,8 @@ class BaseTrainer:
         for cb in self.callbacks:
             cb.on_before_epoch(epoch)
         self.optim.scheduler_step()
-        for i, (x, y) in enumerate(self.loader):
+        for i in range(self.loader.nbatches()):
+            x, y = next(self.loader)
             x, y = x.to(self.device), y.to(self.device)
             
             # Feed Forward
