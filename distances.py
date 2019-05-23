@@ -6,6 +6,7 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 
 
+# TODO remove this function and use pyannote function directly
 def to_condensed(n, i, j):
     """
     Borrowed from pyannote: https://github.com/pyannote/pyannote-core

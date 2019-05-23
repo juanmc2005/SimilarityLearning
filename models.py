@@ -1,9 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import torch
 from torch import nn
 from sincnet import SincNet, MLP
-from losses.arcface import ArcLinear
 
 
 class Flatten(nn.Module):
@@ -11,11 +9,32 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
-class MNISTNet(nn.Module):
+class SimNet(nn.Module):
+
+    def __init__(self, loss_module=None):
+        super(SimNet, self).__init__()
+        self.loss_module = loss_module
+
+    def layers(self):
+        raise NotImplementedError
+
+    def forward(self, x, y):
+        for layer in self.layers():
+            x = layer(x)
+        logits = self.loss_module(x, y) if self.loss_module is not None else None
+        return x, logits
+
+    def all_params(self):
+        params = [layer.parameters() for layer in self.layers()]
+        if self.loss_module is not None:
+            params.append(self.loss_module.parameters())
+        return params
+
+
+class MNISTNet(SimNet):
 
     def __init__(self, nfeat, loss_module=None):
-        super(MNISTNet, self).__init__()
-        self.loss_module = loss_module
+        super(MNISTNet, self).__init__(loss_module)
         self.net = nn.Sequential(
             nn.Conv2d(1, 32, kernel_size=5, padding=2),
             nn.PReLU(),
@@ -37,23 +56,14 @@ class MNISTNet(nn.Module):
             nn.PReLU()
         )
 
-    def forward(self, x, y):
-        feat = self.net(x)
-        logits = self.loss_module(feat, y) if self.loss_module is not None else None
-        return feat, logits
-
-    def net_params(self):
-        return self.net.parameters()
-
-    def loss_params(self):
-        return self.loss_module.parameters()
+    def layers(self):
+        return [self.net]
 
 
-class SpeakerNet(nn.Module):
+class SpeakerNet(SimNet):
 
     def __init__(self, nfeat, sample_rate, window, loss_module=None):
-        super(SpeakerNet, self).__init__()
-        self.loss_module = loss_module
+        super(SpeakerNet, self).__init__(loss_module)
         wlen = int(sample_rate * window / 1000)
         self.cnn = SincNet({'input_dim': wlen,
                             'fs': sample_rate,
@@ -76,22 +86,18 @@ class SpeakerNet(nn.Module):
                         'fc_use_batchnorm_inp': False,
                         'fc_act': ['leaky_relu', 'leaky_relu', 'leaky_relu'],
                         })
-        self.loss_module = loss_module
 
-    def forward(self, x, y):
-        feat = self.dnn(self.cnn(x))
-        logits = self.loss_module(feat, y) if self.loss_module is not None else None
-        return feat, logits
-
-    def all_params(self):
-        return [self.cnn.parameters(), self.dnn.parameters(), self.loss_module.parameters()]
+    def layers(self):
+        return [self.cnn, self.dnn]
 
 
+"""
 if __name__ == '__main__':
     x = torch.rand(50, 3200)
     y = torch.randint(0, 1251, (50,))
-    loss_module = ArcLinear(2048, 1251, margin=0.2, s=7.)
-    net = SpeakerNet(2048, sample_rate=16000, window=200, loss_module=loss_module)
+    loss_module = ArcLinear(nfeat=2048, nclass=1251, margin=0.2, s=7.)
+    net = SpeakerNet(nfeat=2048, sample_rate=16000, window=200, loss_module=loss_module)
     feat, logits = net(x, y)
     print(f"feat size = {feat.size()}")
     print(f"logits size = {logits.size() if logits is not None else None}")
+"""
