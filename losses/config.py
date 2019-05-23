@@ -35,8 +35,9 @@ def softmax(device, nfeat, nclass):
 def arcface(device, nfeat, nclass, margin=0.2, s=7.0):
     model = MNISTNet(nfeat, loss_module=ArcLinear(nfeat, nclass, margin, s))
     loss = LossWrapper(nn.CrossEntropyLoss().to(device))
-    optimizers = [optim.SGD(model.net_params(), lr=0.005, momentum=0.9, weight_decay=0.0005),
-                  optim.SGD(model.loss_params(), lr=0.01)]
+    params = model.all_params()
+    optimizers = [optim.SGD(params[0], lr=0.005, momentum=0.9, weight_decay=0.0005),
+                  optim.SGD(params[1], lr=0.01)]
     schedulers = [lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
                   lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
     return config('ArcFace Loss', f"m={margin} s={s}", model, loss, optimizers, schedulers, CosineDistance())
@@ -54,8 +55,9 @@ def center(device, nfeat, nclass, lweight=1, distance=EuclideanDistance()):
 def coco(device, nfeat, nclass, alpha=6.25):
     model = MNISTNet(nfeat, loss_module=CocoLinear(nfeat, nclass, alpha))
     loss = LossWrapper(nn.CrossEntropyLoss().to(device))
-    optimizers = [optim.SGD(model.net_params(), lr=0.001, momentum=0.9, weight_decay=0.0005),
-                  optim.SGD(model.loss_params(), lr=0.01, momentum=0.9)]
+    params = model.all_params()
+    optimizers = [optim.SGD(params[0], lr=0.001, momentum=0.9, weight_decay=0.0005),
+                  optim.SGD(params[1], lr=0.01, momentum=0.9)]
     schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
     return config('CoCo Loss', f"α={alpha}", model, loss, optimizers, schedulers, CosineDistance())
 
