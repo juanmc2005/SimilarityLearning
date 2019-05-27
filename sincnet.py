@@ -339,10 +339,10 @@ class SincNet(nn.Module):
         seq_len = x.shape[1]
 
         if bool(self.cnn_use_laynorm_inp):
-            x = self.ln0((x))
+            x = self.ln0(x)
 
         if bool(self.cnn_use_batchnorm_inp):
-            x = self.bn0((x))
+            x = self.bn0(x)
 
         x = x.view(batch, 1, seq_len)
 

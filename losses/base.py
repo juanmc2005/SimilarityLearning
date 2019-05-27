@@ -100,7 +100,7 @@ class Logger:
         progress, should_log = self._progress(i)
         if should_log:
             self.last_log = progress
-            print(self.train_log_ft.format(epoch=epoch, progress=progress, loss=loss.item()))
+            print(self.train_log_ft.format(epoch=epoch, progress=progress, loss=loss))
     
     def on_test_batch(self, i):
         progress, should_log = self._progress(i)
@@ -212,12 +212,12 @@ class Evaluator(TrainingListener):
         self.feat_train, self.y_train = [], []
         
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
-        self.feat_train.append(feat)
-        self.y_train.append(y)
+        self.feat_train.append(feat.float().detach().cpu().numpy())
+        self.y_train.append(y.detach().cpu().numpy())
     
     def on_after_epoch(self, epoch, model, optim):
-        feat_train = torch.cat(self.feat_train, 0).float().detach().cpu().numpy()
-        y_train = torch.cat(self.y_train, 0).detach().cpu().numpy()
+        feat_train = np.concatenate(self.feat_train)
+        y_train = np.concatenate(self.y_train)
         acc_calc = AccuracyCalculator(feat_train, y_train, self.distance)
         feat_test, y_test, test_correct, test_total = self._eval(model, acc_calc)
         acc = 100 * test_correct / test_total
@@ -269,7 +269,7 @@ class BaseTrainer:
             self.optim.step()
             
             for cb in self.callbacks:
-                cb.on_after_gradients(epoch, i, feat, logits, y, loss)
+                cb.on_after_gradients(epoch, i, feat, logits, y, loss.item())
         
         for cb in self.callbacks:
             cb.on_after_epoch(epoch, self.model, self.optim)

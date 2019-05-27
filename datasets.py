@@ -68,23 +68,28 @@ class VoxCelebPartition(SimDatasetPartition):
 
     def __init__(self, generator):
         self.generator = generator()
+        self.batches_per_epoch = generator.batches_per_epoch
+        self.batch_size = generator.batch_size
 
     def nbatches(self):
-        return self.generator.batches_per_epoch
+        return self.batches_per_epoch
 
     def __next__(self):
         dic = next(self.generator)
-        return torch.Tensor(dic['X']), torch.Tensor(dic['y'])
+        return torch.Tensor(dic['X']).view(self.batch_size, -1), torch.Tensor(dic['y']).long()
 
 
 class VoxCeleb1(SimDataset):
 
-    def __init__(self):
+    def __init__(self, batch_size):
         extractor = RawAudio(sample_rate=16000)
         preprocessors = {'audio': FileFinder()}
-        protocol = get_protocol('VoxCeleb.SpeakerVerification.VoxCeleb1', preprocessors=preprocessors)
-        self.train_gen = SpeechSegmentGenerator(extractor, protocol, subset='train', duration=1, parallel=0)
-        self.test_gen = SpeechSegmentGenerator(extractor, protocol, subset='test', duration=1, parallel=0)
+        protocol = get_protocol('VoxCeleb.SpeakerVerification.VoxCeleb1_X', preprocessors=preprocessors)
+        self.train_gen = SpeechSegmentGenerator(extractor, protocol, subset='train', per_label=1,
+                                                per_fold=batch_size, duration=0.2, parallel=3)
+        # TODO dev
+        self.test_gen = SpeechSegmentGenerator(extractor, protocol, subset='test', per_label=1,
+                                               per_fold=batch_size, duration=0.2, parallel=2)
 
     def training_partition(self):
         return VoxCelebPartition(self.train_gen)

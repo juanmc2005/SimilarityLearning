@@ -89,15 +89,3 @@ class SpeakerNet(SimNet):
 
     def layers(self):
         return [self.cnn, self.dnn]
-
-
-"""
-if __name__ == '__main__':
-    x = torch.rand(50, 3200)
-    y = torch.randint(0, 1251, (50,))
-    loss_module = ArcLinear(nfeat=2048, nclass=1251, margin=0.2, s=7.)
-    net = SpeakerNet(nfeat=2048, sample_rate=16000, window=200, loss_module=loss_module)
-    feat, logits = net(x, y)
-    print(f"feat size = {feat.size()}")
-    print(f"logits size = {logits.size() if logits is not None else None}")
-"""
