@@ -18,6 +18,12 @@ class SimNet(nn.Module):
     def layers(self):
         raise NotImplementedError
 
+    def common_state_dict(self):
+        raise NotImplementedError
+
+    def load_common_state_dict(self, checkpoint):
+        raise NotImplementedError
+
     def forward(self, x, y):
         for layer in self.layers():
             x = layer(x)
@@ -59,6 +65,12 @@ class MNISTNet(SimNet):
     def layers(self):
         return [self.net]
 
+    def common_state_dict(self):
+        return self.net.state_dict()
+
+    def load_common_state_dict(self, checkpoint):
+        self.net.load_state_dict(checkpoint)
+
 
 class SpeakerNet(SimNet):
 
@@ -89,3 +101,13 @@ class SpeakerNet(SimNet):
 
     def layers(self):
         return [self.cnn, self.dnn]
+
+    def common_state_dict(self):
+        return {
+            'cnn': self.cnn.state_dict(),
+            'dnn': self.dnn.state_dict()
+        }
+
+    def load_common_state_dict(self, checkpoint):
+        self.cnn.load_state_dict(checkpoint['cnn'])
+        self.dnn.load_state_dict(checkpoint['dnn'])

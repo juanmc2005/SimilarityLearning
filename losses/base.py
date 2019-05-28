@@ -11,7 +11,7 @@ class TrainingListener:
     A listener for the training process.
     """
     
-    def on_before_train(self):
+    def on_before_train(self, checkpoint):
         pass
     
     def on_before_epoch(self, epoch):
@@ -23,7 +23,7 @@ class TrainingListener:
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
         pass
     
-    def on_after_epoch(self, epoch, model, optim):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         pass
     
 
@@ -40,7 +40,7 @@ class TestListener:
     def on_after_test(self):
         pass
     
-    def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
+    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         pass
 
 
@@ -153,15 +153,19 @@ class Visualizer(TestListener):
 
 class ModelSaver(TestListener):
     
-    def __init__(self, path):
+    def __init__(self, loss_name, path):
         super(ModelSaver, self).__init__()
+        self.loss_name = loss_name
         self.path = path
     
-    def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
+    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         print(f"Saving model to {self.path}")
         torch.save({
             'epoch': epoch,
-            'model_state_dict': model.state_dict(),
+            'trained_loss': self.loss_name,
+            'common_state_dict': model.common_state_dict(),
+            'loss_module_state_dict': model.loss_module.state_dict() if model.loss_module is not None else None,
+            'loss_state_dict': loss_fn.state_dict(),
             'optim_state_dict': optim.state_dict(),
             'accuracy': accuracy
         }, self.path)
@@ -207,6 +211,10 @@ class Evaluator(TrainingListener):
         for cb in self.callbacks:
             cb.on_after_test()
         return np.concatenate(feat_test), np.concatenate(y_test), correct, total
+
+    def on_before_train(self, checkpoint):
+        if checkpoint is not None:
+            self.best_acc = checkpoint['accuracy']
     
     def on_before_epoch(self, epoch):
         self.feat_train, self.y_train = [], []
@@ -215,7 +223,7 @@ class Evaluator(TrainingListener):
         self.feat_train.append(feat.float().detach().cpu().numpy())
         self.y_train.append(y.detach().cpu().numpy())
     
-    def on_after_epoch(self, epoch, model, optim):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         feat_train = np.concatenate(self.feat_train)
         y_train = np.concatenate(self.y_train)
         acc_calc = AccuracyCalculator(feat_train, y_train, self.distance)
@@ -224,34 +232,54 @@ class Evaluator(TrainingListener):
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.2f}%)")
         print("------------------------------------------------")
-        if test_correct > self.best_acc:
-            self.best_acc = test_correct
+        if acc > self.best_acc:
+            self.best_acc = acc
             print('New Best Test Accuracy!')
             for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, optim, acc, feat_test, y_test)
+                cb.on_best_accuracy(epoch, model, loss_fn, optim, acc, feat_test, y_test)
 
 
 class BaseTrainer:
     
-    def __init__(self, model, device, loss_fn, loader, optim, callbacks=[]):
+    def __init__(self, loss_name, model, device, loss_fn, loader, optim, recover=None, callbacks=[]):
+        self.loss_name = loss_name
         self.model = model.to(device)
         self.device = device
         self.loss_fn = loss_fn
         self.loader = loader
         self.optim = optim
+        self.recover = recover
         self.callbacks = callbacks
         
     def train(self, epochs):
+        if self.recover is not None:
+            checkpoint = torch.load(self.recover)
+            self.model.load_common_state_dict(checkpoint['common_state_dict'])
+            if self.loss_name == checkpoint['trained_loss']:
+                self.loss_fn.load_state_dict(checkpoint['loss_state_dict'])
+                if self.model.loss_module is not None:
+                    self.model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
+                self.optim.load_state_dict(checkpoint['optim_state_dict'])
+            epoch = checkpoint['epoch']
+            accuracy = checkpoint['accuracy']
+            print(f"Recovered Model. Epoch {epoch}. Accuracy {accuracy}%")
+            epoch += 1
+        else:
+            checkpoint = None
+            epoch = 0
         for cb in self.callbacks:
-            cb.on_before_train()
-        for i in range(1, epochs+1):
+            cb.on_before_train(checkpoint)
+        for i in range(epoch, epoch+epochs+1):
             self.train_epoch(i)
         
     def train_epoch(self, epoch):
         self.model.train()
+
         for cb in self.callbacks:
             cb.on_before_epoch(epoch)
+
         self.optim.scheduler_step()
+
         for i in range(self.loader.nbatches()):
             x, y = next(self.loader)
             x, y = x.to(self.device), y.to(self.device)
@@ -272,4 +300,4 @@ class BaseTrainer:
                 cb.on_after_gradients(epoch, i, feat, logits, y, loss.item())
         
         for cb in self.callbacks:
-            cb.on_after_epoch(epoch, self.model, self.optim)
+            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim)

@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, Optimizer, ModelSaver
@@ -10,7 +11,6 @@ from models import MNISTNet, SpeakerNet
 # Constants and script arguments
 loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
-nfeat, nclass = 2, 1251
 seed = 999
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
@@ -29,13 +29,14 @@ parser.add_argument('--save', dest='save', action='store_true', help='Save best 
 parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT save best accuracy models')
 parser.set_defaults(save=True)
 parser.add_argument('--task', type=str, default='mnist', help='The task to train')
+parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
 
 
 def enabled_str(value):
     return 'ENABLED' if value else 'DISABLED'
 
 
-def get_config(loss):
+def get_config(loss, nfeat, nclass):
     if loss == 'softmax':
         return cf.SoftmaxConfig(device, nfeat, nclass)
     elif loss == 'contrastive':
@@ -57,17 +58,19 @@ args = parser.parse_args()
 if args.controlled:
     print(f"[Seed: {seed}]")
     torch.manual_seed(seed)
-
-# Get loss dependent configuration
-config = get_config(args.loss)
+    np.random.seed(seed)
 
 # Load Dataset
 print(f"[Task: {args.task}]")
 print('[Loading Dataset...]')
 if args.task == 'mnist' and args.mnist is not None:
+    nfeat, nclass = 2, 10
+    config = get_config(args.loss, nfeat, nclass)
     model = MNISTNet(nfeat, loss_module=config.loss_module)
     dataset = MNIST(args.mnist, args.batch_size)
 elif args.task == 'speaker':
+    nfeat, nclass = 2048, 1251
+    config = get_config(args.loss, nfeat, nclass)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size)
 else:
@@ -92,11 +95,12 @@ if args.plot:
 
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(ModelSaver(f"images/{args.loss}-best.pt"))
+    test_callbacks.append(ModelSaver(args.loss, f"images/{args.loss}-best.pt"))
 train_callbacks.append(Evaluator(device, test, config.test_distance, test_callbacks))
 
 # Configure trainer
-trainer = BaseTrainer(model, device, config.loss, train, config.optimizer(model, args.task), train_callbacks)
+trainer = BaseTrainer(args.loss, model, device, config.loss, train, config.optimizer(model, args.task),
+                      recover=args.recover, callbacks=train_callbacks)
 
 print()
 

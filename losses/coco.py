@@ -3,6 +3,7 @@ import torch
 from torch import nn
 import torch.nn.functional as F
 
+
 class CocoLinear(nn.Module):
     
     def __init__(self, nfeat, nclass, alpha):
