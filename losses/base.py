@@ -250,8 +250,8 @@ class BaseTrainer:
         self.optim = optim
         self.recover = recover
         self.callbacks = callbacks
-        
-    def train(self, epochs):
+
+    def _restore(self):
         if self.recover is not None:
             checkpoint = torch.load(self.recover)
             self.model.load_common_state_dict(checkpoint['common_state_dict'])
@@ -263,10 +263,12 @@ class BaseTrainer:
             epoch = checkpoint['epoch']
             accuracy = checkpoint['accuracy']
             print(f"Recovered Model. Epoch {epoch}. Accuracy {accuracy}%")
-            epoch += 1
+            return checkpoint, epoch+1
         else:
-            checkpoint = None
-            epoch = 0
+            return None, 0
+        
+    def train(self, epochs):
+        checkpoint, epoch = self._restore()
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
         for i in range(epoch, epoch+epochs+1):

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import random
 from random import randint
 from tqdm import tqdm
-from sts import SentIndex, Segment, MergeSegment
+from sts_stats.sts import SentIndex, Segment, MergeSegment
 
 
 def unique_pairs(xs, ys, scores):
