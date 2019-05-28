@@ -87,12 +87,11 @@ class VoxCeleb1(SimDataset):
         protocol = get_protocol('VoxCeleb.SpeakerVerification.VoxCeleb1_X', preprocessors=preprocessors)
         self.train_gen = SpeechSegmentGenerator(extractor, protocol, subset='train', per_label=1,
                                                 per_fold=batch_size, duration=0.2, parallel=3)
-        # TODO dev
-        self.test_gen = SpeechSegmentGenerator(extractor, protocol, subset='test', per_label=1,
-                                               per_fold=batch_size, duration=0.2, parallel=2)
+        self.dev_gen = SpeechSegmentGenerator(extractor, protocol, subset='development', per_label=1,
+                                              per_fold=batch_size, duration=0.2, parallel=2)
 
     def training_partition(self):
         return VoxCelebPartition(self.train_gen)
 
     def test_partition(self):
-        return VoxCelebPartition(self.test_gen)
+        return VoxCelebPartition(self.dev_gen)
