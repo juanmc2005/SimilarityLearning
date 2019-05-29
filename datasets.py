@@ -30,10 +30,10 @@ class SimDatasetPartition:
         raise NotImplementedError
 
 
-class MNISTPartition(SimDatasetPartition):
-    
+class LoaderWrapperPartition(SimDatasetPartition):
+
     def __init__(self, loader):
-        super(MNISTPartition, self).__init__()
+        super(LoaderWrapperPartition, self).__init__()
         self.loader = loader
         self.iterator = iter(loader)
 
@@ -52,19 +52,18 @@ class MNIST(SimDataset):
 
     def __init__(self, path, batch_size):
         super(MNIST, self).__init__()
+        self.batch_size = batch_size
         transform = transforms.Compose([
             transforms.ToTensor(),
             transforms.Normalize((0.1307,), (0.3081,))])
-        trainset = datasets.MNIST(path, download=True, train=True, transform=transform)
-        testset = datasets.MNIST(path, download=True, train=False, transform=transform)
-        self.train_loader = DataLoader(trainset, batch_size, shuffle=True, num_workers=4)
-        self.test_loader = DataLoader(testset, batch_size, shuffle=False, num_workers=4)
+        self.trainset = datasets.MNIST(path, download=True, train=True, transform=transform)
+        self.testset = datasets.MNIST(path, download=True, train=False, transform=transform)
 
     def training_partition(self):
-        return MNISTPartition(self.train_loader)
+        return LoaderWrapperPartition(DataLoader(self.trainset, self.batch_size, shuffle=True, num_workers=4))
 
     def test_partition(self):
-        return MNISTPartition(self.test_loader)
+        return LoaderWrapperPartition(DataLoader(self.testset, self.batch_size, shuffle=False, num_workers=4))
 
 
 class VoxCelebPartition(SimDatasetPartition):
@@ -100,22 +99,22 @@ class VoxCeleb1(SimDataset):
         return VoxCelebPartition(self.dev_gen)
 
 
-class SemEvalPartition(SimDatasetPartition):
-
-    def __init__(self, data):
-        super(SemEvalPartition, self).__init__()
-        self.data = data
-        self.iterator = iter(data)
-
-    def nbatches(self):
-        return len(self.data)
-
-    def __next__(self):
-        try:
-            return next(self.iterator)
-        except StopIteration:
-            self.iterator = iter(self.data)
-            return next(self.iterator)
+# class SemEvalPartition(SimDatasetPartition):
+#
+#     def __init__(self, data):
+#         super(SemEvalPartition, self).__init__()
+#         self.data = data
+#         self.iterator = iter(data)
+#
+#     def nbatches(self):
+#         return len(self.data)
+#
+#     def __next__(self):
+#         try:
+#             return next(self.iterator)
+#         except StopIteration:
+#             self.iterator = iter(self.data)
+#             return next(self.iterator)
 
 
 class SemEval(SimDataset):
@@ -134,31 +133,32 @@ class SemEval(SimDataset):
             segment_b = sts.SemEvalSegment(sents_b)
             if mode == 'pairs':
                 pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
-                data = np.array([(s1, s2, 0) for s1, s2 in pos] + [(s1, s2, 1) for s1, s2 in neg])
+                data = [(s1, s2, 0) for s1, s2 in pos] + [(s1, s2, 1) for s1, s2 in neg]
+                data = np.array([(s1.split(' '), s2.split(' '), y) for s1, s2, y in data])
             elif mode == 'triplets':
                 pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
                 anchors, positives, negatives = sts.triplets(unique_sents, pos, neg)
-                data = np.array(list(zip(anchors, positives, negatives)))
+                data = np.array([(a.split(' '), p.split(' '), n.split(' '))
+                                 for a, p, n in zip(anchors, positives, negatives)])
             elif mode == 'auto':
                 clusters = segment_a.clusters(segment_b, scores, threshold)
                 data, lens = [], []
                 for i, cluster in enumerate(clusters):
                     lens.append(len(cluster))
-                    data += [(x, i) for x in cluster]
+                    data += [(x.split(' '), i) for x in cluster]
             else:
                 raise ValueError("Mode can only be 'auto', 'pairs' or 'triplets'")
-            np.random.shuffle(data)
         return data
 
     def __init__(self, path, vector_path, vocab_path, batch_size, mode='auto', threshold=2.5):
         self.batch_size = batch_size
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
-        print(f"Created vocabulary. {n_inv} words out of {n_inv + n_oov} ({100 * n_inv / (n_inv + n_oov):d}%)")
+        print(f"Created vocabulary with {int(100 * n_inv / (n_inv + n_oov))}% coverage")
         self.train_sents = self.load_partition(join(path, 'train'), mode, threshold)
         self.dev_sents = self.load_partition(join(path, 'dev'), mode, threshold)
 
     def training_partition(self):
-        return SemEvalPartition(self.train_sents)
+        return LoaderWrapperPartition(DataLoader(self.train_sents, self.batch_size, shuffle=True))
 
     def test_partition(self):
-        return SemEvalPartition(self.dev_sents)
+        return LoaderWrapperPartition(DataLoader(self.dev_sents, self.batch_size, shuffle=True))
