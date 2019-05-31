@@ -99,24 +99,6 @@ class VoxCeleb1(SimDataset):
         return VoxCelebPartition(self.dev_gen)
 
 
-# class SemEvalPartition(SimDatasetPartition):
-#
-#     def __init__(self, data):
-#         super(SemEvalPartition, self).__init__()
-#         self.data = data
-#         self.iterator = iter(data)
-#
-#     def nbatches(self):
-#         return len(self.data)
-#
-#     def __next__(self):
-#         try:
-#             return next(self.iterator)
-#         except StopIteration:
-#             self.iterator = iter(self.data)
-#             return next(self.iterator)
-
-
 class SemEval(SimDataset):
 
     @staticmethod
@@ -148,7 +130,8 @@ class SemEval(SimDataset):
                     data += [(x.split(' '), i) for x in cluster]
             else:
                 raise ValueError("Mode can only be 'auto', 'pairs' or 'triplets'")
-        return data
+            np.random.shuffle(data)
+            return data
 
     def __init__(self, path, vector_path, vocab_path, batch_size, mode='auto', threshold=2.5):
         self.batch_size = batch_size
@@ -158,7 +141,7 @@ class SemEval(SimDataset):
         self.dev_sents = self.load_partition(join(path, 'dev'), mode, threshold)
 
     def training_partition(self):
-        return LoaderWrapperPartition(DataLoader(self.train_sents, self.batch_size, shuffle=True))
+        return LoaderWrapperPartition(DataLoader(self.train_sents, self.batch_size))
 
     def test_partition(self):
-        return LoaderWrapperPartition(DataLoader(self.dev_sents, self.batch_size, shuffle=True))
+        return LoaderWrapperPartition(DataLoader(self.dev_sents, self.batch_size))
