@@ -5,10 +5,10 @@ import numpy as np
 import math
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from pyannote.audio.features.utils import RawAudio
-from pyannote.audio.embedding.generators import SpeechSegmentGenerator
-from pyannote.database import get_protocol
-from pyannote.database import FileFinder
+# from pyannote.audio.features.utils import RawAudio
+# from pyannote.audio.embedding.generators import SpeechSegmentGenerator
+# from pyannote.database import get_protocol
+# from pyannote.database import FileFinder
 from os.path import join
 import sts_utils as sts
 
@@ -124,47 +124,74 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
 
 class SemEval(SimDataset):
 
-    @staticmethod
-    def load_partition(partition_path, mode, threshold):
-        with open(join(partition_path, 'a.toks'), 'r') as file_a,\
-                open(join(partition_path, 'b.toks'), 'r') as file_b,\
-                open(join(partition_path, 'sim.txt'), 'r') as score_file:
-            sents_a = [line.strip() for line in file_a.readlines()]
-            sents_b = [line.strip() for line in file_b.readlines()]
-            scores = [float(line.strip()) for line in score_file.readlines()]
-            sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
-            unique_sents = set(sents_a + sents_b)
-            segment_a = sts.SemEvalSegment(sents_a)
-            segment_b = sts.SemEvalSegment(sents_b)
-            if mode == 'pairs':
-                pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
-                data = [(s1, s2, 0) for s1, s2 in pos] + [(s1, s2, 1) for s1, s2 in neg]
-                data = np.array([(s1.split(' '), s2.split(' '), y) for s1, s2, y in data])
-            elif mode == 'triplets':
-                pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
-                anchors, positives, negatives = sts.triplets(unique_sents, pos, neg)
-                data = np.array([(a.split(' '), p.split(' '), n.split(' '))
-                                 for a, p, n in zip(anchors, positives, negatives)])
-            elif mode == 'auto':
-                clusters = segment_a.clusters(segment_b, scores, threshold)
-                data, lens = [], []
-                for i, cluster in enumerate(clusters):
-                    lens.append(len(cluster))
-                    data += [(x.split(' '), i) for x in cluster]
-            else:
-                raise ValueError("Mode can only be 'auto', 'pairs' or 'triplets'")
-            np.random.shuffle(data)
-            return data
-
     def __init__(self, path, vector_path, vocab_path, batch_size, mode='auto', threshold=2.5):
+        # TODO mode parameter should be refactored into a strategy-like object
+        self.path = path
         self.batch_size = batch_size
+        self.nclass = None
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
         print(f"Created vocabulary with {int(100 * n_inv / (n_inv + n_oov))}% coverage")
-        self.train_sents = self.load_partition(join(path, 'train'), mode, threshold)
-        self.dev_sents = self.load_partition(join(path, 'dev'), mode, threshold)
+        atrain, btrain, simtrain = self._load_partition('train')
+        adev, bdev, simdev = self._load_partition('dev')
+        atest, btest, simtest = self._load_partition('test')
+        if mode == 'auto':
+            sents_a = atrain + adev + atest
+            sents_b = btrain + bdev + btest
+            scores = simtrain + simdev + simtest
+            sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
+            clusters, self.nclass = self._clusterize(sents_a, sents_b, scores, threshold)
+            self.train_sents, self.dev_sents = [], []
+            for i, cluster in enumerate(clusters):
+                for sent in cluster:
+                    if sent in atrain or sent in btrain:
+                        self.train_sents.append((sent.split(' '), i))
+                    if sent in adev or sent in bdev:
+                        self.dev_sents.append((sent.split(' '), i))
+        elif mode == 'pairs':
+            self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
+            self.dev_sents = self._pairs(adev, bdev, simdev, threshold)
+        elif mode == 'triplets':
+            self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
+            self.dev_sents = self._triplets(adev, bdev, simdev, threshold)
+        else:
+            raise ValueError("Mode can only be 'auto', 'pairs' or 'triplets'")
 
     def training_partition(self):
+        np.random.shuffle(self.train_sents)
         return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
 
     def test_partition(self):
+        np.random.shuffle(self.dev_sents)
         return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)
+
+    def _load_partition(self, partition):
+        with open(join(self.path, partition, 'a.toks')) as afile, \
+                open(join(self.path, partition, 'b.toks')) as bfile, \
+                open(join(self.path, partition, 'sim.txt')) as simfile:
+            a = [line.strip() for line in afile.readlines()]
+            b = [line.strip() for line in bfile.readlines()]
+            sim = [float(line.strip()) for line in simfile.readlines()]
+            return a, b, sim
+
+    def _clusterize(self, sents_a, sents_b, scores, threshold):
+        segment_a = sts.SemEvalSegment(sents_a)
+        segment_b = sts.SemEvalSegment(sents_b)
+        clusters = segment_a.clusters(segment_b, scores, threshold)
+        return clusters, len(clusters)
+
+    def _pairs(self, sents_a, sents_b, scores, threshold):
+        segment_a = sts.SemEvalSegment(sents_a)
+        segment_b = sts.SemEvalSegment(sents_b)
+        pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
+        data = [(s1, s2, 0) for s1, s2 in pos] + [(s1, s2, 1) for s1, s2 in neg]
+        return np.array([(s1.split(' '), s2.split(' '), y) for s1, s2, y in data])
+
+    def _triplets(self, sents_a, sents_b, scores, threshold):
+        segment_a = sts.SemEvalSegment(sents_a)
+        segment_b = sts.SemEvalSegment(sents_b)
+        unique_sents = set(sents_a + sents_b)
+        pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
+        anchors, positives, negatives = sts.triplets(unique_sents, pos, neg)
+        return np.array([(a.split(' '), p.split(' '), n.split(' '))
+                         for a, p, n in zip(anchors, positives, negatives)])
+

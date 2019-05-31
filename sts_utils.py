@@ -97,6 +97,9 @@ class SemEvalSegment:
     def __init__(self, sents):
         self.sents = sents
 
+    def append(self, more_sents):
+        self.sents.extend(more_sents)
+
     def clusters(self, other_segment, scores, threshold=2.5):
         """
         Consider scores as edge weights in a graph of sentences.

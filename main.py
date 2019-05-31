@@ -2,10 +2,10 @@ import torch
 import numpy as np
 import argparse
 from distances import CosineDistance
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, Optimizer, ModelSaver
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver
 from losses import config as cf
-from datasets import MNIST, VoxCeleb1
-from models import MNISTNet, SpeakerNet
+from datasets import MNIST, VoxCeleb1, SemEval
+from models import MNISTNet, SpeakerNet, SemanticNet
 
 
 # Constants and script arguments
@@ -14,11 +14,11 @@ use_cuda = torch.cuda.is_available() and True
 seed = 999
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
-parser.add_argument('--mnist', type=str, default=None, help='Path to MNIST dataset')
+parser.add_argument('--path', type=str, default=None, help='Path to MNIST/SemEval dataset')
+parser.add_argument('--vocab', type=str, default=None, help='Path to vocabulary file for STS')
+parser.add_argument('--word2vec', type=str, default=None, help='Path to word embeddings for STS')
 parser.add_argument('--loss', type=str, help=loss_options)
 parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
-parser.add_argument('-c', '--controlled', type=bool, default=True,
-                    help='Whether to set a fixed seed to control the training environment. Default value: True')
 parser.add_argument('--log-interval', type=int, default=10,
                     help='Steps (in percentage) to show epoch progress. Default value: 10')
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
@@ -53,28 +53,32 @@ def get_config(loss, nfeat, nclass):
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
 
-# Parse arguments and set custom seed if requested
+# Parse arguments and set custom seed
 args = parser.parse_args()
-if args.controlled:
-    print(f"[Seed: {seed}]")
-    torch.manual_seed(seed)
-    np.random.seed(seed)
+print(f"[Seed: {seed}]")
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 # Load Dataset
 print(f"[Task: {args.task}]")
 print('[Loading Dataset...]')
-if args.task == 'mnist' and args.mnist is not None:
+if args.task == 'mnist' and args.path is not None:
     nfeat, nclass = 2, 10
     config = get_config(args.loss, nfeat, nclass)
     model = MNISTNet(nfeat, loss_module=config.loss_module)
-    dataset = MNIST(args.mnist, args.batch_size)
+    dataset = MNIST(args.path, args.batch_size)
 elif args.task == 'speaker':
     nfeat, nclass = 2048, 1251
     config = get_config(args.loss, nfeat, nclass)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size)
+elif args.task == 'sts' and args.path is not None and args.vocab is not None and args.word2vec is not None:
+    nfeat = 1024
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode='auto', threshold=4.5)
+    config = get_config(args.loss, nfeat, dataset.nclass)
+    model = SemanticNet(nfeat, dataset.vocab, config.loss_module)
 else:
-    raise ValueError('Unrecognized task or MNIST path missing')
+    raise ValueError('Unrecognized task or dataset path missing')
 test = dataset.test_partition()
 train = dataset.training_partition()
 print('[Dataset Loaded]')
