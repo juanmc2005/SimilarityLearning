@@ -5,10 +5,10 @@ import numpy as np
 import math
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-# from pyannote.audio.features.utils import RawAudio
-# from pyannote.audio.embedding.generators import SpeechSegmentGenerator
-# from pyannote.database import get_protocol
-# from pyannote.database import FileFinder
+from pyannote.audio.features.utils import RawAudio
+from pyannote.audio.embedding.generators import SpeechSegmentGenerator
+from pyannote.database import get_protocol
+from pyannote.database import FileFinder
 from os.path import join
 import sts_utils as sts
 
@@ -111,10 +111,12 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
         start = 0
         while True:
             end = min(start + self.batch_size, len(self.data))
-            yield self.data[start:end]
+            batch = self.data[start:end]
             if end == len(self.data):
                 start = 0
-            start += self.batch_size
+            else:
+                start += self.batch_size
+            yield batch
 
     def nbatches(self):
         return math.ceil(len(self.data) / self.batch_size)
@@ -152,8 +154,12 @@ class SemEval(SimDataset):
                         self.dev_sents.append((sent.split(' '), i))
             self.train_sents = np.array(self.train_sents)
             self.dev_sents = np.array(self.dev_sents)
+            print(f"Unique sentences used for clustering: {len(set(sents_a + sents_b))}")
             print(f"Train Sentences: {len(self.train_sents)}")
             print(f"Dev Sentences: {len(self.dev_sents)}")
+            print(f"N Clusters: {self.nclass}")
+            print(f"Max Cluster Size: {max([len(cluster) for cluster in clusters])}")
+            print(f"Mean Cluster Size: {np.mean([len(cluster) for cluster in clusters])}")
         elif mode == 'pairs':
             self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
             self.dev_sents = self._pairs(adev, bdev, simdev, threshold)

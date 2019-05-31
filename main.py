@@ -77,7 +77,7 @@ elif args.task == 'speaker':
     batch_transforms.append(DeviceMapperTransform(device))
 elif args.task == 'sts' and args.path is not None and args.vocab is not None and args.word2vec is not None:
     nfeat = 1024
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode='auto', threshold=5)
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode='auto', threshold=4)
     config = get_config(args.loss, nfeat, dataset.nclass)
     model = SemanticNet(device, nfeat, dataset.vocab, config.loss_module)
 else:
