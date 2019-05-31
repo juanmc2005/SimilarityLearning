@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import numpy as np
+import math
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from pyannote.audio.features.utils import RawAudio
@@ -99,6 +100,28 @@ class VoxCeleb1(SimDataset):
         return VoxCelebPartition(self.dev_gen)
 
 
+class SemEvalClusterizedPartition(SimDatasetPartition):
+
+    def __init__(self, sent_data, batch_size):
+        self.sents = [x for x, _ in sent_data]
+        self.y = [y for _, y in sent_data]
+        self.batch_size = batch_size
+        self.generator = self._generate()
+
+    def _generate(self):
+        start = -self.batch_size
+        while True:
+            start += self.batch_size
+            end = min(start + self.batch_size, len(self.sents))
+            yield (self.sents[start:end], self.y[start:end])
+
+    def nbatches(self):
+        return math.ceil(len(self.sents) / self.batch_size)
+
+    def __next__(self):
+        return next(self.generator)
+
+
 class SemEval(SimDataset):
 
     @staticmethod
@@ -141,7 +164,7 @@ class SemEval(SimDataset):
         self.dev_sents = self.load_partition(join(path, 'dev'), mode, threshold)
 
     def training_partition(self):
-        return LoaderWrapperPartition(DataLoader(self.train_sents, self.batch_size))
+        return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
 
     def test_partition(self):
-        return LoaderWrapperPartition(DataLoader(self.dev_sents, self.batch_size))
+        return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)

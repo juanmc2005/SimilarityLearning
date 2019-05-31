@@ -30,7 +30,7 @@ def _anchor_related_sents(anchor, pairs):
 
 def triplets(unique_sents, pos_pairs, neg_pairs):
     anchors, positives, negatives = [], [], []
-    for anchor in tqdm(unique_sents):
+    for anchor in tqdm(unique_sents, total=len(unique_sents), desc='Generating triplets'):
         for positive in _anchor_related_sents(anchor, pos_pairs):
             for negative in _anchor_related_sents(anchor, neg_pairs):
                 anchors.append(anchor)
@@ -103,7 +103,8 @@ class SemEvalSegment:
         Search for positive relationships and build clusters à la Breadth First Search
         """
         clusters = []
-        for i, s in tqdm(enumerate(set(self.sents))):
+        sent_set = set(self.sents)
+        for i, s in tqdm(enumerate(sent_set), total=len(sent_set), desc=f"Generating clusters with threshold={threshold}"):
             if SemEvalSegment.find_cluster(clusters, s) is not None:
                 continue
             c = [s]
@@ -144,7 +145,9 @@ class SemEvalSegment:
             tlow = threshold
             thigh = threshold
         pos, neg = [], []
-        for i, s in tqdm(enumerate(set(self.sents))):
+        sent_set = set(self.sents)
+        for i, s in tqdm(enumerate(sent_set), total=len(sent_set),
+                         desc=f"Generating positive and negative pairs with threshold={threshold}"):
             added = {(i, self)}
             stack = deque()
             for j, x in enumerate(self.sents):

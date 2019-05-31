@@ -4,7 +4,6 @@ import torch.nn as nn
 import numpy
 
 
-# TODO further clean up and inherit from SimNet
 class PWIM(nn.Module):
     def __init__(self, nfeat_word, nfeat_sent, vec_vocab, tokens):
         super(PWIM, self).__init__()
@@ -35,15 +34,13 @@ class PWIM(nn.Module):
         sentA = self.word_embedding(indices)
         return sentA.view(-1, 1, self.nfeat_word)
 
-    def forward(self, sents, y):
+    def forward(self, sents):
         embeds = []
         for sent in sents:
             x = self.word_layer(sent)
             # Encode input
-            out, (state, _) = self.lstm(x)
+            out, _ = self.lstm(x)
             # Max pooling to get embeddings
             embed = torch.max(out, 0)[0]
             embeds.append(embed)
-        embeds = torch.cat(embeds, 0).view(-1, self.nfeat_sent)
-        # TODO use the embedding to calculate logits (i.e. add loss module)
-        return embeds, None
+        return torch.cat(embeds, 0).view(-1, self.nfeat_sent)

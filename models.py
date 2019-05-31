@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from torch import nn
 from sincnet import SincNet, MLP
+from pwim import PWIM
 
 
 class Flatten(nn.Module):
@@ -111,3 +112,20 @@ class SpeakerNet(SimNet):
     def load_common_state_dict(self, checkpoint):
         self.cnn.load_state_dict(checkpoint['cnn'])
         self.dnn.load_state_dict(checkpoint['dnn'])
+
+
+class SemanticNet(SimNet):
+
+    def __init__(self, nfeat, vector_vocab, loss_module=None):
+        super().__init__(loss_module)
+        self.pwim = PWIM(nfeat_word=300, nfeat_sent=nfeat,
+                         vec_vocab=vector_vocab, tokens=vector_vocab.keys())
+
+    def layers(self):
+        return [self.pwim]
+
+    def common_state_dict(self):
+        return self.pwim.state_dict()
+
+    def load_common_state_dict(self, checkpoint):
+        self.pwim.load_state_dict(checkpoint)
