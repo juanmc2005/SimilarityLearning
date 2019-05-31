@@ -1,23 +1,24 @@
 import torch
+import numpy as np
 import argparse
 from distances import CosineDistance
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, Optimizer, ModelSaver
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver, DeviceMapperTransform
 from losses import config as cf
-from datasets import MNIST
+from datasets import MNIST, VoxCeleb1, SemEval
+from models import MNISTNet, SpeakerNet, SemanticNet
 
 
 # Constants and script arguments
 loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
-nfeat, nclass = 2, 10
 seed = 999
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
-parser.add_argument('--mnist', type=str, help='Path to MNIST dataset')
+parser.add_argument('--path', type=str, default=None, help='Path to MNIST/SemEval dataset')
+parser.add_argument('--vocab', type=str, default=None, help='Path to vocabulary file for STS')
+parser.add_argument('--word2vec', type=str, default=None, help='Path to word embeddings for STS')
 parser.add_argument('--loss', type=str, help=loss_options)
 parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
-parser.add_argument('-c', '--controlled', type=bool, default=True,
-                    help='Whether to set a fixed seed to control the training environment. Default value: True')
 parser.add_argument('--log-interval', type=int, default=10,
                     help='Steps (in percentage) to show epoch progress. Default value: 10')
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
@@ -27,48 +28,69 @@ parser.set_defaults(plot=True)
 parser.add_argument('--save', dest='save', action='store_true', help='Save best accuracy models')
 parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT save best accuracy models')
 parser.set_defaults(save=True)
+parser.add_argument('--task', type=str, default='mnist', help='The task to train')
+parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
 
 
 def enabled_str(value):
     return 'ENABLED' if value else 'DISABLED'
 
 
-def get_config(loss):
+def get_config(loss, nfeat, nclass):
     if loss == 'softmax':
-        return cf.softmax(device, nfeat, nclass)
+        return cf.SoftmaxConfig(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return cf.contrastive(device, nfeat)
+        return cf.ContrastiveConfig(device)
     elif loss == 'triplet':
-        return cf.triplet(device, nfeat)
+        return cf.TripletConfig(device)
     elif loss == 'arcface':
-        return cf.arcface(device, nfeat, nclass)
+        return cf.ArcFaceConfig(device, nfeat, nclass)
     elif loss == 'center':
-        return cf.center(device, nfeat, nclass, distance=CosineDistance())
+        return cf.CenterConfig(device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
-        return cf.coco(device, nfeat, nclass)
+        return cf.CocoConfig(device, nfeat, nclass)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
 
-# Parse arguments and set custom seed if requested
+# Parse arguments and set custom seed
 args = parser.parse_args()
-if args.controlled:
-    print(f"[Seed: {seed}]")
-    torch.manual_seed(seed)
+print(f"[Seed: {seed}]")
+torch.manual_seed(seed)
+np.random.seed(seed)
 
 # Load Dataset
-mnist = MNIST(args.mnist, args.batch_size)
-test = mnist.test_partition()
-train = mnist.training_partition()
-
-# Get loss dependent configuration
-config = get_config(args.loss)
+print(f"[Task: {args.task}]")
+print('[Loading Dataset...]')
+batch_transforms = []
+if args.task == 'mnist' and args.path is not None:
+    nfeat, nclass = 2, 10
+    config = get_config(args.loss, nfeat, nclass)
+    model = MNISTNet(nfeat, loss_module=config.loss_module)
+    dataset = MNIST(args.path, args.batch_size)
+    batch_transforms.append(DeviceMapperTransform(device))
+elif args.task == 'speaker':
+    nfeat, nclass = 2048, 1251
+    config = get_config(args.loss, nfeat, nclass)
+    model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
+    dataset = VoxCeleb1(args.batch_size)
+    batch_transforms.append(DeviceMapperTransform(device))
+elif args.task == 'sts' and args.path is not None and args.vocab is not None and args.word2vec is not None:
+    nfeat = 1024
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode='auto', threshold=4)
+    config = get_config(args.loss, nfeat, dataset.nclass)
+    model = SemanticNet(device, nfeat, dataset.vocab, config.loss_module)
+else:
+    raise ValueError('Unrecognized task or dataset path missing')
+test = dataset.test_partition()
+train = dataset.training_partition()
+print('[Dataset Loaded]')
 
 # Create plugins
 test_callbacks = []
 train_callbacks = []
 if args.log_interval in range(1, 101):
-    print(f"[Logging: every {args.log_interval}%]")
+    print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
     test_callbacks.append(TestLogger(args.log_interval, test.nbatches()))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches()))
 else:
@@ -76,17 +98,16 @@ else:
 
 print(f"[Plots: {enabled_str(args.plot)}]")
 if args.plot:
-    test_callbacks.append(Visualizer(config['name'], config['param_desc']))
+    test_callbacks.append(Visualizer(config.name, config.param_desc))
 
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(ModelSaver(f"images/{args.loss}-best.pt"))
-train_callbacks.append(Evaluator(device, test, config['test_distance'], test_callbacks))
+    test_callbacks.append(ModelSaver(args.loss, f"images/{args.loss}-best.pt"))
+train_callbacks.append(Evaluator(device, test, config.test_distance, batch_transforms, test_callbacks))
 
 # Configure trainer
-trainer = BaseTrainer(config['model'], device, config['loss'], train,
-                      Optimizer(config['optim'], config['sched']),
-                      callbacks=train_callbacks)
+trainer = BaseTrainer(args.loss, model, device, config.loss, train, config.optimizer(model, args.task),
+                      recover=args.recover, batch_transforms=batch_transforms, callbacks=train_callbacks)
 
 print()
 

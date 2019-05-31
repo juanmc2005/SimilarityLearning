@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 from torch import nn
 from sincnet import SincNet, MLP
+from pwim import PWIM
 
 
 class Flatten(nn.Module):
@@ -16,6 +17,12 @@ class SimNet(nn.Module):
         self.loss_module = loss_module
 
     def layers(self):
+        raise NotImplementedError
+
+    def common_state_dict(self):
+        raise NotImplementedError
+
+    def load_common_state_dict(self, checkpoint):
         raise NotImplementedError
 
     def forward(self, x, y):
@@ -59,6 +66,12 @@ class MNISTNet(SimNet):
     def layers(self):
         return [self.net]
 
+    def common_state_dict(self):
+        return self.net.state_dict()
+
+    def load_common_state_dict(self, checkpoint):
+        self.net.load_state_dict(checkpoint)
+
 
 class SpeakerNet(SimNet):
 
@@ -90,14 +103,29 @@ class SpeakerNet(SimNet):
     def layers(self):
         return [self.cnn, self.dnn]
 
+    def common_state_dict(self):
+        return {
+            'cnn': self.cnn.state_dict(),
+            'dnn': self.dnn.state_dict()
+        }
 
-"""
-if __name__ == '__main__':
-    x = torch.rand(50, 3200)
-    y = torch.randint(0, 1251, (50,))
-    loss_module = ArcLinear(nfeat=2048, nclass=1251, margin=0.2, s=7.)
-    net = SpeakerNet(nfeat=2048, sample_rate=16000, window=200, loss_module=loss_module)
-    feat, logits = net(x, y)
-    print(f"feat size = {feat.size()}")
-    print(f"logits size = {logits.size() if logits is not None else None}")
-"""
+    def load_common_state_dict(self, checkpoint):
+        self.cnn.load_state_dict(checkpoint['cnn'])
+        self.dnn.load_state_dict(checkpoint['dnn'])
+
+
+class SemanticNet(SimNet):
+
+    def __init__(self, device, nfeat, vector_vocab, loss_module=None):
+        super().__init__(loss_module)
+        self.pwim = PWIM(device, nfeat_word=300, nfeat_sent=nfeat,
+                         vec_vocab=vector_vocab, tokens=vector_vocab.keys())
+
+    def layers(self):
+        return [self.pwim]
+
+    def common_state_dict(self):
+        return self.pwim.state_dict()
+
+    def load_common_state_dict(self, checkpoint):
+        self.pwim.load_state_dict(checkpoint)

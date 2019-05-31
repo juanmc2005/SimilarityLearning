@@ -4,6 +4,7 @@ from collections import Counter, deque
 import matplotlib.pyplot as plt
 from tqdm import tqdm
 
+
 def get_bar_data(indexed_items, counter):
     icounts, counts = [], []
     for i, s in indexed_items:
