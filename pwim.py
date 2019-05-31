@@ -5,8 +5,9 @@ import numpy
 
 
 class PWIM(nn.Module):
-    def __init__(self, nfeat_word, nfeat_sent, vec_vocab, tokens):
+    def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, tokens):
         super(PWIM, self).__init__()
+        self.device = device
         self.nfeat_word = nfeat_word
         self.nfeat_sent = nfeat_sent
         if not 'oov' in tokens:
@@ -28,9 +29,7 @@ class PWIM(nn.Module):
                 tmp.append(self.word2id[word])
             else:
                 tmp.append(self.word2id['oov'])
-        indices = Variable(torch.LongTensor(tmp))
-        if torch.cuda.is_available():
-            indices = indices.cuda()
+        indices = Variable(torch.LongTensor(tmp)).to(self.device)
         sentA = self.word_embedding(indices)
         return sentA.view(-1, 1, self.nfeat_word)
 

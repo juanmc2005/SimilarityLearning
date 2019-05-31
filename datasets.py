@@ -103,23 +103,26 @@ class VoxCeleb1(SimDataset):
 class SemEvalClusterizedPartition(SimDatasetPartition):
 
     def __init__(self, sent_data, batch_size):
-        self.sents = [x for x, _ in sent_data]
-        self.y = [y for _, y in sent_data]
+        self.data = sent_data
         self.batch_size = batch_size
         self.generator = self._generate()
 
     def _generate(self):
-        start = -self.batch_size
+        start = 0
         while True:
+            end = min(start + self.batch_size, len(self.data))
+            yield self.data[start:end]
+            if end == len(self.data):
+                start = 0
             start += self.batch_size
-            end = min(start + self.batch_size, len(self.sents))
-            yield (self.sents[start:end], self.y[start:end])
 
     def nbatches(self):
-        return math.ceil(len(self.sents) / self.batch_size)
+        return math.ceil(len(self.data) / self.batch_size)
 
     def __next__(self):
-        return next(self.generator)
+        batch = next(self.generator)
+        np.random.shuffle(batch)
+        return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
 
 
 class SemEval(SimDataset):
@@ -147,6 +150,10 @@ class SemEval(SimDataset):
                         self.train_sents.append((sent.split(' '), i))
                     if sent in adev or sent in bdev:
                         self.dev_sents.append((sent.split(' '), i))
+            self.train_sents = np.array(self.train_sents)
+            self.dev_sents = np.array(self.dev_sents)
+            print(f"Train Sentences: {len(self.train_sents)}")
+            print(f"Dev Sentences: {len(self.dev_sents)}")
         elif mode == 'pairs':
             self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
             self.dev_sents = self._pairs(adev, bdev, simdev, threshold)

@@ -141,8 +141,8 @@ class Visualizer(TestListener):
         super(Visualizer, self).__init__()
         self.loss_name = loss_name
         self.param_desc = param_desc
-    
-    def on_best_accuracy(self, epoch, model, optim, accuracy, feat, y):
+
+    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         plot_name = f"embeddings-epoch-{epoch}"
         plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
         if self.param_desc is not None:
@@ -173,11 +173,12 @@ class ModelSaver(TestListener):
 
 class Evaluator(TrainingListener):
     
-    def __init__(self, device, loader, distance, callbacks=[]):
+    def __init__(self, device, loader, distance, batch_transforms=[], callbacks=[]):
         super(Evaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.distance = distance
+        self.batch_transforms = batch_transforms
         self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
         self.best_acc = 0
@@ -191,7 +192,10 @@ class Evaluator(TrainingListener):
         with torch.no_grad():
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
-                x, y = x.to(self.device), y.to(self.device)
+
+                # Apply custom transformations to the batch before feeding the model
+                for transform in self.batch_transforms:
+                    x, y = transform(x, y)
                 
                 # Feed Forward
                 feat, _ = model(x, y)
@@ -239,9 +243,18 @@ class Evaluator(TrainingListener):
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, acc, feat_test, y_test)
 
 
+class DeviceMapperTransform:
+
+    def __init__(self, device):
+        self.device = device
+
+    def __call__(self, x, y):
+        return x.to(self.device), y.to(self.device)
+
+
 class BaseTrainer:
     
-    def __init__(self, loss_name, model, device, loss_fn, loader, optim, recover=None, callbacks=[]):
+    def __init__(self, loss_name, model, device, loss_fn, loader, optim, recover=None, batch_transforms=[], callbacks=[]):
         self.loss_name = loss_name
         self.model = model.to(device)
         self.device = device
@@ -249,6 +262,7 @@ class BaseTrainer:
         self.loader = loader
         self.optim = optim
         self.recover = recover
+        self.batch_transforms = batch_transforms
         self.callbacks = callbacks
 
     def _restore(self):
@@ -272,7 +286,7 @@ class BaseTrainer:
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
         for i in range(epoch, epoch+epochs+1):
-            self.train_epoch(i)
+            self.train_epoch(i+1)
         
     def train_epoch(self, epoch):
         self.model.train()
@@ -284,7 +298,10 @@ class BaseTrainer:
 
         for i in range(self.loader.nbatches()):
             x, y = next(self.loader)
-            x, y = x.to(self.device), y.to(self.device)
+
+            # Apply custom transformations to the batch before feeding the model
+            for transform in self.batch_transforms:
+                x, y = transform(x, y)
             
             # Feed Forward
             feat, logits = self.model(x, y)

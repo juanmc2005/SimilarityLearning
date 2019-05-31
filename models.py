@@ -116,9 +116,9 @@ class SpeakerNet(SimNet):
 
 class SemanticNet(SimNet):
 
-    def __init__(self, nfeat, vector_vocab, loss_module=None):
+    def __init__(self, device, nfeat, vector_vocab, loss_module=None):
         super().__init__(loss_module)
-        self.pwim = PWIM(nfeat_word=300, nfeat_sent=nfeat,
+        self.pwim = PWIM(device, nfeat_word=300, nfeat_sent=nfeat,
                          vec_vocab=vector_vocab, tokens=vector_vocab.keys())
 
     def layers(self):
