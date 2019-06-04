@@ -73,7 +73,7 @@ elif args.task == 'speaker':
     nfeat, nclass = 2048, 1251
     config = get_config(args.loss, nfeat, nclass)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
-    dataset = VoxCeleb1(args.batch_size)
+    dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
     batch_transforms.append(DeviceMapperTransform(device))
 elif args.task == 'sts' and args.path is not None and args.vocab is not None and args.word2vec is not None:
     nfeat = 1024

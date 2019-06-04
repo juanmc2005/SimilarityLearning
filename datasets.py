@@ -3,6 +3,7 @@
 import torch
 import numpy as np
 import math
+import torch.nn.functional as F
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from pyannote.audio.features.utils import RawAudio
@@ -69,35 +70,41 @@ class MNIST(SimDataset):
 
 class VoxCelebPartition(SimDatasetPartition):
 
-    def __init__(self, generator):
+    def __init__(self, generator, segment_size):
         self.generator = generator()
         self.batches_per_epoch = generator.batches_per_epoch
-        self.batch_size = generator.batch_size
+        self.segment_size = segment_size
 
     def nbatches(self):
         return self.batches_per_epoch
 
     def __next__(self):
         dic = next(self.generator)
-        return torch.Tensor(dic['X']).view(self.batch_size, -1), torch.Tensor(dic['y']).long()
+        x, y = torch.Tensor(dic['X']).view(-1, self.segment_size), torch.Tensor(dic['y']).long()
+        return x, y
 
 
 class VoxCeleb1(SimDataset):
 
-    def __init__(self, batch_size):
-        extractor = RawAudio(sample_rate=16000)
+    def __init__(self, batch_size, segment_size_millis):
+        sample_rate = 16000
+        segment_size_s = segment_size_millis / 1000
+        print(f"Segment Size = {segment_size_s}s")
+        self.nfeat = sample_rate * segment_size_millis // 1000
+        print(f"Embedding Size = {self.nfeat}")
+        extractor = RawAudio(sample_rate=sample_rate)
         preprocessors = {'audio': FileFinder()}
         protocol = get_protocol('VoxCeleb.SpeakerVerification.VoxCeleb1_X', preprocessors=preprocessors)
         self.train_gen = SpeechSegmentGenerator(extractor, protocol, subset='train', per_label=1,
-                                                per_fold=batch_size, duration=0.2, parallel=3)
+                                                per_fold=batch_size, duration=segment_size_s, parallel=3)
         self.dev_gen = SpeechSegmentGenerator(extractor, protocol, subset='development', per_label=1,
-                                              per_fold=batch_size, duration=0.2, parallel=2)
+                                              per_fold=batch_size, duration=segment_size_s, parallel=2)
 
     def training_partition(self):
-        return VoxCelebPartition(self.train_gen)
+        return VoxCelebPartition(self.train_gen, self.nfeat)
 
     def test_partition(self):
-        return VoxCelebPartition(self.dev_gen)
+        return VoxCelebPartition(self.dev_gen, self.nfeat)
 
 
 class SemEvalClusterizedPartition(SimDatasetPartition):
