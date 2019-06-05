@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 import torch
 import numpy as np
-from distances import AccuracyCalculator
 import visual
 
 
@@ -34,7 +33,7 @@ class TestListener:
     def on_before_test(self):
         pass
     
-    def on_batch_tested(self, ibatch, feat, correct, total):
+    def on_batch_tested(self, ibatch, feat):
         pass
     
     def on_after_test(self):
@@ -60,10 +59,12 @@ class Optimizer:
         }
     
     def load_state_dict(self, checkpoint):
-        for i, op in enumerate(self.optimizers):
-            op.load_state_dict(checkpoint[self.OPTIM_KEY][i])
-        for i, s in enumerate(self.schedulers):
-            s.load_state_dict(checkpoint[self.SCHED_KEY][i])
+        if self.OPTIM_KEY in checkpoint:
+            for i, op in enumerate(self.optimizers):
+                op.load_state_dict(checkpoint[self.OPTIM_KEY][i])
+        if self.SCHED_KEY in checkpoint:
+            for i, s in enumerate(self.schedulers):
+                s.load_state_dict(checkpoint[self.SCHED_KEY][i])
     
     def scheduler_step(self):
         for s in self.schedulers:
@@ -131,7 +132,7 @@ class TestLogger(TestListener):
     def on_before_test(self):
         self.logger.restart()
     
-    def on_batch_tested(self, ibatch, feat, correct, total):
+    def on_batch_tested(self, ibatch, feat):
         self.logger.on_test_batch(ibatch)
 
 
@@ -144,7 +145,7 @@ class Visualizer(TestListener):
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         plot_name = f"embeddings-epoch-{epoch}"
-        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
+        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f} Accuracy"
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
         print(f"Saving plot as {plot_name}")
@@ -173,20 +174,19 @@ class ModelSaver(TestListener):
 
 class Evaluator(TrainingListener):
     
-    def __init__(self, device, loader, distance, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
         super(Evaluator, self).__init__()
         self.device = device
         self.loader = loader
-        self.distance = distance
+        self.metric = metric
         self.batch_transforms = batch_transforms
         self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
-        self.best_acc = 0
+        self.best_metric = 0
     
-    def _eval(self, model, acc_calc):
+    def _eval(self, model):
         model.eval()
-        correct, total = 0, 0
-        feat_test, y_test = [], []
+        feat_test, logits_test, y_test = [], [], []
         for cb in self.callbacks:
             cb.on_before_test()
         with torch.no_grad():
@@ -198,27 +198,27 @@ class Evaluator(TrainingListener):
                     x, y = transform(x, y)
                 
                 # Feed Forward
-                feat, _ = model(x, y)
+                feat, logits = model(x, y)
                 feat = feat.detach().cpu().numpy()
+                logits = logits.detach().cpu().numpy()
                 y = y.detach().cpu().numpy()
                 
                 # Track accuracy
                 feat_test.append(feat)
+                logits_test.append(logits)
                 y_test.append(y)
-                bcorrect, btotal = acc_calc.calculate_batch(feat, y)
-                correct += bcorrect
-                total += btotal
+                self.metric.calculate_batch(feat, logits, y)
                 
                 for cb in self.callbacks:
-                    cb.on_batch_tested(i, feat, correct, total)
+                    cb.on_batch_tested(i, feat)
                 
         for cb in self.callbacks:
             cb.on_after_test()
-        return np.concatenate(feat_test), np.concatenate(y_test), correct, total
+        return np.concatenate(feat_test), np.concatenate(y_test)
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:
-            self.best_acc = checkpoint['accuracy']
+            self.best_metric = checkpoint['accuracy']
     
     def on_before_epoch(self, epoch):
         self.feat_train, self.y_train = [], []
@@ -230,17 +230,17 @@ class Evaluator(TrainingListener):
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         feat_train = np.concatenate(self.feat_train)
         y_train = np.concatenate(self.y_train)
-        acc_calc = AccuracyCalculator(feat_train, y_train, self.distance)
-        feat_test, y_test, test_correct, test_total = self._eval(model, acc_calc)
-        acc = 100 * test_correct / test_total
+        self.metric.fit(feat_train, y_train)
+        feat_test, y_test = self._eval(model)
+        metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.2f}%)")
+        print(f"Test Metric: {metric_value:.2f}")
         print("------------------------------------------------")
-        if acc > self.best_acc:
-            self.best_acc = acc
-            print('New Best Test Accuracy!')
+        if metric_value > self.best_metric:
+            self.best_metric = metric_value
+            print('New Best Test Metric!')
             for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, loss_fn, optim, acc, feat_test, y_test)
+                cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
 
 
 class DeviceMapperTransform:
@@ -249,7 +249,9 @@ class DeviceMapperTransform:
         self.device = device
 
     def __call__(self, x, y):
-        return x.to(self.device), y.to(self.device)
+        if isinstance(x, torch.Tensor):
+            x = x.to(self.device)
+        return x, y.to(self.device)
 
 
 class BaseTrainer:
@@ -276,7 +278,7 @@ class BaseTrainer:
                 self.optim.load_state_dict(checkpoint['optim_state_dict'])
             epoch = checkpoint['epoch']
             accuracy = checkpoint['accuracy']
-            print(f"Recovered Model. Epoch {epoch}. Accuracy {accuracy}%")
+            print(f"Recovered Model. Epoch {epoch}. Test Metric {accuracy}")
             return checkpoint, epoch+1
         else:
             return None, 0

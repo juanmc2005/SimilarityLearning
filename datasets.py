@@ -3,7 +3,6 @@
 import torch
 import numpy as np
 import math
-import torch.nn.functional as F
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
 from pyannote.audio.features.utils import RawAudio
@@ -134,19 +133,80 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
         return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
 
 
+class SemEvalPairwisePartition(SimDatasetPartition):
+
+    def __init__(self, data, batch_size, classes):
+        self.data = data
+        self.batch_size = batch_size
+        self.classes = classes
+        self.generator = self._generate()
+
+    def _generate(self):
+        start = 0
+        while True:
+            end = min(start + self.batch_size, len(self.data))
+            batch = self.data[start:end]
+            if end == len(self.data):
+                start = 0
+            else:
+                start += self.batch_size
+            yield batch
+
+    def nbatches(self):
+        return math.ceil(len(self.data) / self.batch_size)
+
+    def __next__(self):
+        batch = next(self.generator)
+        np.random.shuffle(batch)
+        x = [x for x, _ in batch]
+        y = torch.Tensor([y for _, y in batch]).float()
+        y = y.view(-1, 6) if self.classes else y
+        return x, y
+
+
 class SemEval(SimDataset):
 
-    def __init__(self, path, vector_path, vocab_path, batch_size, mode='auto', threshold=2.5):
+    @staticmethod
+    def pad_sent(s1, s2):
+        if len(s1) == len(s2):
+            return s1, s2
+        elif len(s1) > len(s2):
+            d = len(s2)
+            for i in range(d, len(s1)):
+                s2 += ' null'
+        else:
+            d = len(s1)
+            for i in range(d, len(s2)):
+                s1 += 'null'
+        return s1, s2
+
+    @staticmethod
+    def scores_to_probs(scores):
+        labels = []
+        for s in scores:
+            ceil = int(math.ceil(s))
+            floor = int(math.floor(s))
+            tmp = [0, 0, 0, 0, 0, 0]
+            if floor != ceil:
+                tmp[ceil] = s - floor
+                tmp[floor] = ceil - s
+            else:
+                tmp[floor] = 1
+            labels.append(tmp)
+        return labels
+
+    def __init__(self, path, vector_path, vocab_path, batch_size, mode='classic', threshold=2.5):
         # TODO mode parameter should be refactored into a strategy-like object
         self.path = path
         self.batch_size = batch_size
+        self.mode = mode
         self.nclass = None
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
         print(f"Created vocabulary with {int(100 * n_inv / (n_inv + n_oov))}% coverage")
         atrain, btrain, simtrain = self._load_partition('train')
         adev, bdev, simdev = self._load_partition('dev')
         atest, btest, simtest = self._load_partition('test')
-        if mode == 'auto':
+        if mode == 'clusters':
             sents_a = atrain + adev + atest
             sents_b = btrain + bdev + btest
             scores = simtrain + simdev + simtest
@@ -173,16 +233,27 @@ class SemEval(SimDataset):
         elif mode == 'triplets':
             self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
             self.dev_sents = self._triplets(adev, bdev, simdev, threshold)
+        elif mode == 'classic':
+            self.train_sents = np.array(list(zip(zip(atrain, btrain), simtrain)))
+            self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
         else:
-            raise ValueError("Mode can only be 'auto', 'pairs' or 'triplets'")
+            raise ValueError("Mode can only be 'classic', 'clusters', 'pairs' or 'triplets'")
 
     def training_partition(self):
         np.random.shuffle(self.train_sents)
-        return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
+        # TODO add other modes
+        if self.mode == 'classic':
+            return SemEvalPairwisePartition(self.train_sents, self.batch_size, classes=True)
+        else:
+            return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
 
     def test_partition(self):
         np.random.shuffle(self.dev_sents)
-        return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)
+        # TODO add other modes
+        if self.mode == 'classic':
+            return SemEvalPairwisePartition(self.dev_sents, self.batch_size, classes=False)
+        else:
+            return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \
@@ -191,6 +262,10 @@ class SemEval(SimDataset):
             a = [line.strip() for line in afile.readlines()]
             b = [line.strip() for line in bfile.readlines()]
             sim = [float(line.strip()) for line in simfile.readlines()]
+            for i in range(len(a)):
+                a[i], b[i] = self.pad_sent(a[i], b[i])
+            if partition == 'train':
+                sim = self.scores_to_probs(sim)
             return a, b, sim
 
     def _clusterize(self, sents_a, sents_b, scores, threshold):

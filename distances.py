@@ -4,6 +4,7 @@ import torch
 import torch.nn.functional as F
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
+from scipy.stats import spearmanr
 
 
 # TODO remove this function and use pyannote function directly
@@ -125,8 +126,8 @@ class EuclideanDistance(Distance):
         return F.pdist(x)
 
 
-class AccuracyCalculator:
-    """
+class KNNAccuracyMetric:
+    """ TODO update docs
     Abstracts the accuracy calculation strategy. It uses a K Nearest Neighbors
         classifier fit with the embeddings produced for the training set,
         to determine to which class a given test embedding is assigned to.
@@ -137,10 +138,47 @@ class AccuracyCalculator:
     :param distance: a Distance object for the KNN classifier
     """
     
-    def __init__(self, train_embeddings, train_y, distance):
+    def __init__(self, distance):
         self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
-        self.knn.fit(train_embeddings, train_y)
+        self.correct, self.total = 0, 0
+
+    def fit(self, embeddings, y):
+        self.knn.fit(embeddings, y)
     
-    def calculate_batch(self, embeddings, y):
+    def calculate_batch(self, embeddings, logits, y):
         predicted = self.knn.predict(embeddings)
-        return (predicted == y).sum(), y.shape[0]
+        self.correct += (predicted == y).sum()
+        self.total += y.shape[0]
+
+    def get(self):
+        metric = self.correct / self.total
+        self.correct, self.total = 0, 0
+        return metric
+
+
+class SpearmanMetric:
+
+    def __init__(self):
+        self.predictions, self.targets = [], []
+
+    def fit(self, embeddings, y):
+        pass
+
+    def calculate_batch(self, embeddings, logits, y):
+        output = np.exp(logits)
+        predicted = []
+        for i in range(output.shape[0]):
+            predicted.append(0 * output[i, 0] +
+                             1 * output[i, 1] +
+                             2 * output[i, 2] +
+                             3 * output[i, 3] +
+                             4 * output[i, 4] +
+                             5 * output[i, 5])
+        self.predictions.extend(predicted)
+        self.targets.extend(list(y))
+
+    def get(self):
+        metric = spearmanr(self.predictions, self.targets)[0]
+        self.predictions, self.targets = [], []
+        return metric
+

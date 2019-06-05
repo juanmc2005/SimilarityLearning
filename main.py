@@ -3,9 +3,10 @@ import numpy as np
 import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver, DeviceMapperTransform
+from distances import KNNAccuracyMetric
 from losses import config as cf
-from datasets import MNIST, VoxCeleb1, SemEval
-from models import MNISTNet, SpeakerNet, SemanticNet
+from datasets import MNIST, VoxCeleb1
+from models import MNISTNet, SpeakerNet
 
 
 # Constants and script arguments
@@ -62,24 +63,19 @@ np.random.seed(seed)
 # Load Dataset
 print(f"[Task: {args.task}]")
 print('[Loading Dataset...]')
-batch_transforms = []
+batch_transforms = [DeviceMapperTransform(device)]
 if args.task == 'mnist' and args.path is not None:
     nfeat, nclass = 2, 10
     config = get_config(args.loss, nfeat, nclass)
     model = MNISTNet(nfeat, loss_module=config.loss_module)
     dataset = MNIST(args.path, args.batch_size)
-    batch_transforms.append(DeviceMapperTransform(device))
+    metric = KNNAccuracyMetric(config.test_distance)
 elif args.task == 'speaker':
     nfeat, nclass = 2048, 1251
     config = get_config(args.loss, nfeat, nclass)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
-    batch_transforms.append(DeviceMapperTransform(device))
-elif args.task == 'sts' and args.path is not None and args.vocab is not None and args.word2vec is not None:
-    nfeat = 1024
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode='auto', threshold=4)
-    config = get_config(args.loss, nfeat, dataset.nclass)
-    model = SemanticNet(device, nfeat, dataset.vocab, config.loss_module)
+    metric = KNNAccuracyMetric(config.test_distance)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
 test = dataset.test_partition()
@@ -103,7 +99,7 @@ if args.plot:
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
     test_callbacks.append(ModelSaver(args.loss, f"images/{args.loss}-best.pt"))
-train_callbacks.append(Evaluator(device, test, config.test_distance, batch_transforms, test_callbacks))
+train_callbacks.append(Evaluator(device, test, metric, batch_transforms, test_callbacks))
 
 # Configure trainer
 trainer = BaseTrainer(args.loss, model, device, config.loss, train, config.optimizer(model, args.task),
