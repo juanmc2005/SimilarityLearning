@@ -7,12 +7,12 @@ from pwim import PWIM
 
 class PredictionModel(nn.Module):
 
-    def __init__(self, layers):
+    def __init__(self, model: SimNet):
         super(PredictionModel, self).__init__()
-        self.layers = layers
+        self.model = model
 
     def forward(self, x):
-        for layer in self.layers():
+        for layer in self.model.layers():
             x = layer(x)
         return x
 
