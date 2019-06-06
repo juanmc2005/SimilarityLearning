@@ -5,6 +5,18 @@ from sincnet import SincNet, MLP
 from pwim import PWIM
 
 
+class PredictionModel(nn.Module):
+
+    def __init__(self, layers):
+        super(PredictionModel, self).__init__()
+        self.layers = layers
+
+    def forward(self, x):
+        for layer in self.layers():
+            x = layer(x)
+        return x
+
+
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
@@ -24,6 +36,9 @@ class SimNet(nn.Module):
 
     def load_common_state_dict(self, checkpoint):
         raise NotImplementedError
+
+    def to_prediction_model(self):
+        return PredictionModel(self.layers())
 
     def forward(self, x, y):
         for layer in self.layers():

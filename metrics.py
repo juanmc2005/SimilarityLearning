@@ -7,6 +7,7 @@ from pyannote.metrics.binary_classification import det_curve
 from pyannote.core.utils.distance import cdist
 from pyannote.core import Timeline
 from distances import Distance
+from models import SimNet
 
 
 class KNNAccuracyMetric:
@@ -86,8 +87,9 @@ class EERMetric:
             segments = (try_with,)
         return hash((uri, segments))
 
-    def __init__(self, model, device: str, batch_size: int, distance: Distance, config: SpeakerValidationConfig):
-        self.model = model
+    def __init__(self, model: SimNet, device: str, batch_size: int,
+                 distance: Distance, config: SpeakerValidationConfig):
+        self.model = model.to_prediction_model()
         self.device = device
         self.batch_size = batch_size
         self.distance = distance
