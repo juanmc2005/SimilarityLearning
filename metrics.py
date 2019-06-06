@@ -102,11 +102,12 @@ class EERMetric:
         pass
 
     def get(self):
+        # FIXME the SequenceEmbedding is not giving segments of the correct size
         # initialize embedding extraction
         sequence_embedding = SequenceEmbedding(model=self.model,
                                                feature_extraction=self.config.feature_extraction,
                                                duration=self.config.duration,
-                                               step=.5 * self.config.duration,
+                                               step=self.config.duration,
                                                batch_size=self.batch_size,
                                                device=self.device)
         protocol = get_protocol(self.config.protocol_name, progress=False, preprocessors=self.config.preprocessors)

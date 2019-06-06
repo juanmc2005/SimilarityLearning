@@ -26,7 +26,7 @@ class SimNet(nn.Module):
         raise NotImplementedError
 
     def to_prediction_model(self):
-        return PredictionModel(self.layers())
+        return PredictionModel(self)
 
     def forward(self, x, y):
         for layer in self.layers():
