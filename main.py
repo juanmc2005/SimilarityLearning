@@ -3,10 +3,10 @@ import numpy as np
 import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver, DeviceMapperTransform
-from metrics import KNNAccuracyMetric, EERMetric
+from metrics import KNNAccuracyMetric, EERMetric, LogitsSpearmanMetric
 from losses import config as cf
-from datasets import MNIST, VoxCeleb1
-from models import MNISTNet, SpeakerNet
+from datasets import MNIST, VoxCeleb1, SemEval
+from models import MNISTNet, SpeakerNet, SemanticNet
 
 
 # Constants and script arguments
@@ -50,6 +50,8 @@ def get_config(loss, nfeat, nclass):
         return cf.CenterConfig(device, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
         return cf.CocoConfig(device, nfeat, nclass)
+    elif loss == 'kldiv':
+        return cf.KLDivergenceConfig(device, nfeat)
     else:
         raise ValueError(f"Loss function should be one of: {loss_options}")
 
@@ -61,7 +63,7 @@ torch.manual_seed(seed)
 np.random.seed(seed)
 
 # Load Dataset
-print(f"[Task: {args.task}]")
+print(f"[Task: {args.task.upper()}]")
 print('[Loading Dataset...]')
 batch_transforms = [DeviceMapperTransform(device)]
 if args.task == 'mnist' and args.path is not None:
@@ -77,6 +79,22 @@ elif args.task == 'speaker':
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
     metric = EERMetric(model, device, args.batch_size, config.test_distance, dataset.config)
     print(f"EER: {metric.get()}")
+elif args.task == 'sts':
+    nfeat = 500
+    pairwise = args.loss == 'kldiv'
+    if pairwise:
+        mode = 'classic'
+    elif args.loss == 'contrastive':
+        mode = 'pairs'
+    elif args.loss == 'triplet':
+        mode = 'triplets'
+    else:
+        mode = 'clusters'
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=4)
+    config = get_config(args.loss, nfeat, dataset.nclass)
+    model = SemanticNet(device, nfeat, dataset.vocab, pairwise=pairwise, loss_module=config.loss_module)
+    # TODO add modified spearman metric instead of KNN accuracy
+    metric = LogitsSpearmanMetric() if pairwise else KNNAccuracyMetric(config.test_distance)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
 test = dataset.test_partition()

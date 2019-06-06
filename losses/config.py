@@ -127,9 +127,17 @@ class ContrastiveConfig(LossConfig):
         super(ContrastiveConfig, self).__init__('Contrastive Loss', f"m={margin} - {distance}", None, loss, distance)
 
     def optimizer(self, model, task):
-        # TODO change optimizer according to task
-        optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
-        schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
+        if task == 'mnist':
+            optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
+            schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
+        elif task == 'speaker':
+            optimizers = sincnet_optims(model)
+            schedulers = []
+        elif task == 'sts':
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.0001)]
+            schedulers = []
+        else:
+            raise ValueError('Task must be one of mnist/speaker/sts')
         return Optimizer(optimizers, schedulers)
 
 

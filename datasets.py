@@ -139,7 +139,7 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
         return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
 
 
-class SemEvalPairwisePartition(SimDatasetPartition):
+class SemEvalPartition(SimDatasetPartition):
 
     def __init__(self, data, batch_size, classes):
         self.data = data
@@ -213,36 +213,30 @@ class SemEval(SimDataset):
         atrain, btrain, simtrain = self._load_partition('train')
         adev, bdev, simdev = self._load_partition('dev')
         atest, btest, simtest = self._load_partition('test')
+        self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
         if mode == 'clusters':
             sents_a = atrain + adev + atest
             sents_b = btrain + bdev + btest
             scores = simtrain + simdev + simtest
             sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
             clusters, self.nclass = self._clusterize(sents_a, sents_b, scores, threshold)
-            self.train_sents, self.dev_sents = [], []
+            self.train_sents = []
             for i, cluster in enumerate(clusters):
                 for sent in cluster:
                     if sent in atrain or sent in btrain:
                         self.train_sents.append((sent.split(' '), i))
-                    if sent in adev or sent in bdev:
-                        self.dev_sents.append((sent.split(' '), i))
             self.train_sents = np.array(self.train_sents)
-            self.dev_sents = np.array(self.dev_sents)
             print(f"Unique sentences used for clustering: {len(set(sents_a + sents_b))}")
             print(f"Train Sentences: {len(self.train_sents)}")
-            print(f"Dev Sentences: {len(self.dev_sents)}")
             print(f"N Clusters: {self.nclass}")
             print(f"Max Cluster Size: {max([len(cluster) for cluster in clusters])}")
             print(f"Mean Cluster Size: {np.mean([len(cluster) for cluster in clusters])}")
         elif mode == 'pairs':
             self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
-            self.dev_sents = self._pairs(adev, bdev, simdev, threshold)
         elif mode == 'triplets':
             self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
-            self.dev_sents = self._triplets(adev, bdev, simdev, threshold)
         elif mode == 'classic':
             self.train_sents = np.array(list(zip(zip(atrain, btrain), simtrain)))
-            self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
         else:
             raise ValueError("Mode can only be 'classic', 'clusters', 'pairs' or 'triplets'")
 
@@ -250,17 +244,19 @@ class SemEval(SimDataset):
         np.random.shuffle(self.train_sents)
         # TODO add other modes
         if self.mode == 'classic':
-            return SemEvalPairwisePartition(self.train_sents, self.batch_size, classes=True)
+            return SemEvalPartition(self.train_sents, self.batch_size, classes=True)
+        elif self.mode == 'pairs':
+            return SemEvalPartition(self.train_sents, self.batch_size, classes=False)
         else:
             return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
 
     def test_partition(self):
         np.random.shuffle(self.dev_sents)
-        # TODO add other modes
-        if self.mode == 'classic':
-            return SemEvalPairwisePartition(self.dev_sents, self.batch_size, classes=False)
-        else:
+        # TODO add other modes maybe ?
+        if self.mode == 'clusters':
             return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)
+        else:
+            return SemEvalPartition(self.dev_sents, self.batch_size, classes=False)
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \

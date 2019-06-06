@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from datasets import SemEval
 from models import SemanticNet
-from metrics import SpearmanMetric
+from metrics import LogitsSpearmanMetric
 import losses.config as cf
 from losses.base import TrainLogger, TestLogger, ModelSaver, Evaluator, BaseTrainer, DeviceMapperTransform
 
@@ -41,7 +41,7 @@ nfeat = 500
 dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size)
 config = cf.KLDivergenceConfig(device, nfeat)
 model = SemanticNet(device, nfeat, dataset.vocab, pairwise=True, loss_module=config.loss_module)
-metric = SpearmanMetric()
+metric = LogitsSpearmanMetric()
 test = dataset.test_partition()
 train = dataset.training_partition()
 print('[Dataset Loaded]')

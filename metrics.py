@@ -40,7 +40,7 @@ class KNNAccuracyMetric:
         return metric
 
 
-class SpearmanMetric:
+class LogitsSpearmanMetric:
     def __init__(self):
         self.predictions, self.targets = [], []
 
