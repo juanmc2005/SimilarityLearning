@@ -120,11 +120,13 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
 
     def _generate(self):
         start = 0
+        np.random.shuffle(self.data)
         while True:
             end = min(start + self.batch_size, len(self.data))
             batch = self.data[start:end]
             if end == len(self.data):
                 start = 0
+                np.random.shuffle(self.data)
             else:
                 start += self.batch_size
             yield batch
@@ -134,7 +136,6 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
 
     def __next__(self):
         batch = next(self.generator)
-        np.random.shuffle(batch)
         return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
 
 
@@ -148,11 +149,13 @@ class SemEvalPairwisePartition(SimDatasetPartition):
 
     def _generate(self):
         start = 0
+        np.random.shuffle(self.data)
         while True:
             end = min(start + self.batch_size, len(self.data))
             batch = self.data[start:end]
             if end == len(self.data):
                 start = 0
+                np.random.shuffle(self.data)
             else:
                 start += self.batch_size
             yield batch
@@ -162,7 +165,6 @@ class SemEvalPairwisePartition(SimDatasetPartition):
 
     def __next__(self):
         batch = next(self.generator)
-        np.random.shuffle(batch)
         x = [x for x, _ in batch]
         y = torch.Tensor([y for _, y in batch]).float()
         y = y.view(-1, 6) if self.classes else y

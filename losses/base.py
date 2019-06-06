@@ -234,7 +234,7 @@ class Evaluator(TrainingListener):
         feat_test, y_test = self._eval(model)
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Test Metric: {metric_value:.2f}")
+        print(f"Test Metric: {metric_value:.6f}")
         print("------------------------------------------------")
         if metric_value > self.best_metric:
             self.best_metric = metric_value
@@ -281,14 +281,14 @@ class BaseTrainer:
             print(f"Recovered Model. Epoch {epoch}. Test Metric {accuracy}")
             return checkpoint, epoch+1
         else:
-            return None, 0
+            return None, 1
         
     def train(self, epochs):
         checkpoint, epoch = self._restore()
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
         for i in range(epoch, epoch+epochs+1):
-            self.train_epoch(i+1)
+            self.train_epoch(i)
         
     def train_epoch(self, epoch):
         self.model.train()

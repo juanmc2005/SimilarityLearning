@@ -13,7 +13,7 @@ def enabled_str(value):
 
 
 use_cuda = torch.cuda.is_available() and True
-seed = 999
+seed = 124
 device = torch.device('cuda' if use_cuda else 'cpu')
 
 parser = argparse.ArgumentParser()
