@@ -5,18 +5,6 @@ from sincnet import SincNet, MLP
 from pwim import PWIM
 
 
-class PredictionModel(nn.Module):
-
-    def __init__(self, model: SimNet):
-        super(PredictionModel, self).__init__()
-        self.model = model
-
-    def forward(self, x):
-        for layer in self.model.layers():
-            x = layer(x)
-        return x
-
-
 class Flatten(nn.Module):
     def forward(self, x):
         return x.view(x.size(0), -1)
@@ -51,6 +39,18 @@ class SimNet(nn.Module):
         if self.loss_module is not None:
             params.append(self.loss_module.parameters())
         return params
+
+
+class PredictionModel(nn.Module):
+
+    def __init__(self, model: SimNet):
+        super(PredictionModel, self).__init__()
+        self.model = model
+
+    def forward(self, x):
+        for layer in self.model.layers():
+            x = layer(x)
+        return x
 
 
 class MNISTNet(SimNet):
