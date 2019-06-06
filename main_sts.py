@@ -3,7 +3,7 @@ import argparse
 import numpy as np
 from datasets import SemEval
 from models import SemanticNet
-from distances import SpearmanMetric
+from metrics import SpearmanMetric
 import losses.config as cf
 from losses.base import TrainLogger, TestLogger, ModelSaver, Evaluator, BaseTrainer, DeviceMapperTransform
 

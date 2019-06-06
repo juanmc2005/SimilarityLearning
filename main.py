@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver, DeviceMapperTransform
-from distances import KNNAccuracyMetric
+from metrics import KNNAccuracyMetric, EERMetric
 from losses import config as cf
 from datasets import MNIST, VoxCeleb1
 from models import MNISTNet, SpeakerNet
@@ -75,7 +75,8 @@ elif args.task == 'speaker':
     config = get_config(args.loss, nfeat, nclass)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
-    metric = KNNAccuracyMetric(config.test_distance)
+    metric = EERMetric(model, device, args.batch_size, config.test_distance, dataset.config)
+    print(f"EER: {metric.get()}")
 else:
     raise ValueError('Unrecognized task or dataset path missing')
 test = dataset.test_partition()

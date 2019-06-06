@@ -11,6 +11,7 @@ from pyannote.database import get_protocol
 from pyannote.database import FileFinder
 from os.path import join
 import sts_utils as sts
+from metrics import SpeakerValidationConfig
 
 
 class SimDataset:
@@ -91,13 +92,17 @@ class VoxCeleb1(SimDataset):
         print(f"Segment Size = {segment_size_s}s")
         self.nfeat = sample_rate * segment_size_millis // 1000
         print(f"Embedding Size = {self.nfeat}")
-        extractor = RawAudio(sample_rate=sample_rate)
-        preprocessors = {'audio': FileFinder()}
-        protocol = get_protocol('VoxCeleb.SpeakerVerification.VoxCeleb1_X', preprocessors=preprocessors)
-        self.train_gen = SpeechSegmentGenerator(extractor, protocol, subset='train', per_label=1,
-                                                per_fold=batch_size, duration=segment_size_s, parallel=3)
-        self.dev_gen = SpeechSegmentGenerator(extractor, protocol, subset='development', per_label=1,
-                                              per_fold=batch_size, duration=segment_size_s, parallel=2)
+        self.config = SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
+                                              feature_extraction=RawAudio(sample_rate=sample_rate),
+                                              preprocessors={'audio': FileFinder()},
+                                              duration=segment_size_s)
+        protocol = get_protocol(self.config.protocol_name, preprocessors=self.config.preprocessors)
+        self.train_gen = SpeechSegmentGenerator(self.config.feature_extraction, protocol,
+                                                subset='train', per_label=1, per_fold=batch_size,
+                                                duration=segment_size_s, parallel=3)
+        self.dev_gen = SpeechSegmentGenerator(self.config.feature_extraction, protocol,
+                                              subset='development', per_label=1, per_fold=batch_size,
+                                              duration=segment_size_s, parallel=2)
 
     def training_partition(self):
         return VoxCelebPartition(self.train_gen, self.nfeat)

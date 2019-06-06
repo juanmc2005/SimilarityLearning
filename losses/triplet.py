@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.spatial.distance import squareform
-from distances import to_condensed
+from pyannote.core.utils.distance import to_condensed
 
 
 class TripletSamplingStrategy:
