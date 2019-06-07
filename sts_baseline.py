@@ -4,6 +4,27 @@ import torch.nn as nn
 import numpy
 
 
+def set_forget_gate_bias(lstm: nn.LSTM, value: float):
+    """
+    Set forget bias of the given LSTM module to `value`.
+    Pytorch guarantees the following fixed positions for LSTM biases:
+
+    [input_gate | forget_gate | cell_gate | output_gate]
+    0          n/4           n/2         3n/4          n
+                ^             ^
+                |_____________|
+                 we want this!
+
+    Reference: https://discuss.pytorch.org/t/set-forget-gate-bias-of-lstm/1745
+    """
+    for names in lstm._all_weights:
+        for name in filter(lambda n: "bias" in n, names):
+            bias = getattr(l, name)
+            n = bias.size(0)
+            start, end = n // 4, n // 2
+            bias.data[start:end].fill_(value)
+
+
 class STSBaselineNet(nn.Module):
     def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, tokens, mode='baseline'):
         super(STSBaselineNet, self).__init__()
@@ -22,6 +43,9 @@ class STSBaselineNet(nn.Module):
         self.word_embedding.weight.data.copy_(torch.from_numpy(pretrained_weight))
         self.lstm = nn.LSTM(input_size=nfeat_word, hidden_size=nfeat_sent // 2,
                             num_layers=1, bidirectional=True)
+        # TODO this is a hack to deal with the vanishing gradient
+        # Check if this actually reduces or solves the problem
+        set_forget_gate_bias(self.lstm, 1.)
 
     def word_layer(self, sent):
         tmp = []
