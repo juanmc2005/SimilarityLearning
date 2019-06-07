@@ -19,7 +19,7 @@ def set_forget_gate_bias(lstm: nn.LSTM, value: float):
     """
     for names in lstm._all_weights:
         for name in filter(lambda n: "bias" in n, names):
-            bias = getattr(l, name)
+            bias = getattr(lstm, name)
             n = bias.size(0)
             start, end = n // 4, n // 2
             bias.data[start:end].fill_(value)
