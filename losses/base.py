@@ -22,7 +22,7 @@ class TrainingListener:
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
         pass
     
-    def on_after_epoch(self, epoch, model, loss_fn, optim):
+    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
         pass
     
 
@@ -227,7 +227,7 @@ class Evaluator(TrainingListener):
         self.feat_train.append(feat.float().detach().cpu().numpy())
         self.y_train.append(y.detach().cpu().numpy())
     
-    def on_after_epoch(self, epoch, model, loss_fn, optim):
+    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
         feat_train = np.concatenate(self.feat_train)
         y_train = np.concatenate(self.y_train)
         self.metric.fit(feat_train, y_train)
@@ -301,7 +301,9 @@ class BaseTrainer:
 
         self.optim.scheduler_step()
 
-        for i in range(self.loader.nbatches()):
+        total_loss = 0
+        nbatches = self.loader.nbatches()
+        for i in range(nbatches):
             x, y = next(self.loader)
 
             # Apply custom transformations to the batch before feeding the model
@@ -311,18 +313,22 @@ class BaseTrainer:
             # Feed Forward
             feat, logits = self.model(x, y)
             loss = self.loss_fn(feat, logits, y)
-            
+
+            total_loss += loss.item()
+
             # Backprop
             for cb in self.callbacks:
                 cb.on_before_gradients(epoch, i, feat, logits, y, loss)
                 
             self.optim.zero_grad()
             loss.backward()
-            torch.nn.utils.clip_grad_norm(self.model.parameters(), 5)
             self.optim.step()
             
             for cb in self.callbacks:
                 cb.on_after_gradients(epoch, i, feat, logits, y, loss.item())
+
+        mean_loss = total_loss / nbatches
+        print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
         
         for cb in self.callbacks:
-            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim)
+            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim, mean_loss)

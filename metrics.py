@@ -53,6 +53,7 @@ class KNNAccuracyMetric(Metric):
 
 
 class LogitsSpearmanMetric(Metric):
+
     def __init__(self):
         self.predictions, self.targets = [], []
 
@@ -75,6 +76,25 @@ class LogitsSpearmanMetric(Metric):
     def get(self):
         metric = spearmanr(self.predictions, self.targets)[0]
         self.predictions, self.targets = [], []
+        return metric
+
+
+class DistanceSpearmanMetric(Metric):
+
+    def __init__(self, distance: Distance):
+        self.distance = distance
+        self.similarity, self.targets = [], []
+
+    def fit(self, embeddings, y):
+        pass
+
+    def calculate_batch(self, embeddings, logits, y):
+        self.similarity.extend([-self.distance.dist(emb1, emb2) for emb1, emb2 in embeddings])
+        self.targets.extend(list(y))
+
+    def get(self):
+        metric = spearmanr(self.similarity, self.targets)[0]
+        self.similarity, self.targets = [], []
         return metric
 
 
@@ -114,7 +134,7 @@ class EERMetric(Metric):
         pass
 
     def get(self):
-        # FIXME the SequenceEmbedding is not giving segments of the correct size
+        # TODO refactor, maybe transform into a subclass of Evaluator
         # initialize embedding extraction
         sequence_embedding = SequenceEmbedding(model=self.model,
                                                feature_extraction=self.config.feature_extraction,
