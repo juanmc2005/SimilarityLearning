@@ -41,7 +41,7 @@ def get_config(loss, nfeat, nclass, task):
     if loss == 'softmax':
         return cf.SoftmaxConfig(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return cf.ContrastiveConfig(device, online=task != 'sts')
+        return cf.ContrastiveConfig(device, margin=5, online=task != 'sts')
     elif loss == 'triplet':
         return cf.TripletConfig(device)
     elif loss == 'arcface':
@@ -73,26 +73,25 @@ if args.task == 'mnist' and args.path is not None:
     dataset = MNIST(args.path, args.batch_size)
     metric = KNNAccuracyMetric(config.test_distance)
 elif args.task == 'speaker':
-    nfeat, nclass = 2048, 1251
+    nfeat, nclass = 256, 1251
     config = get_config(args.loss, nfeat, nclass, args.task)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
     metric = EERMetric(model, device, args.batch_size, config.test_distance, dataset.config)
-    print(f"EER: {metric.get()}")
 elif args.task == 'sts':
     nfeat = 500
     pairwise = args.loss == 'kldiv'
     if pairwise:
-        mode = 'classic'
+        mode = 'baseline'
     elif args.loss == 'contrastive':
         mode = 'pairs'
     elif args.loss == 'triplet':
         mode = 'triplets'
     else:
         mode = 'clusters'
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=4)
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=3)
     config = get_config(args.loss, nfeat, dataset.nclass, args.task)
-    model = SemanticNet(device, nfeat, dataset.vocab, pairwise=pairwise, loss_module=config.loss_module)
+    model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
     # TODO add modified spearman metric instead of KNN accuracy
     metric = LogitsSpearmanMetric() if pairwise else KNNAccuracyMetric(config.test_distance)
 else:

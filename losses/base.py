@@ -182,7 +182,7 @@ class Evaluator(TrainingListener):
         self.batch_transforms = batch_transforms
         self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
-        self.best_metric = 0
+        self.best_metric, self.best_epoch = 0, -1
     
     def _eval(self, model):
         model.eval()
@@ -235,9 +235,12 @@ class Evaluator(TrainingListener):
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Test Metric: {metric_value:.6f}")
+        if self.best_epoch != -1:
+            print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         print("------------------------------------------------")
         if metric_value > self.best_metric:
             self.best_metric = metric_value
+            self.best_epoch = epoch
             print('New Best Test Metric!')
             for cb in self.callbacks:
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
@@ -315,6 +318,7 @@ class BaseTrainer:
                 
             self.optim.zero_grad()
             loss.backward()
+            torch.nn.utils.clip_grad_norm(self.model.parameters(), 5)
             self.optim.step()
             
             for cb in self.callbacks:

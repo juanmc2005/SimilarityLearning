@@ -335,6 +335,7 @@ class SincNet(nn.Module):
         self.out_dim = current_input * N_filt
 
     def forward(self, x):
+        x = x.view(-1, self.input_dim)
         batch = x.shape[0]
         seq_len = x.shape[1]
 

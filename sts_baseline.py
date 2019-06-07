@@ -4,13 +4,13 @@ import torch.nn as nn
 import numpy
 
 
-class PWIM(nn.Module):
-    def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, tokens, pairwise=False):
-        super(PWIM, self).__init__()
+class STSBaselineNet(nn.Module):
+    def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, tokens, mode='baseline'):
+        super(STSBaselineNet, self).__init__()
         self.device = device
         self.nfeat_word = nfeat_word
         self.nfeat_sent = nfeat_sent
-        self.pairwise = pairwise
+        self.mode = mode
         if 'oov' not in tokens:
             tokens.append('oov')
         self.word2id = {word: index for index, word in enumerate(tokens)}
@@ -31,12 +31,19 @@ class PWIM(nn.Module):
             else:
                 tmp.append(self.word2id['oov'])
         indices = Variable(torch.LongTensor(tmp)).to(self.device)
-        sentA = self.word_embedding(indices)
-        return sentA.view(-1, 1, self.nfeat_word)
+        embedded_sent = self.word_embedding(indices)
+        return embedded_sent.view(-1, 1, self.nfeat_word)
 
     def forward(self, sents):
-        if self.pairwise:
-            return self._forward_pairwise(sents)
+        # FIXME Replace this with subclasses or (preferably) delegation
+        if self.mode == 'baseline':
+            return self._forward_pair_concat(sents)
+        elif self.mode == 'pairs':
+            return self._forward_pair(sents)
+        else:
+            return self._forward_single(sents)
+
+    def _forward_single(self, sents):
         embeds = []
         for sent in sents:
             x = self.word_layer(sent)
@@ -47,7 +54,7 @@ class PWIM(nn.Module):
             embeds.append(embed)
         return torch.cat(embeds, 0).view(-1, self.nfeat_sent)
 
-    def _forward_pairwise(self, sents):
+    def _forward_pair_concat(self, sents):
         embeds = []
         for s1, s2 in sents:
             x1 = self.word_layer(s1)
@@ -61,3 +68,18 @@ class PWIM(nn.Module):
             embed = torch.cat((embed1, embed2), 1)
             embeds.append(embed)
         return torch.cat(embeds, 0).view(-1, 2*self.nfeat_sent)
+
+    def _forward_pair(self, sents):
+        embeds1, embeds2 = [], []
+        for s1, s2 in sents:
+            x1 = self.word_layer(s1)
+            x2 = self.word_layer(s2)
+            # Encode input
+            out1, _ = self.lstm(x1)
+            out2, _ = self.lstm(x2)
+            # Max pooling to get embeddings
+            embed1 = torch.max(out1, 0)[0]
+            embed2 = torch.max(out2, 0)[0]
+            embeds1.append(embed1)
+            embeds2.append(embed2)
+        return torch.cat(embeds1, 0).view(-1, self.nfeat_sent), torch.cat(embeds2, 0).view(-1, self.nfeat_sent)

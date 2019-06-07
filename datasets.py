@@ -199,7 +199,7 @@ class SemEval(SimDataset):
             labels.append(tmp)
         return labels
 
-    def __init__(self, path, vector_path, vocab_path, batch_size, mode='classic', threshold=2.5):
+    def __init__(self, path, vector_path, vocab_path, batch_size, mode='baseline', threshold=2.5):
         # TODO mode parameter should be refactored into a strategy-like object
         self.path = path
         self.batch_size = batch_size
@@ -232,15 +232,15 @@ class SemEval(SimDataset):
             self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
         elif mode == 'triplets':
             self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
-        elif mode == 'classic':
+        elif mode == 'baseline':
             self.train_sents = np.array(list(zip(zip(atrain, btrain), simtrain)))
         else:
-            raise ValueError("Mode can only be 'classic', 'clusters', 'pairs' or 'triplets'")
+            raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
 
     def training_partition(self):
         np.random.shuffle(self.train_sents)
         # TODO add other modes
-        if self.mode == 'classic':
+        if self.mode == 'baseline':
             return SemEvalPartition(self.train_sents, self.batch_size, classes=True, train=True)
         elif self.mode == 'pairs':
             return SemEvalPartition(self.train_sents, self.batch_size, classes=False, train=True)
@@ -264,7 +264,7 @@ class SemEval(SimDataset):
             sim = [float(line.strip()) for line in simfile.readlines()]
             for i in range(len(a)):
                 a[i], b[i] = self.pad_sent(a[i], b[i])
-            if partition == 'train' and self.mode == 'classic':
+            if partition == 'train' and self.mode == 'baseline':
                 sim = self.scores_to_probs(sim)
             return a, b, sim
 

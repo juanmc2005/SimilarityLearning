@@ -10,7 +10,19 @@ from distances import Distance
 from models import SimNet
 
 
-class KNNAccuracyMetric:
+class Metric:
+
+    def fit(self, embeddings, y):
+        raise NotImplementedError("A metric must implement the method 'fit'")
+
+    def calculate_batch(self, embeddings, logits, y):
+        raise NotImplementedError("A metric must implement the method 'calculate_batch'")
+
+    def get(self):
+        raise NotImplementedError("A metric must implement the method 'get'")
+
+
+class KNNAccuracyMetric(Metric):
     """ TODO update docs
     Abstracts the accuracy calculation strategy. It uses a K Nearest Neighbors
         classifier fit with the embeddings produced for the training set,
@@ -40,7 +52,7 @@ class KNNAccuracyMetric:
         return metric
 
 
-class LogitsSpearmanMetric:
+class LogitsSpearmanMetric(Metric):
     def __init__(self):
         self.predictions, self.targets = [], []
 
@@ -75,7 +87,7 @@ class SpeakerValidationConfig:
         self.duration = duration
 
 
-class EERMetric:
+class EERMetric(Metric):
 
     @staticmethod
     def get_hash(trial_file):
@@ -107,7 +119,7 @@ class EERMetric:
         sequence_embedding = SequenceEmbedding(model=self.model,
                                                feature_extraction=self.config.feature_extraction,
                                                duration=self.config.duration,
-                                               step=self.config.duration,
+                                               step=.5*self.config.duration,
                                                batch_size=self.batch_size,
                                                device=self.device)
         protocol = get_protocol(self.config.protocol_name, progress=False, preprocessors=self.config.preprocessors)
