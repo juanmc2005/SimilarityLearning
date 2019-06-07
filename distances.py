@@ -40,6 +40,9 @@ class Distance:
     """
     A distance function implementing pairwise distance
     """
+
+    def dist(self, x, y):
+        raise NotImplementedError("a Distance should implement 'dist'")
     
     def pdist(self, x):
         """
@@ -86,9 +89,12 @@ class CosineDistance(Distance):
     
     def to_sklearn_metric(self):
         return 'cosine'
+
+    def dist(self, x, y):
+        return 1 - F.cosine_similarity(x, y, dim=1, eps=1e-8)
     
     def sqdist_sum(self, x, y):
-        d = 1 - F.cosine_similarity(x, y, dim=1, eps=1e-8)
+        d = self.dist(x, y)
         return d.pow(2).sum()
     
     def pdist(self, x):
@@ -116,6 +122,9 @@ class EuclideanDistance(Distance):
     
     def to_sklearn_metric(self):
         return 'euclidean'
+
+    def dist(self, x, y):
+        return torch.dist(x, y, p=2)
     
     def sqdist_sum(self, x, y):
         return (x - y).pow(2).sum()

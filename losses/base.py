@@ -287,7 +287,7 @@ class BaseTrainer:
         checkpoint, epoch = self._restore()
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
-        for i in range(epoch, epoch+epochs+1):
+        for i in range(epoch, epoch+epochs):
             self.train_epoch(i)
         
     def train_epoch(self, epoch):

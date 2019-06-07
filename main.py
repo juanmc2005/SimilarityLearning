@@ -12,7 +12,7 @@ from models import MNISTNet, SpeakerNet, SemanticNet
 # Constants and script arguments
 loss_options = 'softmax / contrastive / triplet / arcface / center / coco'
 use_cuda = torch.cuda.is_available() and True
-seed = 999
+seed = 124
 device = torch.device('cuda' if use_cuda else 'cpu')
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str, default=None, help='Path to MNIST/SemEval dataset')
@@ -37,11 +37,11 @@ def enabled_str(value):
     return 'ENABLED' if value else 'DISABLED'
 
 
-def get_config(loss, nfeat, nclass):
+def get_config(loss, nfeat, nclass, task):
     if loss == 'softmax':
         return cf.SoftmaxConfig(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return cf.ContrastiveConfig(device)
+        return cf.ContrastiveConfig(device, online=task != 'sts')
     elif loss == 'triplet':
         return cf.TripletConfig(device)
     elif loss == 'arcface':
@@ -68,13 +68,13 @@ print('[Loading Dataset...]')
 batch_transforms = [DeviceMapperTransform(device)]
 if args.task == 'mnist' and args.path is not None:
     nfeat, nclass = 2, 10
-    config = get_config(args.loss, nfeat, nclass)
+    config = get_config(args.loss, nfeat, nclass, args.task)
     model = MNISTNet(nfeat, loss_module=config.loss_module)
     dataset = MNIST(args.path, args.batch_size)
     metric = KNNAccuracyMetric(config.test_distance)
 elif args.task == 'speaker':
     nfeat, nclass = 2048, 1251
-    config = get_config(args.loss, nfeat, nclass)
+    config = get_config(args.loss, nfeat, nclass, args.task)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
     metric = EERMetric(model, device, args.batch_size, config.test_distance, dataset.config)
@@ -91,7 +91,7 @@ elif args.task == 'sts':
     else:
         mode = 'clusters'
     dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=4)
-    config = get_config(args.loss, nfeat, dataset.nclass)
+    config = get_config(args.loss, nfeat, dataset.nclass, args.task)
     model = SemanticNet(device, nfeat, dataset.vocab, pairwise=pairwise, loss_module=config.loss_module)
     # TODO add modified spearman metric instead of KNN accuracy
     metric = LogitsSpearmanMetric() if pairwise else KNNAccuracyMetric(config.test_distance)

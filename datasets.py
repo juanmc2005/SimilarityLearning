@@ -112,6 +112,7 @@ class VoxCeleb1(SimDataset):
 
 
 class SemEvalClusterizedPartition(SimDatasetPartition):
+    # TODO merge this class into SemEvalPartition
 
     def __init__(self, sent_data, batch_size):
         self.data = sent_data
@@ -141,24 +142,20 @@ class SemEvalClusterizedPartition(SimDatasetPartition):
 
 class SemEvalPartition(SimDatasetPartition):
 
-    def __init__(self, data, batch_size, classes):
+    def __init__(self, data, batch_size: int, classes: bool, train: bool):
         self.data = data
         self.batch_size = batch_size
         self.classes = classes
+        self.train = train
         self.generator = self._generate()
 
     def _generate(self):
-        start = 0
-        np.random.shuffle(self.data)
         while True:
-            end = min(start + self.batch_size, len(self.data))
-            batch = self.data[start:end]
-            if end == len(self.data):
-                start = 0
+            if self.train:
                 np.random.shuffle(self.data)
-            else:
-                start += self.batch_size
-            yield batch
+            for i in range(0, len(self.data), self.batch_size):
+                j = min(i + self.batch_size, len(self.data))
+                yield self.data[i:j]
 
     def nbatches(self):
         return math.ceil(len(self.data) / self.batch_size)
@@ -244,9 +241,9 @@ class SemEval(SimDataset):
         np.random.shuffle(self.train_sents)
         # TODO add other modes
         if self.mode == 'classic':
-            return SemEvalPartition(self.train_sents, self.batch_size, classes=True)
+            return SemEvalPartition(self.train_sents, self.batch_size, classes=True, train=True)
         elif self.mode == 'pairs':
-            return SemEvalPartition(self.train_sents, self.batch_size, classes=False)
+            return SemEvalPartition(self.train_sents, self.batch_size, classes=False, train=True)
         else:
             return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
 
@@ -256,7 +253,7 @@ class SemEval(SimDataset):
         if self.mode == 'clusters':
             return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)
         else:
-            return SemEvalPartition(self.dev_sents, self.batch_size, classes=False)
+            return SemEvalPartition(self.dev_sents, self.batch_size, classes=False, train=False)
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \
@@ -267,7 +264,7 @@ class SemEval(SimDataset):
             sim = [float(line.strip()) for line in simfile.readlines()]
             for i in range(len(a)):
                 a[i], b[i] = self.pad_sent(a[i], b[i])
-            if partition == 'train':
+            if partition == 'train' and self.mode == 'classic':
                 sim = self.scores_to_probs(sim)
             return a, b, sim
 
@@ -281,8 +278,8 @@ class SemEval(SimDataset):
         segment_a = sts.SemEvalSegment(sents_a)
         segment_b = sts.SemEvalSegment(sents_b)
         pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
-        data = [(s1, s2, 0) for s1, s2 in pos] + [(s1, s2, 1) for s1, s2 in neg]
-        return np.array([(s1.split(' '), s2.split(' '), y) for s1, s2, y in data])
+        data = [((s1, s2), 0) for s1, s2 in pos] + [((s1, s2), 1) for s1, s2 in neg]
+        return np.array([((s1.split(' '), s2.split(' ')), y) for (s1, s2), y in data])
 
     def _triplets(self, sents_a, sents_b, scores, threshold):
         segment_a = sts.SemEvalSegment(sents_a)
