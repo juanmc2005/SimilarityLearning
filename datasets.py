@@ -5,6 +5,7 @@ import numpy as np
 import math
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
+import torch.nn.functional as F
 from pyannote.audio.features.utils import RawAudio
 from pyannote.audio.embedding.generators import SpeechSegmentGenerator
 from pyannote.database import get_protocol
@@ -80,7 +81,12 @@ class VoxCelebPartition(SimDatasetPartition):
 
     def __next__(self):
         dic = next(self.generator)
-        x, y = torch.Tensor(dic['X']).view(-1, self.segment_size), torch.Tensor(dic['y']).long()
+        x = torch.Tensor(dic['X'])
+        batch_seg_size = x.size(1)
+        if batch_seg_size < self.segment_size:
+            # Due to a pyannote crop bug, pad the tensor to fit the expected segment size
+            x = F.pad(x, pad=[0, 0, 0, self.segment_size - batch_seg_size], mode='constant', value=0)
+        x, y = x.view(-1, self.segment_size), torch.Tensor(dic['y']).long()
         return x, y
 
 

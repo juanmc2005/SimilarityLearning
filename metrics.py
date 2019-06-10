@@ -174,4 +174,5 @@ class EERMetric(Metric):
             y_true.append(trial['reference'])
 
         _, _, _, eer = det_curve(np.array(y_true), np.array(y_pred), distances=True)
-        return eer
+        # Returning 1-eer because the evaluator keeps track of the highest metric value
+        return 1 - eer
