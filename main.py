@@ -3,7 +3,7 @@ import numpy as np
 import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver, DeviceMapperTransform
-from metrics import KNNAccuracyMetric, EERMetric, LogitsSpearmanMetric
+from metrics import KNNAccuracyMetric, EERMetric, LogitsSpearmanMetric, DistanceSpearmanMetric
 from losses import config as cf
 from datasets import MNIST, VoxCeleb1, SemEval
 from models import MNISTNet, SpeakerNet, SemanticNet
@@ -89,11 +89,10 @@ elif args.task == 'sts':
         mode = 'triplets'
     else:
         mode = 'clusters'
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=3)
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=4)
     config = get_config(args.loss, nfeat, dataset.nclass, args.task)
     model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
-    # TODO add modified spearman metric instead of KNN accuracy
-    metric = LogitsSpearmanMetric() if pairwise else KNNAccuracyMetric(config.test_distance)
+    metric = LogitsSpearmanMetric() if pairwise else DistanceSpearmanMetric(config.test_distance)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
 test = dataset.test_partition()
@@ -117,7 +116,9 @@ if args.plot:
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
     test_callbacks.append(ModelSaver(args.loss, f"images/{args.loss}-best.pt"))
-train_callbacks.append(Evaluator(device, test, metric, batch_transforms, test_callbacks))
+# TODO fit_metric should be True for MNIST, this parameter will be gone after an Evaluator refactoring
+train_callbacks.append(Evaluator(device, test, metric, fit_metric=False,
+                                 batch_transforms=batch_transforms, callbacks=test_callbacks))
 
 # Configure trainer
 trainer = BaseTrainer(args.loss, model, device, config.loss, train, config.optimizer(model, args.task),

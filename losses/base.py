@@ -174,11 +174,12 @@ class ModelSaver(TestListener):
 
 class Evaluator(TrainingListener):
     
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, fit_metric=False, batch_transforms=[], callbacks=[]):
         super(Evaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
+        self.fit_metric = fit_metric
         self.batch_transforms = batch_transforms
         self.callbacks = callbacks
         self.feat_train, self.y_train = None, None
@@ -221,16 +222,19 @@ class Evaluator(TrainingListener):
             self.best_metric = checkpoint['accuracy']
     
     def on_before_epoch(self, epoch):
-        self.feat_train, self.y_train = [], []
+        if self.fit_metric:
+            self.feat_train, self.y_train = [], []
         
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
-        self.feat_train.append(feat.float().detach().cpu().numpy())
-        self.y_train.append(y.detach().cpu().numpy())
+        if self.fit_metric:
+            self.feat_train.append(feat.float().detach().cpu().numpy())
+            self.y_train.append(y.detach().cpu().numpy())
     
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        feat_train = np.concatenate(self.feat_train)
-        y_train = np.concatenate(self.y_train)
-        self.metric.fit(feat_train, y_train)
+        if self.fit_metric:
+            feat_train = np.concatenate(self.feat_train)
+            y_train = np.concatenate(self.y_train)
+            self.metric.fit(feat_train, y_train)
         feat_test, y_test = self._eval(model)
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")

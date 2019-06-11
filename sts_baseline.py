@@ -45,7 +45,7 @@ class STSBaselineNet(nn.Module):
                             num_layers=1, bidirectional=True)
         # TODO this is a hack to deal with the vanishing gradient
         # Check if this actually reduces or solves the problem
-        set_forget_gate_bias(self.lstm, 1.)
+        # set_forget_gate_bias(self.lstm, 1.)
 
     def word_layer(self, sent):
         tmp = []
@@ -60,7 +60,12 @@ class STSBaselineNet(nn.Module):
 
     def forward(self, sents):
         # FIXME Replace this with subclasses or (preferably) delegation
-        if self.mode == 'baseline':
+        if not self.training:
+            if self.mode == 'baseline':
+                return self._forward_pair_concat(sents)
+            else:
+                return self._forward_pair(sents)
+        elif self.mode == 'baseline':
             return self._forward_pair_concat(sents)
         elif self.mode == 'pairs':
             return self._forward_pair(sents)
@@ -76,7 +81,7 @@ class STSBaselineNet(nn.Module):
             # Max pooling to get embeddings
             embed = torch.max(out, 0)[0]
             embeds.append(embed)
-        return torch.cat(embeds, 0).view(-1, self.nfeat_sent)
+        return torch.stack(embeds, dim=0).squeeze()
 
     def _forward_pair_concat(self, sents):
         embeds = []
@@ -91,7 +96,7 @@ class STSBaselineNet(nn.Module):
             embed2 = torch.max(out2, 0)[0]
             embed = torch.cat((embed1, embed2), 1)
             embeds.append(embed)
-        return torch.cat(embeds, 0).view(-1, 2*self.nfeat_sent)
+        return torch.stack(embeds, dim=0).squeeze()
 
     def _forward_pair(self, sents):
         embeds1, embeds2 = [], []
@@ -106,4 +111,4 @@ class STSBaselineNet(nn.Module):
             embed2 = torch.max(out2, 0)[0]
             embeds1.append(embed1)
             embeds2.append(embed2)
-        return torch.cat(embeds1, 0).view(-1, self.nfeat_sent), torch.cat(embeds2, 0).view(-1, self.nfeat_sent)
+        return torch.stack(embeds1, dim=0).squeeze(), torch.stack(embeds2, dim=0).squeeze()
