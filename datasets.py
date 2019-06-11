@@ -228,14 +228,19 @@ class SemEval(SimDataset):
             scores = simtrain + simdev + simtest
             sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
             clusters, self.nclass = self._clusterize(sents_a, sents_b, scores, threshold)
-            self.train_sents = []
+            self.train_sents, dev_sents = [], []
             for i, cluster in enumerate(clusters):
                 for sent in cluster:
                     if sent in atrain or sent in btrain:
                         self.train_sents.append((sent.split(' '), i))
+                    if sent in adev or sent in bdev:
+                        dev_sents.append(sent)
             self.train_sents = np.array(self.train_sents)
             print(f"Unique sentences used for clustering: {len(set(sents_a + sents_b))}")
-            print(f"Train Sentences: {len(self.train_sents)}")
+            print(f"Total Train Sentences: {len(set(atrain + btrain))}")
+            print(f"Train Sentences Kept: {len(set(self.train_sents))}")
+            print(f"Total Dev Sentences: {len(set(adev + bdev))}")
+            print(f"Dev Sentences Kept: {len(set(dev_sents))}")
             print(f"N Clusters: {self.nclass}")
             print(f"Max Cluster Size: {max([len(cluster) for cluster in clusters])}")
             print(f"Mean Cluster Size: {np.mean([len(cluster) for cluster in clusters])}")

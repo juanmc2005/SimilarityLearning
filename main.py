@@ -2,8 +2,9 @@ import torch
 import numpy as np
 import argparse
 from distances import CosineDistance
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Evaluator, Visualizer, ModelSaver, DeviceMapperTransform
-from metrics import KNNAccuracyMetric, EERMetric, LogitsSpearmanMetric, DistanceSpearmanMetric
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer, ModelSaver, DeviceMapperTransform
+from metrics import KNNAccuracyMetric, LogitsSpearmanMetric,\
+    DistanceSpearmanMetric, STSEvaluator, SpeakerVerificationEvaluator, ClassAccuracyEvaluator
 from losses import config as cf
 from datasets import MNIST, VoxCeleb1, SemEval
 from models import MNISTNet, SpeakerNet, SemanticNet
@@ -71,17 +72,14 @@ if args.task == 'mnist' and args.path is not None:
     config = get_config(args.loss, nfeat, nclass, args.task)
     model = MNISTNet(nfeat, loss_module=config.loss_module)
     dataset = MNIST(args.path, args.batch_size)
-    metric = KNNAccuracyMetric(config.test_distance)
 elif args.task == 'speaker':
     nfeat, nclass = 256, 1251
     config = get_config(args.loss, nfeat, nclass, args.task)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
-    metric = EERMetric(model, device, args.batch_size, config.test_distance, dataset.config)
 elif args.task == 'sts':
     nfeat = 500
-    pairwise = args.loss == 'kldiv'
-    if pairwise:
+    if args.loss == 'kldiv':
         mode = 'baseline'
     elif args.loss == 'contrastive':
         mode = 'pairs'
@@ -92,7 +90,6 @@ elif args.task == 'sts':
     dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=4)
     config = get_config(args.loss, nfeat, dataset.nclass, args.task)
     model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
-    metric = LogitsSpearmanMetric() if pairwise else DistanceSpearmanMetric(config.test_distance)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
 test = dataset.test_partition()
@@ -116,9 +113,19 @@ if args.plot:
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
     test_callbacks.append(ModelSaver(args.loss, f"images/{args.loss}-best.pt"))
-# TODO fit_metric should be True for MNIST, this parameter will be gone after an Evaluator refactoring
-train_callbacks.append(Evaluator(device, test, metric, fit_metric=False,
-                                 batch_transforms=batch_transforms, callbacks=test_callbacks))
+
+if args.task == 'mnist':
+    evaluator = ClassAccuracyEvaluator(device, test, KNNAccuracyMetric(config.test_distance),
+                                       batch_transforms, test_callbacks)
+elif args.task == 'speaker':
+    evaluator = SpeakerVerificationEvaluator(device, args.batch_size, config.test_distance,
+                                             dataset.config, test_callbacks)
+else:
+    # STS
+    metric = LogitsSpearmanMetric() if args.loss == 'kldiv' else DistanceSpearmanMetric(config.test_distance)
+    evaluator = STSEvaluator(device, test, metric, batch_transforms, test_callbacks)
+
+train_callbacks.append(evaluator)
 
 # Configure trainer
 trainer = BaseTrainer(args.loss, model, device, config.loss, train, config.optimizer(model, args.task),
