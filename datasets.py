@@ -81,13 +81,18 @@ class VoxCelebPartition(SimDatasetPartition):
 
     def __next__(self):
         dic = next(self.generator)
-        x = torch.Tensor(dic['X'])
-        batch_seg_size = x.size(1)
-        if batch_seg_size < self.segment_size:
-            # Due to a pyannote crop bug, pad the tensor to fit the expected segment size
-            x = F.pad(x, pad=[0, 0, 0, self.segment_size - batch_seg_size], mode='constant', value=0)
-        x, y = x.view(-1, self.segment_size), torch.Tensor(dic['y']).long()
-        return x, y
+        x = dic['X']
+        batch = []
+        for i in range(len(x)):
+            actual_size = len(x[i])
+            if actual_size < self.segment_size:
+                # Due to a pyannote crop bug, pad the tensor to fit the expected segment size
+                batch.append(F.pad(torch.Tensor(x[i]), pad=[0, self.segment_size - actual_size],
+                                   mode='constant', value=0))
+            else:
+                batch.append(torch.Tensor(x[i]))
+        batch = torch.stack(batch, dim=0)
+        return batch, torch.Tensor(dic['y']).long()
 
 
 class VoxCeleb1(SimDataset):
