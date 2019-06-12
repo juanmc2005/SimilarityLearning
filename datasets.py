@@ -87,7 +87,7 @@ class VoxCelebPartition(SimDatasetPartition):
             actual_size = len(x[i])
             if actual_size < self.segment_size:
                 # Due to a pyannote crop bug, pad the tensor to fit the expected segment size
-                batch.append(F.pad(torch.Tensor(x[i]), pad=[0, self.segment_size - actual_size],
+                batch.append(F.pad(torch.Tensor(x[i]).squeeze(), pad=[0, self.segment_size - actual_size],
                                    mode='constant', value=0))
             else:
                 batch.append(torch.Tensor(x[i]))
