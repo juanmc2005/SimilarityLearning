@@ -4,6 +4,8 @@ import torch.nn as nn
 import numpy
 
 
+# This function was an attempt to solve a vanishing gradient
+# We can remove it if it doesn't prove useful
 def set_forget_gate_bias(lstm: nn.LSTM, value: float):
     """
     Set forget bias of the given LSTM module to `value`.
@@ -43,9 +45,6 @@ class STSBaselineNet(nn.Module):
         self.word_embedding.weight.data.copy_(torch.from_numpy(pretrained_weight))
         self.lstm = nn.LSTM(input_size=nfeat_word, hidden_size=nfeat_sent // 2,
                             num_layers=1, bidirectional=True)
-        # TODO this is a hack to deal with the vanishing gradient
-        # Check if this actually reduces or solves the problem
-        # set_forget_gate_bias(self.lstm, 1.)
 
     def word_layer(self, sent):
         tmp = []

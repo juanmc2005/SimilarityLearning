@@ -110,6 +110,8 @@ class SpeakerValidationConfig:
         self.duration = duration
 
 
+# TODO These evaluator classes can be refactored, they share a lot of code
+
 class SpeakerVerificationEvaluator(TrainingListener):
 
     @staticmethod

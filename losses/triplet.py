@@ -147,4 +147,3 @@ class TripletLoss(nn.Module):
         loss = dpos.pow(2) - dneg.pow(2) + self.margin
         # Keep only positive values and return the normalized mean
         return torch.clamp(loss, min=0).mean()
-    

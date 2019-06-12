@@ -92,7 +92,7 @@ elif args.task == 'sts':
     model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
-test = dataset.test_partition()
+test = dataset.dev_partition()
 train = dataset.training_partition()
 print('[Dataset Loaded]')
 

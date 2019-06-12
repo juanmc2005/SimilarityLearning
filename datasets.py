@@ -20,7 +20,7 @@ class SimDataset:
     def training_partition(self):
         raise NotImplementedError
 
-    def test_partition(self):
+    def dev_partition(self):
         raise NotImplementedError
 
 
@@ -65,7 +65,7 @@ class MNIST(SimDataset):
     def training_partition(self):
         return LoaderWrapperPartition(DataLoader(self.trainset, self.batch_size, shuffle=True, num_workers=4))
 
-    def test_partition(self):
+    def dev_partition(self):
         return LoaderWrapperPartition(DataLoader(self.testset, self.batch_size, shuffle=False, num_workers=4))
 
 
@@ -118,47 +118,20 @@ class VoxCeleb1(SimDataset):
     def training_partition(self):
         return VoxCelebPartition(self.train_gen, self.nfeat)
 
-    def test_partition(self):
+    def dev_partition(self):
         return VoxCelebPartition(self.dev_gen, self.nfeat)
-
-
-class SemEvalClusterizedPartition(SimDatasetPartition):
-    # TODO merge this class into SemEvalPartition
-
-    def __init__(self, sent_data, batch_size):
-        self.data = sent_data
-        self.batch_size = batch_size
-        self.generator = self._generate()
-
-    def _generate(self):
-        start = 0
-        np.random.shuffle(self.data)
-        while True:
-            end = min(start + self.batch_size, len(self.data))
-            batch = self.data[start:end]
-            if end == len(self.data):
-                start = 0
-                np.random.shuffle(self.data)
-            else:
-                start += self.batch_size
-            yield batch
-
-    def nbatches(self):
-        return math.ceil(len(self.data) / self.batch_size)
-
-    def __next__(self):
-        batch = next(self.generator)
-        return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
 
 
 class SemEvalPartition(SimDatasetPartition):
 
-    def __init__(self, data, batch_size: int, classes: bool, train: bool):
+    def __init__(self, data, batch_size: int, train: bool):
         self.data = data
         self.batch_size = batch_size
-        self.classes = classes
         self.train = train
         self.generator = self._generate()
+
+    def _transform_batch(self, batch):
+        raise NotImplementedError("The class should implement 'transform_batch'")
 
     def _generate(self):
         while True:
@@ -172,11 +145,46 @@ class SemEvalPartition(SimDatasetPartition):
         return math.ceil(len(self.data) / self.batch_size)
 
     def __next__(self):
-        batch = next(self.generator)
+        return self._transform_batch(next(self.generator))
+
+
+class SemEvalBaselinePartition(SemEvalPartition):
+
+    def _transform_batch(self, batch):
         x = [x for x, _ in batch]
         y = torch.Tensor([y for _, y in batch]).float()
-        y = y.view(-1, 6) if self.classes else y
+        y = y.view(-1, 6)
         return x, y
+
+
+class SemEvalClusterizedPartition(SemEvalPartition):
+
+    def _transform_batch(self, batch):
+        return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
+
+
+class SemEvalContrastivePartition(SemEvalPartition):
+
+    def _transform_batch(self, batch):
+        return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).float()
+
+
+class SemEvalPartitionBuilder:
+
+    def __init__(self, batch_size: int, mode: str):
+        self.batch_size = batch_size
+        self.mode = mode
+
+    def build(self, data, train: bool):
+        # TODO add 'triplets' mode
+        if self.mode == 'baseline':
+            return SemEvalBaselinePartition(data, self.batch_size, train)
+        elif self.mode == 'pairs':
+            return SemEvalContrastivePartition(data, self.batch_size, train)
+        elif self.mode == 'clusters':
+            return SemEvalClusterizedPartition(data, self.batch_size, train)
+        else:
+            raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
 
 
 class SemEval(SimDataset):
@@ -256,21 +264,11 @@ class SemEval(SimDataset):
 
     def training_partition(self):
         np.random.shuffle(self.train_sents)
-        # TODO add other modes
-        if self.mode == 'baseline':
-            return SemEvalPartition(self.train_sents, self.batch_size, classes=True, train=True)
-        elif self.mode == 'pairs':
-            return SemEvalPartition(self.train_sents, self.batch_size, classes=False, train=True)
-        else:
-            return SemEvalClusterizedPartition(self.train_sents, self.batch_size)
+        return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.train_sents, train=True)
 
-    def test_partition(self):
+    def dev_partition(self):
         np.random.shuffle(self.dev_sents)
-        # TODO add other modes maybe ?
-        if self.mode == 'clusters':
-            return SemEvalClusterizedPartition(self.dev_sents, self.batch_size)
-        else:
-            return SemEvalPartition(self.dev_sents, self.batch_size, classes=False, train=False)
+        return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.dev_sents, train=False)
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \
