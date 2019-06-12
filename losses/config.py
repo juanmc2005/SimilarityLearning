@@ -122,8 +122,8 @@ class CocoConfig(LossConfig):
 
 class ContrastiveConfig(LossConfig):
 
-    def __init__(self, device, margin=2, distance=EuclideanDistance(), online=True):
-        loss = ContrastiveLoss(device, margin, distance, online)
+    def __init__(self, device, margin=2, distance=EuclideanDistance(), size_average=True, online=True):
+        loss = ContrastiveLoss(device, margin, distance, size_average, online)
         super(ContrastiveConfig, self).__init__('Contrastive Loss', f"m={margin} - {distance}", None, loss, distance)
 
     def optimizer(self, model, task):

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
+from distances import Distance
 
 
 class ContrastiveLoss(nn.Module):
@@ -13,12 +14,14 @@ class ContrastiveLoss(nn.Module):
     :param distance: a Distance object to calculate our Dw
     """
     
-    def __init__(self, device, margin, distance, online=True):
+    def __init__(self, device: str, margin: float, distance: Distance, size_average: bool, online: bool):
         super(ContrastiveLoss, self).__init__()
         self.device = device
         self.margin = margin
         self.distance = distance
+        self.size_average = size_average
         self.online = online
+        # self.batches = 0
     
     def forward(self, feat, logits, y):
         """
@@ -47,5 +50,9 @@ class ContrastiveLoss(nn.Module):
         else:
             feat1, feat2 = feat
             dist = self.distance.dist(feat1, feat2)
+            # if torch.isnan(feat1).sum().item() == 0:
+            #     visual.plot_dists(dist.detach().cpu().numpy(), 'Contrastive Pair Distances', f'dists-{self.batches}')
+            #     self.batches += 1
             loss = (1-y) * torch.pow(dist, 2) + y * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
-            return torch.sum(loss) / 2 / dist.size(0)
+            loss = torch.sum(loss) / 2
+            return loss / dist.size(0) if self.size_average else loss

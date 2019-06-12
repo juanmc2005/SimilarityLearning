@@ -42,7 +42,11 @@ def get_config(loss, nfeat, nclass, task):
     if loss == 'softmax':
         return cf.SoftmaxConfig(device, nfeat, nclass)
     elif loss == 'contrastive':
-        return cf.ContrastiveConfig(device, margin=5, online=task != 'sts')
+        return cf.ContrastiveConfig(device,
+                                    margin=0.25,
+                                    distance=CosineDistance(),
+                                    size_average=False,
+                                    online=task != 'sts')
     elif loss == 'triplet':
         return cf.TripletConfig(device)
     elif loss == 'arcface':
@@ -87,7 +91,7 @@ elif args.task == 'sts':
         mode = 'triplets'
     else:
         mode = 'clusters'
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=4)
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=(2.2, 2.8))
     config = get_config(args.loss, nfeat, dataset.nclass, args.task)
     model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:
@@ -112,7 +116,7 @@ if args.plot:
 
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(ModelSaver(args.loss, f"images/{args.loss}-best.pt"))
+    test_callbacks.append(ModelSaver(args.task, args.loss, 'tmp'))
 
 if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(device, test, KNNAccuracyMetric(config.test_distance),

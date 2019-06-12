@@ -12,6 +12,16 @@ def visualize(feat, labels, title, filename):
         plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=c[i])
     plt.legend(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], loc='upper right')
     plt.title(title)
-    plt.savefig('./images/{}.jpg'.format(filename))
+    plt.savefig(f"./images/{filename}.jpg")
+    plt.draw()
+    plt.pause(0.001)
+
+
+def plot_dists(dists, title, filename):
+    plt.ion()
+    plt.clf()
+    plt.plot(dists, '.')
+    plt.title(title)
+    plt.savefig(f"./images/{filename}.jpg")
     plt.draw()
     plt.pause(0.001)

@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import visual
+from os.path import join
 
 
 class TrainingListener:
@@ -153,13 +154,14 @@ class Visualizer(TestListener):
 
 class ModelSaver(TestListener):
     
-    def __init__(self, loss_name, path):
+    def __init__(self, task: str, loss_name: str, folder_path: str):
         super(ModelSaver, self).__init__()
+        self.task = task
         self.loss_name = loss_name
-        self.path = path
+        self.base_path = folder_path
     
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
-        print(f"Saving model to {self.path}")
+        print(f"Saving model to {self.base_path}")
         torch.save({
             'epoch': epoch,
             'trained_loss': self.loss_name,
@@ -168,7 +170,7 @@ class ModelSaver(TestListener):
             'loss_state_dict': loss_fn.state_dict(),
             'optim_state_dict': optim.state_dict(),
             'accuracy': accuracy
-        }, self.path)
+        }, join(self.base_path, f"best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt"))
 
 
 class DeviceMapperTransform:
