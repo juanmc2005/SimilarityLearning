@@ -153,7 +153,7 @@ class SemEvalBaselinePartition(SemEvalPartition):
     def _transform_batch(self, batch):
         x = [x for x, _ in batch]
         y = torch.Tensor([y for _, y in batch]).float()
-        y = y.view(-1, 6)
+        y = y.view(-1, 6) if self.train else y
         return x, y
 
 
@@ -236,7 +236,7 @@ class SemEval(SimDataset):
             scores = simtrain + simdev + simtest
             sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
             clusters, self.nclass = self._clusterize(sents_a, sents_b, scores, threshold)
-            self.train_sents, dev_sents, train_sents_raw = [], [], []
+            self.train_sents, train_sents_raw, dev_sents, test_sents = [], [], [], []
             for i, cluster in enumerate(clusters):
                 for sent in cluster:
                     if sent in atrain or sent in btrain:
@@ -244,21 +244,35 @@ class SemEval(SimDataset):
                         train_sents_raw.append(sent)
                     if sent in adev or sent in bdev:
                         dev_sents.append(sent)
+                    if sent in atest or sent in btest:
+                        test_sents.append(sent)
             self.train_sents = np.array(self.train_sents)
             print(f"Unique sentences used for clustering: {len(set(sents_a + sents_b))}")
             print(f"Total Train Sentences: {len(set(atrain + btrain))}")
             print(f"Train Sentences Kept: {len(set(train_sents_raw))}")
             print(f"Total Dev Sentences: {len(set(adev + bdev))}")
             print(f"Dev Sentences Kept: {len(set(dev_sents))}")
+            print(f"Total Test Sentences: {len(set(atest + btest))}")
+            print(f"Test Sentences Kept: {len(set(test_sents))}")
             print(f"N Clusters: {self.nclass}")
             print(f"Max Cluster Size: {max([len(cluster) for cluster in clusters])}")
             print(f"Mean Cluster Size: {np.mean([len(cluster) for cluster in clusters])}")
         elif mode == 'pairs':
             self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
+            print(f"Original Train Pairs: {len(atrain)}")
+            print(f"Original Unique Train Pairs: {len(set(zip(atrain, btrain)))}")
+            print(f"Total Train Pairs: {len(self.train_sents)}")
+            print(f"+ Train Pairs: {len([y for _, y in self.train_sents if y == 0])}")
+            print(f"- Train Pairs: {len([y for _, y in self.train_sents if y == 1])}")
         elif mode == 'triplets':
             self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
         elif mode == 'baseline':
-            self.train_sents = np.array(list(zip(zip(atrain, btrain), simtrain)))
+            unique_train_data = list(set(zip(atrain, btrain, simtrain)))
+            pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
+            sim = self.scores_to_probs([y for _, _, y in unique_train_data])
+            self.train_sents = np.array(list(zip(pairs, sim)))
+            print(f"Original Train Pairs: {len(atrain)}")
+            print(f"Unique Train Pairs: {len(unique_train_data)}")
         else:
             raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
 
@@ -279,8 +293,6 @@ class SemEval(SimDataset):
             sim = [float(line.strip()) for line in simfile.readlines()]
             for i in range(len(a)):
                 a[i], b[i] = self.pad_sent(a[i], b[i])
-            if partition == 'train' and self.mode == 'baseline':
-                sim = self.scores_to_probs(sim)
             return a, b, sim
 
     def _clusterize(self, sents_a, sents_b, scores, threshold):

@@ -4,7 +4,8 @@ import argparse
 from distances import CosineDistance
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer, ModelSaver, DeviceMapperTransform
 from metrics import KNNAccuracyMetric, LogitsSpearmanMetric,\
-    DistanceSpearmanMetric, STSEvaluator, SpeakerVerificationEvaluator, ClassAccuracyEvaluator
+    DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator,\
+    SpeakerVerificationEvaluator, ClassAccuracyEvaluator
 from losses import config as cf
 from datasets import MNIST, VoxCeleb1, SemEval
 from models import MNISTNet, SpeakerNet, SemanticNet
@@ -124,10 +125,13 @@ if args.task == 'mnist':
 elif args.task == 'speaker':
     evaluator = SpeakerVerificationEvaluator(device, args.batch_size, config.test_distance,
                                              dataset.config, test_callbacks)
+# STS
+elif args.loss == 'kldiv':
+    metric = LogitsSpearmanMetric()
+    evaluator = STSBaselineEvaluator(device, test, metric, batch_transforms, test_callbacks)
 else:
-    # STS
-    metric = LogitsSpearmanMetric() if args.loss == 'kldiv' else DistanceSpearmanMetric(config.test_distance)
-    evaluator = STSEvaluator(device, test, metric, batch_transforms, test_callbacks)
+    metric = DistanceSpearmanMetric(config.test_distance)
+    evaluator = STSEmbeddingEvaluator(device, test, metric, batch_transforms, test_callbacks)
 
 train_callbacks.append(evaluator)
 
