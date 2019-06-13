@@ -43,7 +43,7 @@ def get_config(loss, nfeat, nclass, task):
         return cf.SoftmaxConfig(device, nfeat, nclass)
     elif loss == 'contrastive':
         return cf.ContrastiveConfig(device,
-                                    margin=0.25,
+                                    margin=0.15,
                                     distance=CosineDistance(),
                                     size_average=False,
                                     online=task != 'sts')
@@ -91,7 +91,7 @@ elif args.task == 'sts':
         mode = 'triplets'
     else:
         mode = 'clusters'
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=(2.2, 2.8))
+    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=(1.2, 3.8))
     config = get_config(args.loss, nfeat, dataset.nclass, args.task)
     model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:

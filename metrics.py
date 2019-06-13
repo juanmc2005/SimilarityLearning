@@ -181,7 +181,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
             self.best_metric = checkpoint['accuracy']
 
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        metric_value = self._eval(model)
+        metric_value = self._eval(model.to_prediction_model())
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev EER: {1 - metric_value:.6f}")
         if self.best_epoch != -1:
