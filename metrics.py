@@ -247,6 +247,7 @@ class ClassAccuracyEvaluator(TrainingListener):
         self.feat_train, self.y_train = [], []
 
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
+        self.feat_train.append(feat.detach().cpu().numpy())
         self.y_train.append(y.detach().cpu().numpy())
 
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):

@@ -7,8 +7,10 @@ from metrics import KNNAccuracyMetric, LogitsSpearmanMetric,\
     DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator,\
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
 from losses import config as cf
-from datasets import MNIST, VoxCeleb1, SemEval
 from models import MNISTNet, SpeakerNet, SemanticNet
+from datasets.mnist import MNIST
+from datasets.semeval import SemEval
+from datasets.voxceleb import VoxCeleb1
 
 
 # Constants and script arguments
@@ -92,7 +94,8 @@ elif args.task == 'sts':
         mode = 'triplets'
     else:
         mode = 'clusters'
-    dataset = SemEval(args.path, args.word2vec, args.vocab, args.batch_size, mode=mode, threshold=(1.2, 3.8))
+    dataset = SemEval(args.path, args.word2vec, args.vocab,
+                                       args.batch_size, mode=mode, threshold=(1.2, 3.8))
     config = get_config(args.loss, nfeat, dataset.nclass, args.task)
     model = SemanticNet(device, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:
