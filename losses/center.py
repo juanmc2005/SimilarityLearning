@@ -4,6 +4,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
+
 class SoftmaxCenterLoss(nn.Module):
     """
     Cross Entropy + Center Loss module

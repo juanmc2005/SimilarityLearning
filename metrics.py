@@ -124,7 +124,8 @@ class SpeakerVerificationEvaluator(TrainingListener):
             segments = (try_with,)
         return hash((uri, segments))
 
-    def __init__(self, device: str, batch_size: int, distance: Distance, eval_interval: int, config: SpeakerValidationConfig, callbacks=[]):
+    def __init__(self, device: str, batch_size: int, distance: Distance,
+                 eval_interval: int, config: SpeakerValidationConfig, callbacks=[]):
         super(SpeakerVerificationEvaluator, self).__init__()
         self.device = device
         self.batch_size = batch_size
@@ -134,7 +135,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
         self.callbacks = callbacks
         self.best_metric, self.best_epoch = 0, -1
 
-    def _eval(self, model):
+    def eval(self, model, partition: str = 'development'):
         model.eval()
         sequence_embedding = SequenceEmbedding(model=model,
                                                feature_extraction=self.config.feature_extraction,
@@ -146,7 +147,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
 
         y_true, y_pred, cache = [], [], {}
 
-        for trial in protocol.development_trial():
+        for trial in getattr(protocol, f"{partition}_trial")():
 
             # compute embedding for file1
             file1 = trial['file1']
@@ -183,7 +184,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
         if epoch % self.eval_interval == 0:
-            metric_value = self._eval(model.to_prediction_model())
+            metric_value = self.eval(model.to_prediction_model())
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
             print(f"Dev EER: {1 - metric_value:.6f}")
             if self.best_epoch != -1:

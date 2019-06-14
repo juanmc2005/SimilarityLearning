@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import torch
+import torch.nn as nn
 import visual
 from os.path import join
+from models import SimNet
 
 
 class TrainingListener:
@@ -184,10 +186,33 @@ class DeviceMapperTransform:
         return x, y.to(self.device)
 
 
+class ModelLoader:
+
+    def __init__(self, loss_name):
+        self.loss_name = loss_name
+
+    def restore(self, model: SimNet, loss_fn: nn.Module, optimizer: Optimizer, path: str):
+        checkpoint = torch.load(path)
+        model.load_common_state_dict(checkpoint['common_state_dict'])
+        if self.loss_name == checkpoint['trained_loss']:
+            loss_fn.load_state_dict(checkpoint['loss_state_dict'])
+            if model.loss_module is not None:
+                model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
+            optimizer.load_state_dict(checkpoint['optim_state_dict'])
+        print(f"Recovered Model. Epoch {checkpoint['epoch']}. Test Metric {checkpoint['accuracy']}")
+        return checkpoint
+
+    def load(self, model: SimNet, path: str):
+        checkpoint = torch.load(path)
+        model.load_common_state_dict(checkpoint['common_state_dict'])
+        if self.loss_name == checkpoint['trained_loss'] and model.loss_module is not None:
+            model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
+        return checkpoint
+
+
 class BaseTrainer:
     
     def __init__(self, loss_name, model, device, loss_fn, loader, optim, recover=None, batch_transforms=[], callbacks=[]):
-        self.loss_name = loss_name
         self.model = model.to(device)
         self.device = device
         self.loss_fn = loss_fn
@@ -196,20 +221,13 @@ class BaseTrainer:
         self.recover = recover
         self.batch_transforms = batch_transforms
         self.callbacks = callbacks
+        self.model_loader = ModelLoader(loss_name)
 
     def _restore(self):
         if self.recover is not None:
-            checkpoint = torch.load(self.recover)
-            self.model.load_common_state_dict(checkpoint['common_state_dict'])
-            if self.loss_name == checkpoint['trained_loss']:
-                self.loss_fn.load_state_dict(checkpoint['loss_state_dict'])
-                if self.model.loss_module is not None:
-                    self.model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
-                self.optim.load_state_dict(checkpoint['optim_state_dict'])
+            checkpoint = self.model_loader.restore(self.model, self.loss_fn, self.optim, self.recover)
             epoch = checkpoint['epoch']
-            accuracy = checkpoint['accuracy']
-            print(f"Recovered Model. Epoch {epoch}. Test Metric {accuracy}")
-            return checkpoint, epoch+1
+            return checkpoint, epoch + 1
         else:
             return None, 1
         
