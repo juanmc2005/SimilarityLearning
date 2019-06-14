@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from torch import nn
 from sincnet import SincNet, MLP
-from pwim import PWIM
+from sts_baseline import STSBaselineNet
 
 
 class Flatten(nn.Module):
@@ -25,6 +25,9 @@ class SimNet(nn.Module):
     def load_common_state_dict(self, checkpoint):
         raise NotImplementedError
 
+    def to_prediction_model(self):
+        return PredictionModel(self)
+
     def forward(self, x, y):
         for layer in self.layers():
             x = layer(x)
@@ -36,6 +39,18 @@ class SimNet(nn.Module):
         if self.loss_module is not None:
             params.append(self.loss_module.parameters())
         return params
+
+
+class PredictionModel(nn.Module):
+
+    def __init__(self, model: SimNet):
+        super(PredictionModel, self).__init__()
+        self.model = model
+
+    def forward(self, x):
+        for layer in self.model.layers():
+            x = layer(x)
+        return x
 
 
 class MNISTNet(SimNet):
@@ -116,16 +131,16 @@ class SpeakerNet(SimNet):
 
 class SemanticNet(SimNet):
 
-    def __init__(self, device, nfeat, vector_vocab, loss_module=None):
+    def __init__(self, device, nfeat, vector_vocab, loss_module=None, mode='baseline'):
         super().__init__(loss_module)
-        self.pwim = PWIM(device, nfeat_word=300, nfeat_sent=nfeat,
-                         vec_vocab=vector_vocab, tokens=vector_vocab.keys())
+        self.base_model = STSBaselineNet(device, nfeat_word=300, nfeat_sent=nfeat,
+                                         vec_vocab=vector_vocab, tokens=vector_vocab.keys(), mode=mode)
 
     def layers(self):
-        return [self.pwim]
+        return [self.base_model]
 
     def common_state_dict(self):
-        return self.pwim.state_dict()
+        return self.base_model.state_dict()
 
     def load_common_state_dict(self, checkpoint):
-        self.pwim.load_state_dict(checkpoint)
+        self.base_model.load_state_dict(checkpoint)

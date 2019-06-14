@@ -4,7 +4,7 @@ import torch
 import torch.nn as nn
 import numpy as np
 from scipy.spatial.distance import squareform
-from distances import to_condensed
+from pyannote.core.utils.distance import to_condensed
 
 
 class TripletSamplingStrategy:
@@ -147,4 +147,3 @@ class TripletLoss(nn.Module):
         loss = dpos.pow(2) - dneg.pow(2) + self.margin
         # Keep only positive values and return the normalized mean
         return torch.clamp(loss, min=0).mean()
-    

@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import torch
-import numpy as np
-from distances import AccuracyCalculator
 import visual
+from os.path import join
 
 
 class TrainingListener:
@@ -23,7 +22,7 @@ class TrainingListener:
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
         pass
     
-    def on_after_epoch(self, epoch, model, loss_fn, optim):
+    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
         pass
     
 
@@ -34,7 +33,7 @@ class TestListener:
     def on_before_test(self):
         pass
     
-    def on_batch_tested(self, ibatch, feat, correct, total):
+    def on_batch_tested(self, ibatch, feat):
         pass
     
     def on_after_test(self):
@@ -60,10 +59,12 @@ class Optimizer:
         }
     
     def load_state_dict(self, checkpoint):
-        for i, op in enumerate(self.optimizers):
-            op.load_state_dict(checkpoint[self.OPTIM_KEY][i])
-        for i, s in enumerate(self.schedulers):
-            s.load_state_dict(checkpoint[self.SCHED_KEY][i])
+        if self.OPTIM_KEY in checkpoint:
+            for i, op in enumerate(self.optimizers):
+                op.load_state_dict(checkpoint[self.OPTIM_KEY][i])
+        if self.SCHED_KEY in checkpoint:
+            for i, s in enumerate(self.schedulers):
+                s.load_state_dict(checkpoint[self.SCHED_KEY][i])
     
     def scheduler_step(self):
         for s in self.schedulers:
@@ -131,7 +132,7 @@ class TestLogger(TestListener):
     def on_before_test(self):
         self.logger.restart()
     
-    def on_batch_tested(self, ibatch, feat, correct, total):
+    def on_batch_tested(self, ibatch, feat):
         self.logger.on_test_batch(ibatch)
 
 
@@ -144,7 +145,7 @@ class Visualizer(TestListener):
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         plot_name = f"embeddings-epoch-{epoch}"
-        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f}% Accuracy"
+        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f} Accuracy"
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
         print(f"Saving plot as {plot_name}")
@@ -153,13 +154,14 @@ class Visualizer(TestListener):
 
 class ModelSaver(TestListener):
     
-    def __init__(self, loss_name, path):
+    def __init__(self, task: str, loss_name: str, folder_path: str):
         super(ModelSaver, self).__init__()
+        self.task = task
         self.loss_name = loss_name
-        self.path = path
+        self.base_path = folder_path
     
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
-        print(f"Saving model to {self.path}")
+        print(f"Saving model to {self.base_path}")
         torch.save({
             'epoch': epoch,
             'trained_loss': self.loss_name,
@@ -168,79 +170,7 @@ class ModelSaver(TestListener):
             'loss_state_dict': loss_fn.state_dict(),
             'optim_state_dict': optim.state_dict(),
             'accuracy': accuracy
-        }, self.path)
-
-
-class Evaluator(TrainingListener):
-    
-    def __init__(self, device, loader, distance, batch_transforms=[], callbacks=[]):
-        super(Evaluator, self).__init__()
-        self.device = device
-        self.loader = loader
-        self.distance = distance
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
-        self.feat_train, self.y_train = None, None
-        self.best_acc = 0
-    
-    def _eval(self, model, acc_calc):
-        model.eval()
-        correct, total = 0, 0
-        feat_test, y_test = [], []
-        for cb in self.callbacks:
-            cb.on_before_test()
-        with torch.no_grad():
-            for i in range(self.loader.nbatches()):
-                x, y = next(self.loader)
-
-                # Apply custom transformations to the batch before feeding the model
-                for transform in self.batch_transforms:
-                    x, y = transform(x, y)
-                
-                # Feed Forward
-                feat, _ = model(x, y)
-                feat = feat.detach().cpu().numpy()
-                y = y.detach().cpu().numpy()
-                
-                # Track accuracy
-                feat_test.append(feat)
-                y_test.append(y)
-                bcorrect, btotal = acc_calc.calculate_batch(feat, y)
-                correct += bcorrect
-                total += btotal
-                
-                for cb in self.callbacks:
-                    cb.on_batch_tested(i, feat, correct, total)
-                
-        for cb in self.callbacks:
-            cb.on_after_test()
-        return np.concatenate(feat_test), np.concatenate(y_test), correct, total
-
-    def on_before_train(self, checkpoint):
-        if checkpoint is not None:
-            self.best_acc = checkpoint['accuracy']
-    
-    def on_before_epoch(self, epoch):
-        self.feat_train, self.y_train = [], []
-        
-    def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
-        self.feat_train.append(feat.float().detach().cpu().numpy())
-        self.y_train.append(y.detach().cpu().numpy())
-    
-    def on_after_epoch(self, epoch, model, loss_fn, optim):
-        feat_train = np.concatenate(self.feat_train)
-        y_train = np.concatenate(self.y_train)
-        acc_calc = AccuracyCalculator(feat_train, y_train, self.distance)
-        feat_test, y_test, test_correct, test_total = self._eval(model, acc_calc)
-        acc = 100 * test_correct / test_total
-        print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Test Accuracy: {test_correct} / {test_total} ({acc:.2f}%)")
-        print("------------------------------------------------")
-        if acc > self.best_acc:
-            self.best_acc = acc
-            print('New Best Test Accuracy!')
-            for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, loss_fn, optim, acc, feat_test, y_test)
+        }, join(self.base_path, f"best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt"))
 
 
 class DeviceMapperTransform:
@@ -249,7 +179,9 @@ class DeviceMapperTransform:
         self.device = device
 
     def __call__(self, x, y):
-        return x.to(self.device), y.to(self.device)
+        if isinstance(x, torch.Tensor):
+            x = x.to(self.device)
+        return x, y.to(self.device)
 
 
 class BaseTrainer:
@@ -276,17 +208,17 @@ class BaseTrainer:
                 self.optim.load_state_dict(checkpoint['optim_state_dict'])
             epoch = checkpoint['epoch']
             accuracy = checkpoint['accuracy']
-            print(f"Recovered Model. Epoch {epoch}. Accuracy {accuracy}%")
+            print(f"Recovered Model. Epoch {epoch}. Test Metric {accuracy}")
             return checkpoint, epoch+1
         else:
-            return None, 0
+            return None, 1
         
     def train(self, epochs):
         checkpoint, epoch = self._restore()
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
-        for i in range(epoch, epoch+epochs+1):
-            self.train_epoch(i+1)
+        for i in range(epoch, epoch+epochs):
+            self.train_epoch(i)
         
     def train_epoch(self, epoch):
         self.model.train()
@@ -296,7 +228,9 @@ class BaseTrainer:
 
         self.optim.scheduler_step()
 
-        for i in range(self.loader.nbatches()):
+        total_loss = 0
+        nbatches = self.loader.nbatches()
+        for i in range(nbatches):
             x, y = next(self.loader)
 
             # Apply custom transformations to the batch before feeding the model
@@ -306,7 +240,9 @@ class BaseTrainer:
             # Feed Forward
             feat, logits = self.model(x, y)
             loss = self.loss_fn(feat, logits, y)
-            
+
+            total_loss += loss.item()
+
             # Backprop
             for cb in self.callbacks:
                 cb.on_before_gradients(epoch, i, feat, logits, y, loss)
@@ -317,6 +253,9 @@ class BaseTrainer:
             
             for cb in self.callbacks:
                 cb.on_after_gradients(epoch, i, feat, logits, y, loss.item())
+
+        mean_loss = total_loss / nbatches
+        print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
         
         for cb in self.callbacks:
-            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim)
+            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim, mean_loss)

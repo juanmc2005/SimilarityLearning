@@ -4,7 +4,7 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from distances import CosineDistance, EuclideanDistance
 from losses.center import CenterLinear, SoftmaxCenterLoss
-from losses.wrappers import LossWrapper
+from losses.wrappers import LossWrapper, PWIMPairwiseClassification
 from losses.arcface import ArcLinear
 from losses.coco import CocoLinear
 from losses.contrastive import ContrastiveLoss
@@ -31,6 +31,17 @@ class LossConfig:
         raise NotImplementedError
 
 
+class KLDivergenceConfig(LossConfig):
+
+    def __init__(self, device, nfeat):
+        loss_module = PWIMPairwiseClassification(nfeat)
+        loss = LossWrapper(nn.KLDivLoss().to(device))
+        super(KLDivergenceConfig, self).__init__('KL-Divergence', None, loss_module, loss, CosineDistance())
+
+    def optimizer(self, model, task):
+        return Optimizer([optim.RMSprop(model.parameters(), lr=0.0001)], [])
+
+
 class SoftmaxConfig(LossConfig):
 
     def __init__(self, device, nfeat, nclass):
@@ -47,7 +58,7 @@ class SoftmaxConfig(LossConfig):
             optimizers.append(optim.RMSprop(self.loss_module.parameters(), 0.001, alpha=0.95))
             schedulers = []
         elif task == 'sts':
-            optimizers = [optim.RMSprop(model.parameters(), lr=0.0001)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.005)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
@@ -62,6 +73,7 @@ class ArcFaceConfig(LossConfig):
         super(ArcFaceConfig, self).__init__('ArcFace Loss', f"m={margin} s={s}", self.loss_module, loss, CosineDistance())
 
     def optimizer(self, model, task):
+        # TODO add STS
         if task == 'mnist':
             params = model.all_params()
             optimizers = [optim.SGD(params[0], lr=0.005, momentum=0.9, weight_decay=0.0005),
@@ -85,6 +97,7 @@ class CenterConfig(LossConfig):
         super(CenterConfig, self).__init__('Center Loss', f"λ={lweight} - {distance}", loss_module, self.loss, distance)
 
     def optimizer(self, model, task):
+        # TODO change optimizer according to task
         optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
                       optim.SGD(self.loss.center_parameters(), lr=0.5)]
         schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
@@ -99,6 +112,7 @@ class CocoConfig(LossConfig):
         super(CocoConfig, self).__init__('CoCo Loss', f"α={alpha}", loss_module, loss, CosineDistance())
 
     def optimizer(self, model, task):
+        # TODO change optimizer according to task
         params = model.all_params()
         optimizers = [optim.SGD(params[0], lr=0.001, momentum=0.9, weight_decay=0.0005),
                       optim.SGD(params[1], lr=0.01, momentum=0.9)]
@@ -108,13 +122,22 @@ class CocoConfig(LossConfig):
 
 class ContrastiveConfig(LossConfig):
 
-    def __init__(self, device, margin=2, distance=EuclideanDistance()):
-        loss = ContrastiveLoss(device, margin, distance)
+    def __init__(self, device, margin=2, distance=EuclideanDistance(), size_average=True, online=True):
+        loss = ContrastiveLoss(device, margin, distance, size_average, online)
         super(ContrastiveConfig, self).__init__('Contrastive Loss', f"m={margin} - {distance}", None, loss, distance)
 
     def optimizer(self, model, task):
-        optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
-        schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
+        if task == 'mnist':
+            optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005)]
+            schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
+        elif task == 'speaker':
+            optimizers = sincnet_optims(model)
+            schedulers = []
+        elif task == 'sts':
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.0001)]
+            schedulers = []
+        else:
+            raise ValueError('Task must be one of mnist/speaker/sts')
         return Optimizer(optimizers, schedulers)
 
 
@@ -125,6 +148,15 @@ class TripletConfig(LossConfig):
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 
     def optimizer(self, model, task):
-        optimizers = [optim.SGD(model.parameters(), lr=0.0001, momentum=0.9, weight_decay=0.0005)]
-        schedulers = [lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)]
+        if task == 'mnist':
+            optimizers = [optim.SGD(model.parameters(), lr=0.0001, momentum=0.9, weight_decay=0.0005)]
+            schedulers = [lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)]
+        elif task == 'speaker':
+            optimizers = sincnet_optims(model)
+            schedulers = []
+        elif task == 'sts':
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.0001)]
+            schedulers = []
+        else:
+            raise ValueError('Task must be one of mnist/speaker/sts')
         return Optimizer(optimizers, schedulers)

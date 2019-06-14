@@ -132,5 +132,7 @@ dmypy.json
 
 # Custom
 images/
+tmp/
+saved-models/
 
 # End of https://www.gitignore.io/api/python

@@ -3,44 +3,46 @@
 import torch
 import torch.nn.functional as F
 import numpy as np
-from sklearn.neighbors import KNeighborsClassifier
 
 
 # TODO remove this function and use pyannote function directly
-def to_condensed(n, i, j):
-    """
-    Borrowed from pyannote: https://github.com/pyannote/pyannote-core
-    Compute index in condensed pdist matrix
-                V
-        0 | . 0 1 2 3
-     -> 1 | . . 4 5 6 <-   ==>   0 1 2 3 4 5 6 7 8 9
-        2 | . . . 7 8                    ^
-        3 | . . . . 9
-        4 | . . . . .
-           ----------
-            0 1 2 3 4
-    Parameters
-    ----------
-    n : int
-        Number of inputs in squared pdist matrix
-    i, j : `int` or `numpy.ndarray`
-        Indices in squared pdist matrix
-    Returns
-    -------
-    k : `int` or `numpy.ndarray`
-        Index in condensed pdist matrix
-    """
-    i, j = np.array(i), np.array(j)
-    if np.any(i == j):
-        raise ValueError('i and j should be different.')
-    i, j = np.minimum(i, j), np.maximum(i, j)
-    return np.int64(i * n - i * i / 2 - 3 * i / 2 + j - 1)
+# def to_condensed(n, i, j):
+#     """
+#     Borrowed from pyannote: https://github.com/pyannote/pyannote-core
+#     Compute index in condensed pdist matrix
+#                 V
+#         0 | . 0 1 2 3
+#      -> 1 | . . 4 5 6 <-   ==>   0 1 2 3 4 5 6 7 8 9
+#         2 | . . . 7 8                    ^
+#         3 | . . . . 9
+#         4 | . . . . .
+#            ----------
+#             0 1 2 3 4
+#     Parameters
+#     ----------
+#     n : int
+#         Number of inputs in squared pdist matrix
+#     i, j : `int` or `numpy.ndarray`
+#         Indices in squared pdist matrix
+#     Returns
+#     -------
+#     k : `int` or `numpy.ndarray`
+#         Index in condensed pdist matrix
+#     """
+#     i, j = np.array(i), np.array(j)
+#     if np.any(i == j):
+#         raise ValueError('i and j should be different.')
+#     i, j = np.minimum(i, j), np.maximum(i, j)
+#     return np.int64(i * n - i * i / 2 - 3 * i / 2 + j - 1)
 
 
 class Distance:
     """
     A distance function implementing pairwise distance
     """
+
+    def dist(self, x, y):
+        raise NotImplementedError("a Distance should implement 'dist'")
     
     def pdist(self, x):
         """
@@ -87,9 +89,12 @@ class CosineDistance(Distance):
     
     def to_sklearn_metric(self):
         return 'cosine'
+
+    def dist(self, x, y):
+        return 1 - F.cosine_similarity(x, y, dim=1, eps=1e-8)
     
     def sqdist_sum(self, x, y):
-        d = 1 - F.cosine_similarity(x, y, dim=1, eps=1e-8)
+        d = self.dist(x, y)
         return d.pow(2).sum()
     
     def pdist(self, x):
@@ -117,30 +122,12 @@ class EuclideanDistance(Distance):
     
     def to_sklearn_metric(self):
         return 'euclidean'
+
+    def dist(self, x, y):
+        return torch.sqrt(torch.sum(torch.pow(x - y, 2), 1))
     
     def sqdist_sum(self, x, y):
         return (x - y).pow(2).sum()
     
     def pdist(self, x):
         return F.pdist(x)
-
-
-class AccuracyCalculator:
-    """
-    Abstracts the accuracy calculation strategy. It uses a K Nearest Neighbors
-        classifier fit with the embeddings produced for the training set,
-        to determine to which class a given test embedding is assigned to.
-    :param train_embeddings: a tensor of shape (N, d), where
-            N = training set size
-            d = embedding dimension
-    :param train_y: a non one-hot encoded tensor of labels for the train embeddings
-    :param distance: a Distance object for the KNN classifier
-    """
-    
-    def __init__(self, train_embeddings, train_y, distance):
-        self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
-        self.knn.fit(train_embeddings, train_y)
-    
-    def calculate_batch(self, embeddings, y):
-        predicted = self.knn.predict(embeddings)
-        return (predicted == y).sum(), y.shape[0]
