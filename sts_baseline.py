@@ -29,12 +29,13 @@ def set_forget_gate_bias(lstm: nn.LSTM, value: float):
 
 class STSBaselineNet(nn.Module):
 
-    def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, tokens, mode='baseline'):
+    def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, mode='baseline'):
         super(STSBaselineNet, self).__init__()
         self.device = device
         self.nfeat_word = nfeat_word
         self.nfeat_sent = nfeat_sent
         self.mode = mode
+        tokens = vec_vocab.keys()
         if 'oov' not in tokens:
             tokens.append('oov')
         self.word2id = {word: index for index, word in enumerate(tokens)}
