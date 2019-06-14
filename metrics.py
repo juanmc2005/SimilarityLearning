@@ -124,11 +124,12 @@ class SpeakerVerificationEvaluator(TrainingListener):
             segments = (try_with,)
         return hash((uri, segments))
 
-    def __init__(self, device: str, batch_size: int, distance: Distance, config: SpeakerValidationConfig, callbacks=[]):
+    def __init__(self, device: str, batch_size: int, distance: Distance, eval_interval: int, config: SpeakerValidationConfig, callbacks=[]):
         super(SpeakerVerificationEvaluator, self).__init__()
         self.device = device
         self.batch_size = batch_size
         self.distance = distance
+        self.eval_interval = eval_interval
         self.config = config
         self.callbacks = callbacks
         self.best_metric, self.best_epoch = 0, -1
@@ -181,18 +182,19 @@ class SpeakerVerificationEvaluator(TrainingListener):
             self.best_metric = checkpoint['accuracy']
 
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        metric_value = self._eval(model.to_prediction_model())
-        print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Dev EER: {1 - metric_value:.6f}")
-        if self.best_epoch != -1:
-            print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")
-        print("------------------------------------------------")
-        if metric_value > self.best_metric:
-            self.best_metric = metric_value
-            self.best_epoch = epoch
-            print('New Best Dev EER!')
-            for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, None, None)
+        if epoch % self.eval_interval == 0:
+            metric_value = self._eval(model.to_prediction_model())
+            print(f"--------------- Epoch {epoch:02d} Results ---------------")
+            print(f"Dev EER: {1 - metric_value:.6f}")
+            if self.best_epoch != -1:
+                print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")
+            print("------------------------------------------------")
+            if metric_value > self.best_metric:
+                self.best_metric = metric_value
+                self.best_epoch = epoch
+                print('New Best Dev EER!')
+                for cb in self.callbacks:
+                    cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, None, None)
 
 
 class ClassAccuracyEvaluator(TrainingListener):

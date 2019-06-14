@@ -26,6 +26,8 @@ parser.add_argument('--loss', type=str, help=loss_options)
 parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
 parser.add_argument('--log-interval', type=int, default=10,
                     help='Steps (in percentage) to show epoch progress. Default value: 10')
+parser.add_argument('--eval-interval', type=int, default=10,
+                    help='Steps (in epochs) to evaluate the speaker model. Default value: 10')
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
 parser.add_argument('--plot', dest='plot', action='store_true', help='Plot best accuracy dev embeddings')
 parser.add_argument('--no-plot', dest='plot', action='store_false', help='Do NOT plot best accuracy dev embeddings')
@@ -127,7 +129,7 @@ if args.task == 'mnist':
                                        batch_transforms, test_callbacks)
 elif args.task == 'speaker':
     evaluator = SpeakerVerificationEvaluator(device, args.batch_size, config.test_distance,
-                                             dataset.config, test_callbacks)
+                                             args.eval_interval, dataset.config, test_callbacks)
 # STS
 elif args.loss == 'kldiv':
     metric = LogitsSpearmanMetric()

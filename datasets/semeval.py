@@ -104,11 +104,12 @@ class SemEval(SimDataset):
             labels.append(tmp)
         return labels
 
-    def __init__(self, path, vector_path, vocab_path, batch_size, mode='baseline', threshold=2.5):
+    def __init__(self, path, vector_path, vocab_path, batch_size, mode='baseline', threshold=2.5, allow_redundancy=True):
         # TODO mode parameter should be refactored into a strategy-like object
         self.path = path
         self.batch_size = batch_size
         self.mode = mode
+        self.allow_redundancy = allow_redundancy
         self.nclass = None
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
         print(f"Created vocabulary with {int(100 * n_inv / (n_inv + n_oov))}% coverage")
@@ -153,12 +154,18 @@ class SemEval(SimDataset):
         elif mode == 'triplets':
             self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
         elif mode == 'baseline':
-            unique_train_data = list(set(zip(atrain, btrain, simtrain)))
-            pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
-            sim = self.scores_to_probs([y for _, _, y in unique_train_data])
-            self.train_sents = np.array(list(zip(pairs, sim)))
-            print(f"Original Train Pairs: {len(atrain)}")
-            print(f"Unique Train Pairs: {len(unique_train_data)}")
+            if self.allow_redundancy:
+                sim = self.scores_to_probs(simtrain)
+                self.train_sents = np.array(list(zip(zip(atrain, btrain), sim)))
+                print(f"Train Pairs: {len(atrain)}")
+                print("Redundancy in the training set is allowed")
+            else:
+                unique_train_data = list(set(zip(atrain, btrain, simtrain)))
+                pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
+                sim = self.scores_to_probs([y for _, _, y in unique_train_data])
+                self.train_sents = np.array(list(zip(pairs, sim)))
+                print(f"Original Train Pairs: {len(atrain)}")
+                print(f"Unique Train Pairs: {len(unique_train_data)}")
         else:
             raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
 
