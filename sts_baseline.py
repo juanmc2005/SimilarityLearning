@@ -4,6 +4,47 @@ import torch.nn as nn
 import numpy
 
 
+class ForwardMode:
+
+    @staticmethod
+    def stack(embeddings):
+        return torch.stack(embeddings, dim=0).squeeze()
+
+    def __call__(self, embed_fn, sents, train: bool):
+        raise NotImplementedError
+
+
+class ConcatForwardMode(ForwardMode):
+
+    def __call__(self, embed_fn, sents, train: bool):
+        embs = [torch.cat((embed_fn(s1), embed_fn(s2)), 1) for s1, s2 in sents]
+        return self.stack(embs)
+
+
+class PairForwardMode(ForwardMode):
+
+    def __call__(self, embed_fn, sents, train: bool):
+        embs1, embs2 = [], []
+        for s1, s2 in sents:
+            embs1.append(embed_fn(s1))
+            embs2.append(embed_fn(s2))
+        return self.stack(embs1), self.stack(embs2)
+
+
+class SingleForwardMode(ForwardMode):
+
+    def __init__(self):
+        self.eval_mode = PairForwardMode()
+
+    def __call__(self, embed_fn, sents, train: bool):
+        if train:
+            embs = [embed_fn(sent) for sent in sents]
+            return self.stack(embs)
+        else:
+            return self.eval_mode(embed_fn, sents, train)
+
+
+# TODO use the above modes instead of the string parameter
 class STSBaselineNet(nn.Module):
 
     def __init__(self, device, nfeat_word, nfeat_sent, vec_vocab, mode='baseline'):
