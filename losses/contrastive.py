@@ -43,16 +43,15 @@ class ContrastiveLoss(nn.Module):
                 for j in range(i+1, nbatch):
                     gt.append(int(y[i] != y[j]))
             gt = torch.Tensor(gt).float().to(self.device)
-            # Calculate the losses as described in the paper
-            loss = (1-gt) * torch.pow(dist, 2) + gt * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
-            # Normalize by batch size
-            return torch.sum(loss) / 2 / dist.size(0)
         else:
             feat1, feat2 = feat
             dist = self.distance.dist(feat1, feat2)
+            gt = y
             # if torch.isnan(feat1).sum().item() == 0:
             #     visual.plot_dists(dist.detach().cpu().numpy(), 'Contrastive Pair Distances', f'dists-{self.batches}')
             #     self.batches += 1
-            loss = (1-y) * torch.pow(dist, 2) + y * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
-            loss = torch.sum(loss) / 2
-            return loss / dist.size(0) if self.size_average else loss
+        # Calculate the losses as described in the paper
+        loss = (1 - gt) * torch.pow(dist, 2) + gt * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
+        loss = torch.sum(loss) / 2
+        # Average by batch size if requested
+        return loss / dist.size(0) if self.size_average else loss
