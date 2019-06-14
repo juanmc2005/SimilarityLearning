@@ -283,7 +283,7 @@ class STSEmbeddingEvaluator(TrainingListener):
         self.callbacks = callbacks
         self.best_metric, self.best_epoch = 0, -1
 
-    def _eval(self, model):
+    def eval(self, model):
         model.eval()
         feat_test, y_test = [], []
         for cb in self.callbacks:
@@ -321,7 +321,7 @@ class STSEmbeddingEvaluator(TrainingListener):
             self.best_metric = checkpoint['accuracy']
 
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        feat_test, y_test = self._eval(model.to_prediction_model())
+        feat_test, y_test = self.eval(model.to_prediction_model())
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Spearman: {metric_value:.6f}")
