@@ -3,7 +3,7 @@ import argparse
 from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from datasets.voxceleb import VoxCeleb1
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer, ModelSaver, DeviceMapperTransform
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer, ModelSaver, ModelLoader, DeviceMapperTransform
 from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, \
     DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator, \
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
@@ -100,8 +100,10 @@ else:
 train_callbacks.append(evaluator)
 
 # Configure trainer
-trainer = BaseTrainer(args.loss, model, DEVICE, config.loss, train, config.optimizer(model, args.task),
-                      recover=args.recover, batch_transforms=batch_transforms, callbacks=train_callbacks)
+trainer = BaseTrainer(model, config.loss, train, config.optimizer(model, args.task),
+                      model_loader=ModelLoader(args.loss, args.recover) if args.recover is not None else None,
+                      batch_transforms=batch_transforms,
+                      callbacks=train_callbacks)
 
 print()
 

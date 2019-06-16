@@ -30,7 +30,7 @@ if args.task == 'speaker':
                                                     nfeat=256,
                                                     distance=distance,
                                                     batch_size=args.batch_size)
-    result_format = "[{partition} EER = {metric}]"
+    metric_name = 'EER'
 elif args.task == 'sts':
     experiment = SemEvalModelEvaluationExperiment(model_path=args.model,
                                                   nfeat=500,
@@ -40,7 +40,7 @@ elif args.task == 'sts':
                                                   distance=distance,
                                                   log_interval=args.log_interval,
                                                   batch_size=args.batch_size)
-    result_format = "[{partition} Spearman = {metric}]"
+    metric_name = 'Spearman'
 else:
     raise ValueError("Task can only be 'speaker' or 'sts'")
 
@@ -51,4 +51,4 @@ else:
     metric = experiment.evaluate_on_test()
 print(f"[Evaluation Finished]")
 
-print(result_format.format(partition=args.partition.upper(), metric=metric))
+print(f"[{args.partition.upper()} {metric_name} = {metric}]")

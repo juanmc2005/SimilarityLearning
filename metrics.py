@@ -125,14 +125,14 @@ class SpeakerVerificationEvaluator(TrainingListener):
         return hash((uri, segments))
 
     def __init__(self, device: str, batch_size: int, distance: Distance,
-                 eval_interval: int, config: SpeakerValidationConfig, callbacks=[]):
+                 eval_interval: int, config: SpeakerValidationConfig, callbacks=None):
         super(SpeakerVerificationEvaluator, self).__init__()
         self.device = device
         self.batch_size = batch_size
         self.distance = distance
         self.eval_interval = eval_interval
         self.config = config
-        self.callbacks = callbacks
+        self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
     def eval(self, model, partition: str = 'development'):
@@ -200,13 +200,13 @@ class SpeakerVerificationEvaluator(TrainingListener):
 
 class ClassAccuracyEvaluator(TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
         super(ClassAccuracyEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
+        self.batch_transforms = batch_transforms if batch_transforms is not None else []
+        self.callbacks = callbacks if callbacks is not None else []
         self.feat_train, self.y_train = None, None
         self.best_metric, self.best_epoch = 0, -1
 
@@ -274,13 +274,13 @@ class ClassAccuracyEvaluator(TrainingListener):
 
 class STSEmbeddingEvaluator(TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
         super(STSEmbeddingEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
+        self.batch_transforms = batch_transforms if batch_transforms is not None else []
+        self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
     def eval(self, model):
@@ -338,13 +338,13 @@ class STSEmbeddingEvaluator(TrainingListener):
 
 class STSBaselineEvaluator(TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
         super(STSBaselineEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
+        self.batch_transforms = batch_transforms if batch_transforms is not None else []
+        self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
     def _eval(self, model):
