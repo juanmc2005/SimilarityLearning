@@ -2,9 +2,11 @@ from models import SpeakerNet, SemanticNet
 from distances import Distance
 from losses.base import ModelLoader, DeviceMapperTransform, TestLogger
 from datasets.voxceleb import VoxCeleb1
-from datasets.semeval import SemEval
+from datasets.semeval import SemEval, SemEvalPartitionFactory
+from sts.augmentation import NoAugmentation
+from sts.modes import PairSTSForwardMode
 from metrics import SpeakerVerificationEvaluator, STSEmbeddingEvaluator, DistanceSpearmanMetric
-from utils import DEVICE
+from common import DEVICE
 
 
 class ModelEvaluationExperiment:
@@ -39,10 +41,15 @@ class SemEvalModelEvaluationExperiment(ModelEvaluationExperiment):
 
     def __init__(self, model_path: str, nfeat: int, data_path: str, word2vec_path: str,
                  vocab_path: str, distance: Distance, log_interval: int, batch_size: int):
-        # The mode and threshold are not important since we won't use any of this for training
-        self.dataset = SemEval(data_path, word2vec_path, vocab_path, batch_size)
-        # We can pass any mode but 'baseline' here, because we don't want to concatenate both embeddings in the end
-        self.model = SemanticNet(DEVICE, nfeat, self.dataset.vocab, mode='pairs')
+        # The augmentation is only done for the training set, so it doesn't matter which one we choose
+        augmentation = NoAugmentation(allow_redundancy=True)
+        # All partition types (should!) format the data in the same manner when it comes to dev or test
+        # so it doesn't matter what loss we choose here
+        partition_factory = SemEvalPartitionFactory(loss='contrastive', batch_size=batch_size)
+        self.dataset = SemEval(data_path, word2vec_path, vocab_path, augmentation, partition_factory)
+        # We can use any mode but ConcatMode, because we don't want to concatenate our 2 embeddings when evaluating
+        # Similarly, since we're just testing, we don't care about the loss module
+        self.model = SemanticNet(DEVICE, nfeat, self.dataset.vocab, mode=PairSTSForwardMode())
         ModelLoader(None).load(self.model, model_path)
         self.model = self.model.to_prediction_model().to(DEVICE)
         self.dev_evaluator, self.test_evaluator = None, None

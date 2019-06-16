@@ -1,14 +1,16 @@
 import argparse
-from utils import LOSS_OPTIONS_STR, get_config, enabled_str, set_custom_seed, DEVICE
+
+from datasets.mnist import MNIST
+from datasets.semeval import SemEval, SemEvalPartitionFactory
+from datasets.voxceleb import VoxCeleb1
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer, ModelSaver, DeviceMapperTransform
-from metrics import KNNAccuracyMetric, LogitsSpearmanMetric,\
-    DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator,\
+from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, \
+    DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator, \
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
 from models import MNISTNet, SpeakerNet, SemanticNet
-from datasets.mnist import MNIST
-from datasets.semeval import SemEval
-from datasets.voxceleb import VoxCeleb1
-
+from sts.modes import STSForwardModeFactory
+from sts.augmentation import SemEvalAugmentationStrategyFactory
+from common import LOSS_OPTIONS_STR, get_config, enabled_str, set_custom_seed, DEVICE
 
 # Script arguments
 parser = argparse.ArgumentParser()
@@ -51,16 +53,10 @@ elif args.task == 'speaker':
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
 elif args.task == 'sts':
     nfeat = 500
-    if args.loss == 'kldiv':
-        mode = 'baseline'
-    elif args.loss == 'contrastive':
-        mode = 'pairs'
-    elif args.loss == 'triplet':
-        mode = 'triplets'
-    else:
-        mode = 'clusters'
-    dataset = SemEval(args.path, args.word2vec, args.vocab,
-                      args.batch_size, mode=mode, threshold=(1.2, 3.8))
+    mode = STSForwardModeFactory().new(args.loss)
+    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=(1.2, 3.8), allow_redundancy=True).new()
+    partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
+    dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation, partition_factory)
     config = get_config(args.loss, nfeat, dataset.nclass, args.task, DEVICE)
     model = SemanticNet(DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:

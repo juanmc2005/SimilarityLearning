@@ -1,8 +1,10 @@
 import argparse
-import numpy as np
-import matplotlib.pyplot as plt
 from os.path import join
-import sts_utils as sts
+
+import matplotlib.pyplot as plt
+import numpy as np
+
+from sts import utils as sts
 
 
 def load_partition(path, partition):

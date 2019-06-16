@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import torch
-import numpy as np
 import math
 from os.path import join
-import sts_utils as sts
+
+import numpy as np
+import torch
+
 from datasets.base import SimDataset, SimDatasetPartition
+from sts.augmentation import SemEvalAugmentationStrategy
+from sts import utils as sts
 
 
 class SemEvalPartition(SimDatasetPartition):
@@ -55,22 +58,23 @@ class SemEvalContrastivePartition(SemEvalPartition):
         return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).float()
 
 
-class SemEvalPartitionBuilder:
+class SemEvalPartitionFactory:
 
-    def __init__(self, batch_size: int, mode: str):
+    def __init__(self, loss: str, batch_size: int):
+        self.loss = loss
         self.batch_size = batch_size
-        self.mode = mode
 
-    def build(self, data, train: bool):
+    def new(self, data, train: bool):
         # TODO add 'triplets' mode
-        if self.mode == 'baseline':
+        if self.loss == 'kldiv':
             return SemEvalBaselinePartition(data, self.batch_size, train)
-        elif self.mode == 'pairs':
+        elif self.loss == 'contrastive':
             return SemEvalContrastivePartition(data, self.batch_size, train)
-        elif self.mode == 'clusters':
-            return SemEvalClusterizedPartition(data, self.batch_size, train)
+        elif self.loss == 'triplet':
+            raise NotImplementedError('Triplet loss SemEval partition is not implemented yet')
         else:
-            raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
+            # Softmax based loss, classes are simulated with clusters
+            return SemEvalClusterizedPartition(data, self.batch_size, train)
 
 
 class SemEval(SimDataset):
@@ -89,98 +93,19 @@ class SemEval(SimDataset):
                 s1 += 'null'
         return s1, s2
 
-    @staticmethod
-    def scores_to_probs(scores):
-        labels = []
-        for s in scores:
-            ceil = int(math.ceil(s))
-            floor = int(math.floor(s))
-            tmp = [0, 0, 0, 0, 0, 0]
-            if floor != ceil:
-                tmp[ceil] = s - floor
-                tmp[floor] = ceil - s
-            else:
-                tmp[floor] = 1
-            labels.append(tmp)
-        return labels
-
-    def __init__(self, path, vector_path, vocab_path, batch_size, mode='baseline', threshold=2.5, allow_redundancy=True):
-        # TODO mode parameter should be refactored into a strategy-like object
+    def __init__(self, path: str, vector_path: str, vocab_path: str,
+                 augmentation: SemEvalAugmentationStrategy, partition_factory: SemEvalPartitionFactory):
         self.path = path
-        self.batch_size = batch_size
-        self.mode = mode
-        self.allow_redundancy = allow_redundancy
-        self.nclass = None
+        self.augmentation = augmentation
+        self.partition_factory = partition_factory
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
-        print(f"Created vocabulary with {int(100 * n_inv / (n_inv + n_oov))}% coverage")
-        atrain, btrain, simtrain = self._load_partition('train')
-        adev, bdev, simdev = self._load_partition('dev')
-        atest, btest, simtest = self._load_partition('test')
-        self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
-        self.test_sents = np.array(list(zip(zip(atest, btest), simtest)))
-        if mode == 'clusters':
-            sents_a = atrain + adev + atest
-            sents_b = btrain + bdev + btest
-            scores = simtrain + simdev + simtest
-            sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
-            clusters, self.nclass = self._clusterize(sents_a, sents_b, scores, threshold)
-            self.train_sents, train_sents_raw, dev_sents, test_sents = [], [], [], []
-            for i, cluster in enumerate(clusters):
-                for sent in cluster:
-                    if sent in atrain or sent in btrain:
-                        self.train_sents.append((sent.split(' '), i))
-                        train_sents_raw.append(sent)
-                    if sent in adev or sent in bdev:
-                        dev_sents.append(sent)
-                    if sent in atest or sent in btest:
-                        test_sents.append(sent)
-            self.train_sents = np.array(self.train_sents)
-            print(f"Unique sentences used for clustering: {len(set(sents_a + sents_b))}")
-            print(f"Total Train Sentences: {len(set(atrain + btrain))}")
-            print(f"Train Sentences Kept: {len(set(train_sents_raw))}")
-            print(f"Total Dev Sentences: {len(set(adev + bdev))}")
-            print(f"Dev Sentences Kept: {len(set(dev_sents))}")
-            print(f"Total Test Sentences: {len(set(atest + btest))}")
-            print(f"Test Sentences Kept: {len(set(test_sents))}")
-            print(f"N Clusters: {self.nclass}")
-            print(f"Max Cluster Size: {max([len(cluster) for cluster in clusters])}")
-            print(f"Mean Cluster Size: {np.mean([len(cluster) for cluster in clusters])}")
-        elif mode == 'pairs':
-            self.train_sents = self._pairs(atrain, btrain, simtrain, threshold)
-            print(f"Original Train Pairs: {len(atrain)}")
-            print(f"Original Unique Train Pairs: {len(set(zip(atrain, btrain)))}")
-            print(f"Total Train Pairs: {len(self.train_sents)}")
-            print(f"+ Train Pairs: {len([y for _, y in self.train_sents if y == 0])}")
-            print(f"- Train Pairs: {len([y for _, y in self.train_sents if y == 1])}")
-        elif mode == 'triplets':
-            self.train_sents = self._triplets(atrain, btrain, simtrain, threshold)
-        elif mode == 'baseline':
-            if self.allow_redundancy:
-                sim = self.scores_to_probs(simtrain)
-                self.train_sents = np.array(list(zip(zip(atrain, btrain), sim)))
-                print(f"Train Pairs: {len(atrain)}")
-                print("Redundancy in the training set is allowed")
-            else:
-                unique_train_data = list(set(zip(atrain, btrain, simtrain)))
-                pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
-                sim = self.scores_to_probs([y for _, _, y in unique_train_data])
-                self.train_sents = np.array(list(zip(pairs, sim)))
-                print(f"Original Train Pairs: {len(atrain)}")
-                print(f"Unique Train Pairs: {len(unique_train_data)}")
-        else:
-            raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
-
-    def training_partition(self) -> SimDatasetPartition:
-        np.random.shuffle(self.train_sents)
-        return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.train_sents, train=True)
-
-    def dev_partition(self) -> SimDatasetPartition:
-        np.random.shuffle(self.dev_sents)
-        return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.dev_sents, train=False)
-
-    def test_partition(self) -> SimDatasetPartition:
-        np.random.shuffle(self.test_sents)
-        return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.test_sents, train=False)
+        print(f"Created vocabulary with {n_inv} INV and {n_oov} OOV ({int(100 * n_inv / (n_inv + n_oov))}% coverage)")
+        train = self._load_partition('train')
+        dev = self._load_partition('dev')
+        test = self._load_partition('test')
+        self.train_sents = self.augmentation.augment(train, dev, test)
+        self.dev_sents = np.array(list(zip(zip(dev[0], dev[1]), dev[2])))
+        self.test_sents = np.array(list(zip(zip(test[0], test[1]), test[2])))
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \
@@ -193,24 +118,16 @@ class SemEval(SimDataset):
                 a[i], b[i] = self.pad_sent(a[i], b[i])
             return a, b, sim
 
-    def _clusterize(self, sents_a, sents_b, scores, threshold):
-        segment_a = sts.SemEvalSegment(sents_a)
-        segment_b = sts.SemEvalSegment(sents_b)
-        clusters = segment_a.clusters(segment_b, scores, threshold)
-        return clusters, len(clusters)
+    @property
+    def nclass(self):
+        return self.augmentation.nclass()
 
-    def _pairs(self, sents_a, sents_b, scores, threshold):
-        segment_a = sts.SemEvalSegment(sents_a)
-        segment_b = sts.SemEvalSegment(sents_b)
-        pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
-        data = [((s1, s2), 0) for s1, s2 in pos] + [((s1, s2), 1) for s1, s2 in neg]
-        return np.array([((s1.split(' '), s2.split(' ')), y) for (s1, s2), y in data])
+    def training_partition(self) -> SimDatasetPartition:
+        np.random.shuffle(self.train_sents)
+        return self.partition_factory.new(self.train_sents, train=True)
 
-    def _triplets(self, sents_a, sents_b, scores, threshold):
-        segment_a = sts.SemEvalSegment(sents_a)
-        segment_b = sts.SemEvalSegment(sents_b)
-        unique_sents = set(sents_a + sents_b)
-        pos, neg = sts.pairs(segment_a, segment_b, scores, threshold)
-        anchors, positives, negatives = sts.triplets(unique_sents, pos, neg)
-        return np.array([(a.split(' '), p.split(' '), n.split(' '))
-                         for a, p, n in zip(anchors, positives, negatives)])
+    def dev_partition(self) -> SimDatasetPartition:
+        return self.partition_factory.new(self.dev_sents, train=False)
+
+    def test_partition(self) -> SimDatasetPartition:
+        return self.partition_factory.new(self.test_sents, train=False)

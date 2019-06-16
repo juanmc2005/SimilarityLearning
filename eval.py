@@ -1,5 +1,5 @@
 import argparse
-from utils import set_custom_seed
+from common import set_custom_seed
 from distances import EuclideanDistance, CosineDistance
 from experiments import VoxCeleb1ModelEvaluationExperiment, SemEvalModelEvaluationExperiment
 
