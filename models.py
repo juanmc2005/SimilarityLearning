@@ -133,8 +133,7 @@ class SemanticNet(SimNet):
 
     def __init__(self, device, nfeat, vector_vocab, loss_module=None, mode='baseline'):
         super().__init__(loss_module)
-        self.base_model = STSBaselineNet(device, nfeat_word=300, nfeat_sent=nfeat,
-                                         vec_vocab=vector_vocab, tokens=vector_vocab.keys(), mode=mode)
+        self.base_model = STSBaselineNet(device, nfeat_word=300, nfeat_sent=nfeat, vec_vocab=vector_vocab, mode=mode)
 
     def layers(self):
         return [self.base_model]

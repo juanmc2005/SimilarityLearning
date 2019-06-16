@@ -2,21 +2,24 @@
 # -*- coding: utf-8 -*-
 
 
-class SimDataset:
-
-    def training_partition(self):
-        raise NotImplementedError
-
-    def dev_partition(self):
-        raise NotImplementedError
-
-
 class SimDatasetPartition:
 
-    def nbatches(self):
+    def nbatches(self) -> int:
         raise NotImplementedError
 
     def __next__(self):
+        raise NotImplementedError
+
+
+class SimDataset:
+
+    def training_partition(self) -> SimDatasetPartition:
+        raise NotImplementedError
+
+    def dev_partition(self) -> SimDatasetPartition:
+        raise NotImplementedError
+
+    def test_partition(self) -> SimDatasetPartition:
         raise NotImplementedError
 
 
@@ -27,7 +30,7 @@ class LoaderWrapperPartition(SimDatasetPartition):
         self.loader = loader
         self.iterator = iter(loader)
 
-    def nbatches(self):
+    def nbatches(self) -> int:
         return len(self.loader)
 
     def __next__(self):

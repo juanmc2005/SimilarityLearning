@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader
-from datasets.base import SimDataset, LoaderWrapperPartition
+from datasets.base import SimDataset, LoaderWrapperPartition, SimDatasetPartition
 
 
 class MNIST(SimDataset):
@@ -16,8 +16,11 @@ class MNIST(SimDataset):
         self.trainset = datasets.MNIST(path, download=True, train=True, transform=transform)
         self.testset = datasets.MNIST(path, download=True, train=False, transform=transform)
 
-    def training_partition(self):
+    def training_partition(self) -> SimDatasetPartition:
         return LoaderWrapperPartition(DataLoader(self.trainset, self.batch_size, shuffle=True, num_workers=4))
 
-    def dev_partition(self):
+    def dev_partition(self) -> SimDatasetPartition:
         return LoaderWrapperPartition(DataLoader(self.testset, self.batch_size, shuffle=False, num_workers=4))
+
+    def test_partition(self) -> SimDatasetPartition:
+        return self.dev_partition()

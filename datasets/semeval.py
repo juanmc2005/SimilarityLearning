@@ -117,6 +117,7 @@ class SemEval(SimDataset):
         adev, bdev, simdev = self._load_partition('dev')
         atest, btest, simtest = self._load_partition('test')
         self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
+        self.test_sents = np.array(list(zip(zip(atest, btest), simtest)))
         if mode == 'clusters':
             sents_a = atrain + adev + atest
             sents_b = btrain + bdev + btest
@@ -169,13 +170,17 @@ class SemEval(SimDataset):
         else:
             raise ValueError("Mode can only be 'baseline', 'clusters', 'pairs' or 'triplets'")
 
-    def training_partition(self):
+    def training_partition(self) -> SimDatasetPartition:
         np.random.shuffle(self.train_sents)
         return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.train_sents, train=True)
 
-    def dev_partition(self):
+    def dev_partition(self) -> SimDatasetPartition:
         np.random.shuffle(self.dev_sents)
         return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.dev_sents, train=False)
+
+    def test_partition(self) -> SimDatasetPartition:
+        np.random.shuffle(self.test_sents)
+        return SemEvalPartitionBuilder(self.batch_size, self.mode).build(self.test_sents, train=False)
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \
