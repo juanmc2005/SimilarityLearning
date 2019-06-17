@@ -100,8 +100,8 @@ else:
 train_callbacks.append(evaluator)
 
 # Configure trainer
-trainer = BaseTrainer(model, config.loss, train, config.optimizer(model, args.task),
-                      model_loader=ModelLoader(args.loss, args.recover) if args.recover is not None else None,
+trainer = BaseTrainer(args.loss, model, config.loss, train, config.optimizer(model, args.task),
+                      model_loader=ModelLoader(args.recover) if args.recover is not None else None,
                       batch_transforms=batch_transforms,
                       callbacks=train_callbacks)
 

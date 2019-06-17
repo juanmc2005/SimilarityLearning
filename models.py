@@ -131,7 +131,8 @@ class SpeakerNet(SimNet):
 
 class SemanticNet(SimNet):
 
-    def __init__(self, device: str, nfeat: int, vector_vocab: dict, mode: STSForwardMode, loss_module: nn.Module = None):
+    def __init__(self, device: str, nfeat: int, vector_vocab: dict,
+                 mode: STSForwardMode, loss_module: nn.Module = None):
         super().__init__(loss_module)
         self.base_model = STSBaselineNet(device, nfeat_word=300, nfeat_sent=nfeat, vec_vocab=vector_vocab, mode=mode)
 

@@ -347,7 +347,7 @@ class STSBaselineEvaluator(TrainingListener):
         self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
-    def _eval(self, model):
+    def eval(self, model):
         model.eval()
         feat_test, logits_test, y_test = [], [], []
         for cb in self.callbacks:
@@ -384,7 +384,7 @@ class STSBaselineEvaluator(TrainingListener):
             self.best_metric = checkpoint['accuracy']
 
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        feat_test, y_test = self._eval(model)
+        feat_test, y_test = self.eval(model)
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Spearman: {metric_value:.6f}")

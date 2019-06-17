@@ -51,6 +51,7 @@ class NoAugmentation(SemEvalAugmentationStrategy):
 
 
 class ClusterAugmentation(SemEvalAugmentationStrategy):
+    # TODO IMPORTANT!! Remove dev and test from the clustering algorithm if we decide to use this approach later
 
     def __init__(self, threshold: int):
         self.threshold = threshold

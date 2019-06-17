@@ -190,14 +190,16 @@ class DeviceMapperTransform:
 
 class ModelLoader:
 
-    def __init__(self, loss: str, path: str):
-        self.loss = loss
+    def __init__(self, path: str):
         self.path = path
 
-    def restore(self, model: SimNet, loss_fn: nn.Module, optimizer: Optimizer):
+    def get_trained_loss(self):
+        return torch.load(self.path)['trained_loss']
+
+    def restore(self, model: SimNet, loss_fn: nn.Module, optimizer: Optimizer, current_loss: str):
         checkpoint = torch.load(self.path)
         model.load_common_state_dict(checkpoint['common_state_dict'])
-        if self.loss == checkpoint['trained_loss']:
+        if current_loss == checkpoint['trained_loss']:
             loss_fn.load_state_dict(checkpoint['loss_state_dict'])
             if model.loss_module is not None:
                 model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
@@ -205,19 +207,20 @@ class ModelLoader:
         print(f"Recovered Model. Epoch {checkpoint['epoch']}. Test Metric {checkpoint['accuracy']}")
         return checkpoint
 
-    def load(self, model: SimNet):
+    def load(self, model: SimNet, current_loss: str):
         checkpoint = torch.load(self.path)
         model.load_common_state_dict(checkpoint['common_state_dict'])
-        if self.loss == checkpoint['trained_loss'] and model.loss_module is not None:
+        if current_loss == checkpoint['trained_loss'] and model.loss_module is not None:
             model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
         return checkpoint
 
 
 class BaseTrainer:
     
-    def __init__(self, model: SimNet, loss_fn: nn.Module, partition: SimDatasetPartition,
+    def __init__(self, loss_name: str, model: SimNet, loss_fn: nn.Module, partition: SimDatasetPartition,
                  optim: Optimizer, model_loader: ModelLoader = None,
                  batch_transforms: list = None, callbacks: list = None):
+        self.loss_name = loss_name
         self.model = model.to(common.DEVICE)
         self.loss_fn = loss_fn
         self.partition = partition
@@ -228,7 +231,7 @@ class BaseTrainer:
 
     def _restore(self):
         if self.model_loader is not None:
-            checkpoint = self.model_loader.restore(self.model, self.loss_fn, self.optim)
+            checkpoint = self.model_loader.restore(self.model, self.loss_fn, self.optim, self.loss_name)
             epoch = checkpoint['epoch']
             return checkpoint, epoch + 1
         else:
