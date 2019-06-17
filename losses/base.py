@@ -6,7 +6,7 @@ import visual
 from os.path import join
 from models import SimNet
 from datasets.base import SimDatasetPartition
-from common import DEVICE
+import common
 
 
 class TrainingListener:
@@ -218,7 +218,7 @@ class BaseTrainer:
     def __init__(self, model: SimNet, loss_fn: nn.Module, partition: SimDatasetPartition,
                  optim: Optimizer, model_loader: ModelLoader = None,
                  batch_transforms: list = None, callbacks: list = None):
-        self.model = model.to(DEVICE)
+        self.model = model.to(common.DEVICE)
         self.loss_fn = loss_fn
         self.partition = partition
         self.optim = optim

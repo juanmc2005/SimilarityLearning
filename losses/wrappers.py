@@ -12,10 +12,10 @@ class LossWrapper(nn.Module):
         return self.loss(logits, y)
 
 
-class PWIMPairwiseClassification(nn.Module):
+class STSBaselineClassifier(nn.Module):
 
     def __init__(self, nfeat_sent):
-        super(PWIMPairwiseClassification, self).__init__()
+        super(STSBaselineClassifier, self).__init__()
         self.mlp = nn.Sequential(nn.Linear(2*nfeat_sent, 128), nn.Tanh(), nn.Linear(128, 6), nn.LogSoftmax())
 
     def forward(self, x, y):

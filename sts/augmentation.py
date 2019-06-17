@@ -38,7 +38,7 @@ class NoAugmentation(SemEvalAugmentationStrategy):
             sim = self.scores_to_probs(simtrain)
             train_sents = np.array(list(zip(zip(atrain, btrain), sim)))
             print(f"Train Pairs: {len(atrain)}")
-            print("Redundancy in the training set is allowed")
+            print("Redundancy in the training set: YES")
         else:
             unique_train_data = list(set(zip(atrain, btrain, simtrain)))
             pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
@@ -46,6 +46,7 @@ class NoAugmentation(SemEvalAugmentationStrategy):
             train_sents = np.array(list(zip(pairs, sim)))
             print(f"Original Train Pairs: {len(atrain)}")
             print(f"Unique Train Pairs: {len(unique_train_data)}")
+            print("Redundancy in the training set: NO")
         return train_sents
 
 

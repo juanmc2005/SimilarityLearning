@@ -40,4 +40,4 @@ class STSBaselineNet(nn.Module):
         return torch.max(out, 0)[0]
 
     def forward(self, sents):
-        self.mode.forward(self._embed, sents, self.training)
+        return self.mode.forward(self._embed, sents, self.training)

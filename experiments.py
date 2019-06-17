@@ -22,7 +22,7 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
 
     def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int):
         self.model = SpeakerNet(nfeat, sample_rate=16000, window=200)
-        ModelLoader(None).load(self.model, model_path)
+        ModelLoader('', model_path).load(self.model)
         self.model = self.model.to_prediction_model().to(DEVICE)
         dataset = VoxCeleb1(batch_size, segment_size_millis=200)
         self.evaluator = SpeakerVerificationEvaluator(DEVICE, batch_size, distance,
@@ -50,7 +50,7 @@ class SemEvalModelEvaluationExperiment(ModelEvaluationExperiment):
         # We can use any mode but ConcatMode, because we don't want to concatenate our 2 embeddings when evaluating
         # Similarly, since we're just testing, we don't care about the loss module
         self.model = SemanticNet(DEVICE, nfeat, self.dataset.vocab, mode=PairSTSForwardMode())
-        ModelLoader(None).load(self.model, model_path)
+        ModelLoader('', model_path).load(self.model)
         self.model = self.model.to_prediction_model().to(DEVICE)
         self.dev_evaluator, self.test_evaluator = None, None
         self.log_interval = log_interval
