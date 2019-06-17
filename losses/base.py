@@ -28,6 +28,9 @@ class TrainingListener:
     
     def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
         pass
+
+    def on_after_train(self):
+        pass
     
 
 class TestListener:
@@ -83,10 +86,10 @@ class Optimizer:
             o.step()
 
 
-class Logger:
+class ScreenProgressLogger:
     
     def __init__(self, interval, n_batch):
-        super(Logger, self).__init__()
+        super(ScreenProgressLogger, self).__init__()
         self.interval = interval
         self.n_batch = n_batch
         self.train_log_ft = "Train Epoch: {epoch} [{progress}%]\tLoss: {loss:.6f}"
@@ -116,22 +119,35 @@ class Logger:
 
 class TrainLogger(TrainingListener):
     
-    def __init__(self, interval, n_batch):
+    def __init__(self, interval, nbatches):
         super(TrainLogger, self).__init__()
-        self.logger = Logger(interval, n_batch)
+        self.nbatches = nbatches
+        self.logger = ScreenProgressLogger(interval, nbatches)
+        self.total_loss = 0
+        self.log_file = open('logs.csv', 'w')
     
     def on_before_epoch(self, epoch):
+        self.total_loss = 0
         self.logger.restart()
     
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
+        self.total_loss += loss
         self.logger.on_train_batch(ibatch, epoch, loss)
+
+    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+        mean_loss = self.total_loss / self.nbatches
+        print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
+        self.log_file.write(str(mean_loss))
+
+    def on_after_train(self):
+        self.log_file.close()
 
 
 class TestLogger(TestListener):
 
     def __init__(self, interval, n_batch):
         super(TestLogger, self).__init__()
-        self.logger = Logger(interval, n_batch)
+        self.logger = ScreenProgressLogger(interval, n_batch)
     
     def on_before_test(self):
         self.logger.restart()
@@ -265,10 +281,15 @@ class BaseTrainer:
         
     def train(self, epochs):
         checkpoint, epoch = self._restore()
+
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
+
         for i in range(epoch, epoch+epochs):
             self.train_epoch(i)
+
+        for cb in self.callbacks:
+            cb.on_after_train()
         
     def train_epoch(self, epoch):
         self.model.train()
