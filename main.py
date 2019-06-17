@@ -3,7 +3,8 @@ import argparse
 from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from datasets.voxceleb import VoxCeleb1
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer, ModelSaver, ModelLoader, DeviceMapperTransform
+from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer,\
+    BestModelSaver, ModelLoader, DeviceMapperTransform, RegularModelSaver
 from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, \
     DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator, \
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
@@ -81,12 +82,13 @@ if args.plot:
 
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(ModelSaver(args.task, args.loss, 'tmp'))
+    test_callbacks.append(BestModelSaver(args.task, args.loss, 'tmp'))
 
 if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance),
                                        batch_transforms, test_callbacks)
 elif args.task == 'speaker':
+    train_callbacks.append(RegularModelSaver(args.task, args.loss, 'tmp', interval=5))
     evaluator = SpeakerVerificationEvaluator(DEVICE, args.batch_size, config.test_distance,
                                              args.eval_interval, dataset.config, test_callbacks)
 # STS

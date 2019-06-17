@@ -156,27 +156,6 @@ class Visualizer(TestListener):
         visual.visualize(feat, y, plot_title, plot_name)
 
 
-class ModelSaver(TestListener):
-    
-    def __init__(self, task: str, loss_name: str, folder_path: str):
-        super(ModelSaver, self).__init__()
-        self.task = task
-        self.loss_name = loss_name
-        self.base_path = folder_path
-    
-    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
-        print(f"Saving model to {self.base_path}")
-        torch.save({
-            'epoch': epoch,
-            'trained_loss': self.loss_name,
-            'common_state_dict': model.common_state_dict(),
-            'loss_module_state_dict': model.loss_module.state_dict() if model.loss_module is not None else None,
-            'loss_state_dict': loss_fn.state_dict(),
-            'optim_state_dict': optim.state_dict(),
-            'accuracy': accuracy
-        }, join(self.base_path, f"best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt"))
-
-
 class DeviceMapperTransform:
 
     def __init__(self, device):
@@ -186,6 +165,24 @@ class DeviceMapperTransform:
         if isinstance(x, torch.Tensor):
             x = x.to(self.device)
         return x, y.to(self.device)
+
+
+class ModelSaver:
+
+    def __init__(self, loss_name: str):
+        self.loss_name = loss_name
+
+    def save(self, epoch: int, model: SimNet, loss_fn: nn.Module, optim: Optimizer, accuracy: float, filepath: str):
+        print(f"Saving model to {filepath}")
+        torch.save({
+            'epoch': epoch,
+            'trained_loss': self.loss_name,
+            'common_state_dict': model.common_state_dict(),
+            'loss_module_state_dict': model.loss_module.state_dict() if model.loss_module is not None else None,
+            'loss_state_dict': loss_fn.state_dict(),
+            'optim_state_dict': optim.state_dict(),
+            'accuracy': accuracy
+        }, filepath)
 
 
 class ModelLoader:
@@ -213,6 +210,35 @@ class ModelLoader:
         if current_loss == checkpoint['trained_loss'] and model.loss_module is not None:
             model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
         return checkpoint
+
+
+class BestModelSaver(TestListener):
+
+    def __init__(self, task: str, loss_name: str, base_path: str):
+        super(BestModelSaver, self).__init__()
+        self.task = task
+        self.loss_name = loss_name
+        self.base_path = base_path
+        self.saver = ModelSaver(loss_name)
+
+    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
+        filepath = join(self.base_path, f"best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt")
+        self.saver.save(epoch, model, loss_fn, optim, accuracy, filepath)
+
+
+class RegularModelSaver(TrainingListener):
+
+    def __init__(self, task: str, loss_name: str, base_path: str, interval: int):
+        self.task = task
+        self.loss_name = loss_name
+        self.base_path = base_path
+        self.interval = interval
+        self.saver = ModelSaver(loss_name)
+
+    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+        if epoch % self.interval == 0:
+            filepath = join(self.base_path, f"{self.task}-{self.loss_name}-epoch={epoch}")
+            self.saver.save(epoch, model, loss_fn, optim, 0, filepath)
 
 
 class BaseTrainer:

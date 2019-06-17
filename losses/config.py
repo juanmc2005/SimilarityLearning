@@ -13,7 +13,7 @@ import losses.base as base
 
 
 def sincnet_optims(model):
-    return [optim.RMSprop(l.parameters(), 0.001, alpha=0.95) for l in model.layers()]
+    return [optim.RMSprop(l.parameters(), 0.0001, alpha=0.95) for l in model.layers()]
 
 
 class LossConfig:

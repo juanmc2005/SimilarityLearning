@@ -7,7 +7,7 @@ from experiments import VoxCeleb1ModelEvaluationExperiment, SemEvalModelEvaluati
 parser = argparse.ArgumentParser()
 parser.add_argument('--task', type=str, required=True, help='speaker / sts')
 parser.add_argument('--model', type=str, required=True, help='The path to the saved model to evaluate')
-parser.add_argument('--partition', type=str, required=True, help='dev / test. Default: test')
+parser.add_argument('--partition', type=str, required=True, help='dev / test')
 parser.add_argument('--distance', type=str, default='euclidean', help='cosine / euclidean. Default: euclidean')
 parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
 parser.add_argument('--sts-path', type=str, default=None, help='Path to SemEval dataset')
