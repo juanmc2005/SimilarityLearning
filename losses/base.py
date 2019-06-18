@@ -299,7 +299,6 @@ class BaseTrainer:
 
         self.optim.scheduler_step()
 
-        total_loss = 0
         nbatches = self.partition.nbatches()
         for i in range(nbatches):
             x, y = next(self.partition)
@@ -312,8 +311,6 @@ class BaseTrainer:
             feat, logits = self.model(x, y)
             loss = self.loss_fn(feat, logits, y)
 
-            total_loss += loss.item()
-
             # Backprop
             for cb in self.callbacks:
                 cb.on_before_gradients(epoch, i, feat, logits, y, loss)
@@ -324,9 +321,6 @@ class BaseTrainer:
             
             for cb in self.callbacks:
                 cb.on_after_gradients(epoch, i, feat, logits, y, loss.item())
-
-        mean_loss = total_loss / nbatches
-        print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
         
         for cb in self.callbacks:
             cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim, mean_loss)

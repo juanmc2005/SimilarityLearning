@@ -8,7 +8,7 @@ class SemEvalAugmentationStrategy:
     def nclass(self):
         return None
 
-    def augment(self, train: tuple, dev: tuple, test: tuple) -> np.ndarray:
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
         raise NotImplementedError
 
 
@@ -29,11 +29,23 @@ class NoAugmentation(SemEvalAugmentationStrategy):
             labels.append(tmp)
         return labels
 
-    def __init__(self, allow_redundancy: bool):
-        self.allow_redundancy = allow_redundancy
+    @staticmethod
+    def remove_pairs_with_score(a: list, b: list, sim: list, targets: tuple):
+        anew, bnew, simnew = [], [], []
+        for i in range(len(a)):
+            if math.floor(sim[i]) not in targets:
+                anew.append(a[i])
+                bnew.append(b[i])
+                simnew.append(sim[i])
+        return anew, bnew, simnew
 
-    def augment(self, train: tuple, dev: tuple, test: tuple) -> np.ndarray:
-        atrain, btrain, simtrain = train
+    def __init__(self, allow_redundancy: bool = False, remove_scores: tuple = ()):
+        self.allow_redundancy = allow_redundancy
+        self.remove_scores = remove_scores
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
+        atrain, btrain, simtrain = self.remove_pairs_with_score(train_sents_a, train_sents_b,
+                                                                train_scores, self.remove_scores)
         if self.allow_redundancy:
             sim = self.scores_to_probs(simtrain)
             train_sents = np.array(list(zip(zip(atrain, btrain), sim)))
@@ -65,38 +77,23 @@ class ClusterAugmentation(SemEvalAugmentationStrategy):
     def nclass(self):
         return self.classes
 
-    def augment(self, train: tuple, dev: tuple, test: tuple) -> np.ndarray:
-        atrain, btrain, simtrain = train
-        adev, bdev, simdev = dev
-        atest, btest, simtest = test
-
-        sents_a = atrain + adev + atest
-        sents_b = btrain + bdev + btest
-        scores = simtrain + simdev + simtest
-        sents_a, sents_b, scores = utils.unique_pairs(sents_a, sents_b, scores)
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
+        sents_a, sents_b, scores = utils.unique_pairs(train_sents_a, train_sents_b, train_scores)
 
         clusters = self._clusterize(sents_a, sents_b, scores)
         self.classes = len(clusters)
 
-        train_sents, train_sents_raw, dev_sents, test_sents = [], [], [], []
+        train_sents, train_sents_raw = [], []
         for i, cluster in enumerate(clusters):
             for sent in cluster:
-                if sent in atrain or sent in btrain:
+                if sent in train_sents_a or sent in train_sents_b:
                     train_sents.append((sent.split(' '), i))
                     train_sents_raw.append(sent)
-                if sent in adev or sent in bdev:
-                    dev_sents.append(sent)
-                if sent in atest or sent in btest:
-                    test_sents.append(sent)
         train_sents = np.array(train_sents)
 
         print(f"Unique sentences used for clustering: {len(set(sents_a + sents_b))}")
-        print(f"Total Train Sentences: {len(set(atrain + btrain))}")
+        print(f"Total Train Sentences: {len(set(train_sents_a + train_sents_b))}")
         print(f"Train Sentences Kept: {len(set(train_sents_raw))}")
-        print(f"Total Dev Sentences: {len(set(adev + bdev))}")
-        print(f"Dev Sentences Kept: {len(set(dev_sents))}")
-        print(f"Total Test Sentences: {len(set(atest + btest))}")
-        print(f"Test Sentences Kept: {len(set(test_sents))}")
         print(f"N Clusters: {self.classes}")
         print(f"Max Cluster Size: {max([len(cluster) for cluster in clusters])}")
         print(f"Mean Cluster Size: {np.mean([len(cluster) for cluster in clusters])}")
@@ -117,11 +114,10 @@ class PairAugmentation(SemEvalAugmentationStrategy):
         data = [((s1, s2), 0) for s1, s2 in pos] + [((s1, s2), 1) for s1, s2 in neg]
         return np.array([((s1.split(' '), s2.split(' ')), y) for (s1, s2), y in data])
 
-    def augment(self, train: tuple, dev: tuple, test: tuple) -> np.ndarray:
-        atrain, btrain, simtrain = train
-        train_sents = self._pairs(atrain, btrain, simtrain, self.threshold)
-        print(f"Original Train Pairs: {len(atrain)}")
-        print(f"Original Unique Train Pairs: {len(set(zip(atrain, btrain)))}")
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
+        train_sents = self._pairs(train_sents_a, train_sents_b, train_scores, self.threshold)
+        print(f"Original Train Pairs: {len(train_sents_a)}")
+        print(f"Original Unique Train Pairs: {len(set(zip(train_sents_a, train_sents_b)))}")
         print(f"Total Train Pairs: {len(train_sents)}")
         print(f"+ Train Pairs: {len([y for _, y in train_sents if y == 0])}")
         print(f"- Train Pairs: {len([y for _, y in train_sents if y == 1])}")
@@ -143,9 +139,8 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
         return np.array([(a.split(' '), p.split(' '), n.split(' '))
                          for a, p, n in zip(anchors, positives, negatives)])
 
-    def augment(self, train: tuple, dev: tuple, test: tuple):
-        atrain, btrain, simtrain = train
-        return self._triplets(atrain, btrain, simtrain)
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+        return self._triplets(train_sents_a, train_sents_b, train_scores)
 
 
 class SemEvalAugmentationStrategyFactory:
