@@ -26,7 +26,7 @@ class TrainingListener:
     def on_after_gradients(self, epoch, ibatch, feat, logits, y, loss):
         pass
     
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         pass
 
     def on_after_train(self):
@@ -119,12 +119,12 @@ class ScreenProgressLogger:
 
 class TrainLogger(TrainingListener):
     
-    def __init__(self, interval, nbatches):
+    def __init__(self, interval, nbatches, log_file_path: str):
         super(TrainLogger, self).__init__()
         self.nbatches = nbatches
         self.logger = ScreenProgressLogger(interval, nbatches)
         self.total_loss = 0
-        self.log_file = open('logs.csv', 'w')
+        self.log_file = open(log_file_path, 'w')
     
     def on_before_epoch(self, epoch):
         self.total_loss = 0
@@ -134,7 +134,7 @@ class TrainLogger(TrainingListener):
         self.total_loss += loss
         self.logger.on_train_batch(ibatch, epoch, loss)
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         mean_loss = self.total_loss / self.nbatches
         print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
         self.log_file.write(str(mean_loss))
@@ -251,7 +251,7 @@ class RegularModelSaver(TrainingListener):
         self.interval = interval
         self.saver = ModelSaver(loss_name)
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.interval == 0:
             filepath = join(self.base_path, f"{self.task}-{self.loss_name}-epoch={epoch}")
             self.saver.save(epoch, model, loss_fn, optim, 0, filepath)
@@ -323,4 +323,4 @@ class BaseTrainer:
                 cb.on_after_gradients(epoch, i, feat, logits, y, loss.item())
         
         for cb in self.callbacks:
-            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim, mean_loss)
+            cb.on_after_epoch(epoch, self.model, self.loss_fn, self.optim)

@@ -182,7 +182,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
         if checkpoint is not None:
             self.best_metric = checkpoint['accuracy']
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
             metric_value = self.eval(model.to_prediction_model())
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
@@ -253,7 +253,7 @@ class ClassAccuracyEvaluator(TrainingListener):
         self.feat_train.append(feat.detach().cpu().numpy())
         self.y_train.append(y.detach().cpu().numpy())
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         feat_train = np.concatenate(self.feat_train)
         y_train = np.concatenate(self.y_train)
         self.metric.fit(feat_train, y_train)
@@ -320,7 +320,7 @@ class STSEmbeddingEvaluator(TrainingListener):
         if checkpoint is not None:
             self.best_metric = checkpoint['accuracy']
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         feat_test, y_test = self.eval(model.to_prediction_model())
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
@@ -383,7 +383,7 @@ class STSBaselineEvaluator(TrainingListener):
         if checkpoint is not None:
             self.best_metric = checkpoint['accuracy']
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         feat_test, y_test = self.eval(model)
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")

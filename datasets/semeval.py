@@ -100,12 +100,12 @@ class SemEval(SimDataset):
         self.partition_factory = partition_factory
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
         print(f"Created vocabulary with {n_inv} INV and {n_oov} OOV ({int(100 * n_inv / (n_inv + n_oov))}% coverage)")
-        train = self._load_partition('train')
-        dev = self._load_partition('dev')
-        test = self._load_partition('test')
-        self.train_sents = self.augmentation.augment(train, dev, test)
-        self.dev_sents = np.array(list(zip(zip(dev[0], dev[1]), dev[2])))
-        self.test_sents = np.array(list(zip(zip(test[0], test[1]), test[2])))
+        atrain, btrain, simtrain = self._load_partition('train')
+        adev, bdev, simdev = self._load_partition('dev')
+        atest, btest, simtest = self._load_partition('test')
+        self.train_sents = self.augmentation.augment(atrain, btrain, simtrain)
+        self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
+        self.test_sents = np.array(list(zip(zip(atest, btest), simtest)))
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \

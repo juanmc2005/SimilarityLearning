@@ -40,7 +40,7 @@ elif args.task == 'sts':
                                                   distance=distance,
                                                   log_interval=args.log_interval,
                                                   batch_size=args.batch_size,
-                                                  baseline=True)
+                                                  baseline=False)
     metric_name = 'Spearman'
 else:
     raise ValueError("Task can only be 'speaker' or 'sts'")

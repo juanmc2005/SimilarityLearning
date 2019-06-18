@@ -12,10 +12,15 @@ class SemEvalAugmentationStrategy:
         raise NotImplementedError
 
 
-class NoAugmentation(SemEvalAugmentationStrategy):
+class ScoreFormatter:
 
-    @staticmethod
-    def scores_to_probs(scores):
+    def format(self, scores):
+        raise NotImplementedError
+
+
+class ProbabilitiesScoreFormatter(ScoreFormatter):
+
+    def format(self, scores):
         labels = []
         for s in scores:
             ceil = int(math.ceil(s))
@@ -29,6 +34,18 @@ class NoAugmentation(SemEvalAugmentationStrategy):
             labels.append(tmp)
         return labels
 
+
+class BinaryScoreFormatter(ScoreFormatter):
+
+    def __init__(self, threshold: float):
+        self.threshold = threshold
+
+    def format(self, scores):
+        return [0 if s >= self.threshold else 1 for s in scores]
+
+
+class NoAugmentation(SemEvalAugmentationStrategy):
+
     @staticmethod
     def remove_pairs_with_score(a: list, b: list, sim: list, targets: tuple):
         anew, bnew, simnew = [], [], []
@@ -39,33 +56,32 @@ class NoAugmentation(SemEvalAugmentationStrategy):
                 simnew.append(sim[i])
         return anew, bnew, simnew
 
-    def __init__(self, allow_redundancy: bool = False, remove_scores: tuple = ()):
+    def __init__(self, allow_redundancy: bool = False, remove_scores: tuple = (), formatter: ScoreFormatter = None):
         self.allow_redundancy = allow_redundancy
         self.remove_scores = remove_scores
+        self.formatter = formatter
 
     def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
         atrain, btrain, simtrain = self.remove_pairs_with_score(train_sents_a, train_sents_b,
                                                                 train_scores, self.remove_scores)
+        print(f"Total Train Pairs: {len(atrain)}")
         if self.allow_redundancy:
-            sim = self.scores_to_probs(simtrain)
-            train_sents = np.array(list(zip(zip(atrain, btrain), sim)))
-            print(f"Train Pairs: {len(atrain)}")
-            print("Redundancy in the training set: YES")
+            pairs = zip(atrain, btrain)
+            sim = simtrain
         else:
             unique_train_data = list(set(zip(atrain, btrain, simtrain)))
             pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
-            sim = self.scores_to_probs([y for _, _, y in unique_train_data])
-            train_sents = np.array(list(zip(pairs, sim)))
-            print(f"Original Train Pairs: {len(atrain)}")
+            sim = [y for _, _, y in unique_train_data]
             print(f"Unique Train Pairs: {len(unique_train_data)}")
-            print("Redundancy in the training set: NO")
-        return train_sents
+
+        sim = self.formatter.format(sim) if self.formatter is not None else sim
+        print(f"Redundancy in the training set: {'YES' if self.allow_redundancy else 'NO'}")
+        return np.array(list(zip(pairs, sim)))
 
 
 class ClusterAugmentation(SemEvalAugmentationStrategy):
-    # TODO IMPORTANT!! Remove dev and test from the clustering algorithm if we decide to use this approach later
 
-    def __init__(self, threshold: int):
+    def __init__(self, threshold: float):
         self.threshold = threshold
         self.classes = None
 
@@ -145,16 +161,18 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
 
 class SemEvalAugmentationStrategyFactory:
 
-    def __init__(self, loss: str, threshold, allow_redundancy: bool):
+    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: tuple = ()):
         self.loss = loss
         self.threshold = threshold
         self.allow_redundancy = allow_redundancy
+        self.remove_scores = remove_scores
 
     def new(self):
         if self.loss == 'kldiv':
-            return NoAugmentation(self.allow_redundancy)
+            return NoAugmentation(self.allow_redundancy, self.remove_scores, ProbabilitiesScoreFormatter())
         elif self.loss == 'contrastive':
-            return PairAugmentation(self.threshold)
+            # return PairAugmentation(self.threshold)
+            return NoAugmentation(self.allow_redundancy, self.remove_scores, BinaryScoreFormatter(self.threshold))
         elif self.loss == 'triplet':
             return TripletAugmentation(self.threshold)
         else:

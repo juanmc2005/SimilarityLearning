@@ -1,4 +1,5 @@
 import argparse
+import time
 
 from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
@@ -55,9 +56,9 @@ elif args.task == 'speaker':
 elif args.task == 'sts':
     nfeat = 500
     mode = STSForwardModeFactory().new(args.loss)
-    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=(1.2, 3.8), allow_redundancy=True).new()
+    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=3, allow_redundancy=False, remove_scores=(0,))
     partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
-    dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation, partition_factory)
+    dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), partition_factory)
     config = get_config(args.loss, nfeat, dataset.nclass, args.task, DEVICE)
     model = SemanticNet(DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:
@@ -72,7 +73,8 @@ train_callbacks = []
 if args.log_interval in range(1, 101):
     print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
     test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
-    train_callbacks.append(TrainLogger(args.log_interval, train.nbatches()))
+    train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
+                                       log_file_path=f"tmp/{args.task}-{args.loss}-logs-{time.strftime('%c')}.txt"))
 else:
     print(f"[Logging: {enabled_str(False)}]")
 
