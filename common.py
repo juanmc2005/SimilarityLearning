@@ -24,15 +24,17 @@ _use_cuda = torch.cuda.is_available() and True
 DEVICE = torch.device('cuda' if _use_cuda else 'cpu')
 
 
-def set_custom_seed():
+def set_custom_seed(seed: int = None):
     """
     Set the same seed for all sources of random computations
     :return: nothing
     """
-    print(f"[Seed: {SEED}]")
-    torch.manual_seed(SEED)
-    np.random.seed(SEED)
-    random.seed(SEED)
+    if seed is None:
+        seed = SEED
+    print(f"[Seed: {seed}]")
+    torch.manual_seed(seed)
+    np.random.seed(seed)
+    random.seed(seed)
 
 
 def enabled_str(value: bool) -> str:

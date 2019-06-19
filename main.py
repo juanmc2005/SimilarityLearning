@@ -39,10 +39,11 @@ parser.add_argument('--recover', type=str, default=None, help='The path to the s
 parser.add_argument('--margin', type=float, default=2., help='The margin to use for the losses that need it')
 parser.add_argument('--t', type=float, default=3., help='The threshold for STS to consider a pair positive or negative')
 parser.add_argument('--exp-id', type=str, default=f"EXP {launch_datetime}", help='An identifier for the experience')
+parser.add_argument('--seed', type=int, default=None, help='Random seed')
 args = parser.parse_args()
 
 # Set custom seed before doing anything
-set_custom_seed()
+set_custom_seed(args.seed)
 
 # Load Dataset
 print(f"[Task: {args.task.upper()}]")

@@ -17,10 +17,11 @@ parser.add_argument('--vocab', type=str, default=None, help='Path to vocabulary 
 parser.add_argument('--word2vec', type=str, default=None, help='Path to word embeddings for STS')
 parser.add_argument('--log-interval', type=int, default=10,
                     help='Steps (in percentage) to show evaluation progress, only for STS. Default: 10')
+parser.add_argument('--seed', type=int, default=None, help='Random seed')
 args = parser.parse_args()
 
 # Set custom seed
-set_custom_seed()
+set_custom_seed(args.seed)
 
 if args.distance == 'cosine':
     distance = CosineDistance()
