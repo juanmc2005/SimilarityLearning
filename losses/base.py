@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
+import numpy as np
 import visual
 from os.path import join
 from models import SimNet
@@ -43,7 +44,7 @@ class TestListener:
     def on_batch_tested(self, ibatch, feat):
         pass
     
-    def on_after_test(self):
+    def on_after_test(self, feat_test, y_test):
         pass
     
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
@@ -169,6 +170,22 @@ class Visualizer(TestListener):
             plot_title += f" - {self.param_desc}"
         print(f"Saving plot as {plot_name}")
         visual.visualize(feat, y, plot_title, plot_name)
+
+
+class TSNEVisualizer(TestListener):
+
+    def __init__(self, loss: str, param_desc: str = None):
+        self.loss = loss
+        self.param_desc = param_desc
+
+    def on_after_test(self, feat_test, y_test):
+        plot_name = f"embeddings-{self.loss}"
+        plot_title = f"{self.loss[0].upper()}{self.loss[1:]} Embeddings"
+        if self.param_desc is not None:
+            plot_title += f" - {self.param_desc}"
+        print(f"Saving TSNE plot as {plot_name}")
+        unique_feat = np.unique(feat_test, axis=0)
+        visual.visualize_tsne(unique_feat, plot_title, plot_name)
 
 
 class DeviceMapperTransform:

@@ -238,9 +238,10 @@ class ClassAccuracyEvaluator(TrainingListener):
                 for cb in self.callbacks:
                     cb.on_batch_tested(i, feat)
 
+        feat_test, y_test = np.concatenate(feat_test), np.concatenate(y_test)
         for cb in self.callbacks:
-            cb.on_after_test()
-        return np.concatenate(feat_test), np.concatenate(y_test)
+            cb.on_after_test(feat_test, y_test)
+        return feat_test, y_test
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:
@@ -313,7 +314,8 @@ class STSEmbeddingEvaluator(TrainingListener):
                     cb.on_batch_tested(i, feat)
 
         for cb in self.callbacks:
-            cb.on_after_test()
+            all_feat = np.concatenate([e1 for e1, _ in feat_test] + [e2 for _, e2 in feat_test])
+            cb.on_after_test(all_feat, np.concatenate(y_test))
         return feat_test, y_test
 
     def on_before_train(self, checkpoint):
@@ -375,9 +377,10 @@ class STSBaselineEvaluator(TrainingListener):
                 for cb in self.callbacks:
                     cb.on_batch_tested(i, feat)
 
+        feat_test, y_test = np.concatenate(feat_test), np.concatenate(y_test)
         for cb in self.callbacks:
-            cb.on_after_test()
-        return np.concatenate(feat_test), np.concatenate(y_test)
+            cb.on_after_test(feat_test, y_test)
+        return feat_test, y_test
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:

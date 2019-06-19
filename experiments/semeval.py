@@ -1,6 +1,6 @@
 from models import SemanticNet
 from distances import Distance
-from losses.base import ModelLoader, DeviceMapperTransform, TestLogger
+from losses.base import ModelLoader, DeviceMapperTransform, TestLogger, TSNEVisualizer
 from losses.wrappers import STSBaselineClassifier
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from sts.augmentation import NoAugmentation
@@ -15,27 +15,26 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
     def __init__(self, model_loader: ModelLoader, nfeat: int, data_path: str, word2vec_path: str,
                  vocab_path: str, distance: Distance, log_interval: int, batch_size: int):
 
-        loss_name = model_loader.get_trained_loss()
+        self.loss_name = model_loader.get_trained_loss()
+        self.dev_evaluator, self.test_evaluator = None, None
+        self.log_interval = log_interval
+        self.distance = distance
+        self.nfeat = nfeat
 
         # The augmentation is only done for the training set, so it doesn't matter which one we choose.
         # Here I'm choosing NoAugmentation allowing redundancy because it's the cheapest to compute
         augmentation = NoAugmentation(allow_redundancy=True)
         # All partition types (should!) format the data in the same manner when it comes to dev or test
         # so it doesn't matter what loss we choose here
-        partition_factory = SemEvalPartitionFactory(loss=loss_name, batch_size=batch_size)
+        partition_factory = SemEvalPartitionFactory(loss=self.loss_name, batch_size=batch_size)
         self.dataset = SemEval(data_path, word2vec_path, vocab_path, augmentation, partition_factory)
 
         self.model = SemanticNet(DEVICE, nfeat, self.dataset.vocab,
                                  mode=self._get_model_mode(),
                                  loss_module=self._get_loss_module())
-        model_loader.load(self.model, loss_name)
+        model_loader.load(self.model, self.loss_name)
         self.model = self._transform_model(self.model)
         self.model = self.model.to(DEVICE)
-
-        self.dev_evaluator, self.test_evaluator = None, None
-        self.log_interval = log_interval
-        self.distance = distance
-        self.nfeat = nfeat
 
     def evaluate_on_dev(self) -> float:
         if self.dev_evaluator is None:
@@ -67,7 +66,8 @@ class SemEvalEmbeddingEvaluationExperiment(SemEvalEvaluationExperiment):
     def _build_evaluator(self, partition):
         return STSEmbeddingEvaluator(DEVICE, partition, DistanceSpearmanMetric(self.distance),
                                      batch_transforms=[DeviceMapperTransform(DEVICE)],
-                                     callbacks=[TestLogger(self.log_interval, partition.nbatches())])
+                                     callbacks=[TestLogger(self.log_interval, partition.nbatches()),
+                                                TSNEVisualizer(self.loss_name, None)])
 
     def _get_model_mode(self) -> STSForwardMode:
         return PairSTSForwardMode()
@@ -84,7 +84,8 @@ class SemEvalBaselineModelEvaluationExperiment(SemEvalEvaluationExperiment):
     def _build_evaluator(self, partition):
         return STSBaselineEvaluator(DEVICE, partition, LogitsSpearmanMetric(),
                                     batch_transforms=[DeviceMapperTransform(DEVICE)],
-                                    callbacks=[TestLogger(self.log_interval, partition.nbatches())])
+                                    callbacks=[TestLogger(self.log_interval, partition.nbatches()),
+                                               TSNEVisualizer(self.loss_name, None)])
 
     def _get_model_mode(self) -> STSForwardMode:
         return ConcatSTSForwardMode()
