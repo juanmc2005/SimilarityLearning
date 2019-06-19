@@ -59,7 +59,7 @@ else:
 
 print('[Started Evaluation...]')
 if args.partition == 'dev':
-    metric = experiment.evaluate_on_dev()
+    metric = experiment.evaluate_on_dev(True)
 elif args.partition == 'test':
     metric = experiment.evaluate_on_test()
 else:

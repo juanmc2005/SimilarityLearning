@@ -90,7 +90,7 @@ class SemEval(SimDataset):
         else:
             d = len(s1)
             for i in range(d, len(s2)):
-                s1 += 'null'
+                s1 += ' null'
         return s1, s2
 
     def __init__(self, path: str, vector_path: str, vocab_path: str,

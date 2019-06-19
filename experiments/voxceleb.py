@@ -19,7 +19,7 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
         self.evaluator = SpeakerVerificationEvaluator(common.DEVICE, batch_size, distance,
                                                       eval_interval=0, config=dataset.config)
 
-    def evaluate_on_dev(self) -> float:
+    def evaluate_on_dev(self, plot: bool) -> float:
         inverse_eer = self.evaluator.eval(self.model, partition='development')
         return 1 - inverse_eer
 

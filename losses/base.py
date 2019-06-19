@@ -180,7 +180,7 @@ class TSNEVisualizer(TestListener):
 
     def on_after_test(self, feat_test, y_test):
         plot_name = f"embeddings-{self.loss}"
-        plot_title = f"{self.loss[0].upper()}{self.loss[1:]} Embeddings"
+        plot_title = f"{self.loss.capitalize()} Embeddings"
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
         print(f"Saving TSNE plot as {plot_name}")

@@ -8,6 +8,7 @@ from sts.modes import STSForwardMode, PairSTSForwardMode, ConcatSTSForwardMode
 from metrics import STSEmbeddingEvaluator, STSBaselineEvaluator, DistanceSpearmanMetric, LogitsSpearmanMetric
 from experiments.base import ModelEvaluationExperiment
 from common import DEVICE
+import visual
 
 
 class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
@@ -36,10 +37,14 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
         self.model = self._transform_model(self.model)
         self.model = self.model.to(DEVICE)
 
-    def evaluate_on_dev(self) -> float:
+    def evaluate_on_dev(self, plot: bool) -> float:
         if self.dev_evaluator is None:
             self.dev_evaluator = self._build_evaluator(self.dataset.dev_partition())
-        self.dev_evaluator.eval(self.model)
+        phrases, feat_test, y_test = self.dev_evaluator.eval(self.model)
+        if plot:
+            plot_name = f"embeddings-{self.loss_name}"
+            plot_title = f"{self.loss_name.capitalize()} Embeddings"
+            visual.visualize_tsne(feat_test, phrases, plot_title, plot_name)
         return self.dev_evaluator.metric.get()
 
     def evaluate_on_test(self) -> float:
@@ -66,8 +71,7 @@ class SemEvalEmbeddingEvaluationExperiment(SemEvalEvaluationExperiment):
     def _build_evaluator(self, partition):
         return STSEmbeddingEvaluator(DEVICE, partition, DistanceSpearmanMetric(self.distance),
                                      batch_transforms=[DeviceMapperTransform(DEVICE)],
-                                     callbacks=[TestLogger(self.log_interval, partition.nbatches()),
-                                                TSNEVisualizer(self.loss_name, None)])
+                                     callbacks=[TestLogger(self.log_interval, partition.nbatches())])
 
     def _get_model_mode(self) -> STSForwardMode:
         return PairSTSForwardMode()
@@ -84,8 +88,7 @@ class SemEvalBaselineModelEvaluationExperiment(SemEvalEvaluationExperiment):
     def _build_evaluator(self, partition):
         return STSBaselineEvaluator(DEVICE, partition, LogitsSpearmanMetric(),
                                     batch_transforms=[DeviceMapperTransform(DEVICE)],
-                                    callbacks=[TestLogger(self.log_interval, partition.nbatches()),
-                                               TSNEVisualizer(self.loss_name, None)])
+                                    callbacks=[TestLogger(self.log_interval, partition.nbatches())])
 
     def _get_model_mode(self) -> STSForwardMode:
         return ConcatSTSForwardMode()
