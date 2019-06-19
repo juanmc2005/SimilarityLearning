@@ -124,7 +124,8 @@ class TrainLogger(TrainingListener):
         self.nbatches = nbatches
         self.logger = ScreenProgressLogger(interval, nbatches)
         self.total_loss = 0
-        self.log_file = open(log_file_path, 'w')
+        self.log_file_path = log_file_path
+        open(log_file_path, 'w').close()
     
     def on_before_epoch(self, epoch):
         self.total_loss = 0
@@ -137,10 +138,8 @@ class TrainLogger(TrainingListener):
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         mean_loss = self.total_loss / self.nbatches
         print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
-        self.log_file.write(str(mean_loss))
-
-    def on_after_train(self):
-        self.log_file.close()
+        with open(self.log_file_path, 'a') as logfile:
+            logfile.write(str(mean_loss) + '\n')
 
 
 class TestLogger(TestListener):
@@ -230,15 +229,18 @@ class ModelLoader:
 
 class BestModelSaver(TestListener):
 
-    def __init__(self, task: str, loss_name: str, base_path: str):
+    def __init__(self, task: str, loss_name: str, base_path: str, experience_name: str):
         super(BestModelSaver, self).__init__()
         self.task = task
         self.loss_name = loss_name
         self.base_path = base_path
+        self.experience_name = experience_name
         self.saver = ModelSaver(loss_name)
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
-        filepath = join(self.base_path, f"best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt")
+        filepath = join(
+            self.base_path,
+            f"{self.experience_name}-best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt")
         self.saver.save(epoch, model, loss_fn, optim, accuracy, filepath)
 
 

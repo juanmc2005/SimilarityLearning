@@ -14,6 +14,8 @@ from sts.modes import STSForwardModeFactory
 from sts.augmentation import SemEvalAugmentationStrategyFactory
 from common import LOSS_OPTIONS_STR, get_config, enabled_str, set_custom_seed, DEVICE
 
+launch_datetime = time.strftime('%c')
+
 # Script arguments
 parser = argparse.ArgumentParser()
 parser.add_argument('--path', type=str, default=None, help='Path to MNIST/SemEval dataset')
@@ -34,6 +36,9 @@ parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT
 parser.set_defaults(save=True)
 parser.add_argument('--task', type=str, default='mnist', help='The task to train')
 parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
+parser.add_argument('--margin', type=float, default=2., help='The margin to use for the losses that need it')
+parser.add_argument('--t', type=float, default=3., help='The threshold for STS to consider a pair positive or negative')
+parser.add_argument('--exp-id', type=str, default=f"EXP {launch_datetime}", help='An identifier for the experience')
 args = parser.parse_args()
 
 # Set custom seed before doing anything
@@ -41,25 +46,28 @@ set_custom_seed()
 
 # Load Dataset
 print(f"[Task: {args.task.upper()}]")
+print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 batch_transforms = [DeviceMapperTransform(DEVICE)]
 if args.task == 'mnist' and args.path is not None:
     nfeat, nclass = 2, 10
-    config = get_config(args.loss, nfeat, nclass, args.task, DEVICE)
+    config = get_config(args.loss, nfeat, nclass, args.task, args.margin)
     model = MNISTNet(nfeat, loss_module=config.loss_module)
     dataset = MNIST(args.path, args.batch_size)
 elif args.task == 'speaker':
     nfeat, nclass = 256, 1251
-    config = get_config(args.loss, nfeat, nclass, args.task, DEVICE)
+    config = get_config(args.loss, nfeat, nclass, args.task, args.margin)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
-elif args.task == 'sts':
+elif args.task == 'sts' and args.path is not None:
+    print(f"[Threshold: {args.t}]")
     nfeat = 500
     mode = STSForwardModeFactory().new(args.loss)
-    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=3, allow_redundancy=False, remove_scores=(0,))
+    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=args.t,
+                                                      allow_redundancy=False, remove_scores=(0,))
     partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
     dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), partition_factory)
-    config = get_config(args.loss, nfeat, dataset.nclass, args.task, DEVICE)
+    config = get_config(args.loss, nfeat, dataset.nclass, args.task, args.margin)
     model = SemanticNet(DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
@@ -74,7 +82,7 @@ if args.log_interval in range(1, 101):
     print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
     test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
-                                       log_file_path=f"tmp/{args.task}-{args.loss}-logs-{time.strftime('%c')}.txt"))
+                                       log_file_path=f"tmp/{args.task}-{args.loss}-logs-{launch_datetime}.txt"))
 else:
     print(f"[Logging: {enabled_str(False)}]")
 
@@ -84,7 +92,7 @@ if args.plot:
 
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(BestModelSaver(args.task, args.loss, 'tmp'))
+    test_callbacks.append(BestModelSaver(args.task, args.loss, 'tmp', args.exp_id))
 
 if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance),

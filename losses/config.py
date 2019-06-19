@@ -143,7 +143,7 @@ class ContrastiveConfig(LossConfig):
 
 class TripletConfig(LossConfig):
 
-    def __init__(self, device, margin=2, distance=EuclideanDistance(), sampling=BatchAll()):
+    def __init__(self, device, margin: float = 2, distance=EuclideanDistance(), sampling=BatchAll()):
         loss = TripletLoss(device, margin, distance, sampling)
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 
