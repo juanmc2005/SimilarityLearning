@@ -98,7 +98,7 @@ if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance),
                                        batch_transforms, test_callbacks)
 elif args.task == 'speaker':
-    train_callbacks.append(RegularModelSaver(args.task, args.loss, 'tmp', interval=5))
+    train_callbacks.append(RegularModelSaver(args.task, args.loss, 'tmp', interval=5, experience_name=args.exp_id))
     evaluator = SpeakerVerificationEvaluator(DEVICE, args.batch_size, config.test_distance,
                                              args.eval_interval, dataset.config, test_callbacks)
 # STS

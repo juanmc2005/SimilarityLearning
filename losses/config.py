@@ -55,7 +55,7 @@ class SoftmaxConfig(LossConfig):
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
         elif task == 'speaker':
             optimizers = sincnet_optims(model)
-            optimizers.append(optim.RMSprop(self.loss_module.parameters(), 0.001, alpha=0.95))
+            optimizers.append(optim.RMSprop(self.loss_module.parameters(), 0.0001, alpha=0.95))
             schedulers = []
         elif task == 'sts':
             optimizers = [optim.RMSprop(model.parameters(), lr=0.005)]

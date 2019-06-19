@@ -246,16 +246,17 @@ class BestModelSaver(TestListener):
 
 class RegularModelSaver(TrainingListener):
 
-    def __init__(self, task: str, loss_name: str, base_path: str, interval: int):
+    def __init__(self, task: str, loss_name: str, base_path: str, interval: int, experience_name: str):
         self.task = task
         self.loss_name = loss_name
         self.base_path = base_path
         self.interval = interval
+        self.experience_name = experience_name
         self.saver = ModelSaver(loss_name)
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.interval == 0:
-            filepath = join(self.base_path, f"{self.task}-{self.loss_name}-epoch={epoch}")
+            filepath = join(self.base_path, f"EXP {self.experience_name}-{self.task}-{self.loss_name}-epoch={epoch}")
             self.saver.save(epoch, model, loss_fn, optim, 0, filepath)
 
 
