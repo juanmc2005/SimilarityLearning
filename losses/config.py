@@ -4,16 +4,16 @@ import torch.optim as optim
 import torch.optim.lr_scheduler as lr_scheduler
 from distances import CosineDistance, EuclideanDistance
 from losses.center import CenterLinear, SoftmaxCenterLoss
-from losses.wrappers import LossWrapper, PWIMPairwiseClassification
+from losses.wrappers import LossWrapper, STSBaselineClassifier
 from losses.arcface import ArcLinear
 from losses.coco import CocoLinear
 from losses.contrastive import ContrastiveLoss
 from losses.triplet import TripletLoss, BatchAll
-from losses.base import Optimizer
+import losses.base as base
 
 
 def sincnet_optims(model):
-    return [optim.RMSprop(l.parameters(), 0.001, alpha=0.95) for l in model.layers()]
+    return [optim.RMSprop(l.parameters(), 0.01, alpha=0.95) for l in model.layers()]
 
 
 class LossConfig:
@@ -34,12 +34,12 @@ class LossConfig:
 class KLDivergenceConfig(LossConfig):
 
     def __init__(self, device, nfeat):
-        loss_module = PWIMPairwiseClassification(nfeat)
+        loss_module = STSBaselineClassifier(nfeat)
         loss = LossWrapper(nn.KLDivLoss().to(device))
         super(KLDivergenceConfig, self).__init__('KL-Divergence', None, loss_module, loss, CosineDistance())
 
     def optimizer(self, model, task):
-        return Optimizer([optim.RMSprop(model.parameters(), lr=0.0001)], [])
+        return base.Optimizer([optim.RMSprop(model.parameters(), lr=0.0001)], [])
 
 
 class SoftmaxConfig(LossConfig):
@@ -55,14 +55,14 @@ class SoftmaxConfig(LossConfig):
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
         elif task == 'speaker':
             optimizers = sincnet_optims(model)
-            optimizers.append(optim.RMSprop(self.loss_module.parameters(), 0.001, alpha=0.95))
+            optimizers.append(optim.RMSprop(self.loss_module.parameters(), 0.01, alpha=0.95))
             schedulers = []
         elif task == 'sts':
             optimizers = [optim.RMSprop(model.parameters(), lr=0.005)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
-        return Optimizer(optimizers, schedulers)
+        return base.Optimizer(optimizers, schedulers)
 
 
 class ArcFaceConfig(LossConfig):
@@ -86,7 +86,7 @@ class ArcFaceConfig(LossConfig):
             schedulers = [lr_scheduler.StepLR(optimizers[-1], 8, gamma=0.8)]
         else:
             raise ValueError
-        return Optimizer(optimizers, schedulers)
+        return base.Optimizer(optimizers, schedulers)
 
 
 class CenterConfig(LossConfig):
@@ -101,7 +101,7 @@ class CenterConfig(LossConfig):
         optimizers = [optim.SGD(model.parameters(), lr=0.001, momentum=0.9, weight_decay=0.0005),
                       optim.SGD(self.loss.center_parameters(), lr=0.5)]
         schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
-        return Optimizer(optimizers, schedulers)
+        return base.Optimizer(optimizers, schedulers)
 
 
 class CocoConfig(LossConfig):
@@ -117,7 +117,7 @@ class CocoConfig(LossConfig):
         optimizers = [optim.SGD(params[0], lr=0.001, momentum=0.9, weight_decay=0.0005),
                       optim.SGD(params[1], lr=0.01, momentum=0.9)]
         schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
-        return Optimizer(optimizers, schedulers)
+        return base.Optimizer(optimizers, schedulers)
 
 
 class ContrastiveConfig(LossConfig):
@@ -134,16 +134,16 @@ class ContrastiveConfig(LossConfig):
             optimizers = sincnet_optims(model)
             schedulers = []
         elif task == 'sts':
-            optimizers = [optim.RMSprop(model.parameters(), lr=0.0001)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=1e-5)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
-        return Optimizer(optimizers, schedulers)
+        return base.Optimizer(optimizers, schedulers)
 
 
 class TripletConfig(LossConfig):
 
-    def __init__(self, device, margin=2, distance=EuclideanDistance(), sampling=BatchAll()):
+    def __init__(self, device, margin: float = 2, distance=EuclideanDistance(), sampling=BatchAll()):
         loss = TripletLoss(device, margin, distance, sampling)
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 
@@ -159,4 +159,4 @@ class TripletConfig(LossConfig):
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
-        return Optimizer(optimizers, schedulers)
+        return base.Optimizer(optimizers, schedulers)

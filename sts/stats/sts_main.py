@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import argparse
-import matplotlib.pyplot as plt
 import random
 from random import randint
+
+import matplotlib.pyplot as plt
 from tqdm import tqdm
-from sts_stats.sts import SentIndex, Segment, MergeSegment
+
+from sts.stats.utils import SentIndex, Segment, MergeSegment
 
 
 def unique_pairs(xs, ys, scores):

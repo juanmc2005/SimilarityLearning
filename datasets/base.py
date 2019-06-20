@@ -4,6 +4,9 @@
 
 class SimDatasetPartition:
 
+    def __iter__(self):
+        return self
+
     def nbatches(self) -> int:
         raise NotImplementedError
 

@@ -110,7 +110,7 @@ class SpeakerValidationConfig:
         self.duration = duration
 
 
-# TODO These evaluator classes can be refactored, they share a lot of code
+# TODO These evaluator classes need to be refactored, they share a lot of code
 
 class SpeakerVerificationEvaluator(TrainingListener):
 
@@ -125,14 +125,14 @@ class SpeakerVerificationEvaluator(TrainingListener):
         return hash((uri, segments))
 
     def __init__(self, device: str, batch_size: int, distance: Distance,
-                 eval_interval: int, config: SpeakerValidationConfig, callbacks=[]):
+                 eval_interval: int, config: SpeakerValidationConfig, callbacks=None):
         super(SpeakerVerificationEvaluator, self).__init__()
         self.device = device
         self.batch_size = batch_size
         self.distance = distance
         self.eval_interval = eval_interval
         self.config = config
-        self.callbacks = callbacks
+        self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
     def eval(self, model, partition: str = 'development'):
@@ -182,7 +182,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
         if checkpoint is not None:
             self.best_metric = checkpoint['accuracy']
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
             metric_value = self.eval(model.to_prediction_model())
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
@@ -200,13 +200,13 @@ class SpeakerVerificationEvaluator(TrainingListener):
 
 class ClassAccuracyEvaluator(TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
         super(ClassAccuracyEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
+        self.batch_transforms = batch_transforms if batch_transforms is not None else []
+        self.callbacks = callbacks if callbacks is not None else []
         self.feat_train, self.y_train = None, None
         self.best_metric, self.best_epoch = 0, -1
 
@@ -238,9 +238,10 @@ class ClassAccuracyEvaluator(TrainingListener):
                 for cb in self.callbacks:
                     cb.on_batch_tested(i, feat)
 
+        feat_test, y_test = np.concatenate(feat_test), np.concatenate(y_test)
         for cb in self.callbacks:
-            cb.on_after_test()
-        return np.concatenate(feat_test), np.concatenate(y_test)
+            cb.on_after_test(feat_test, y_test)
+        return feat_test, y_test
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:
@@ -253,7 +254,7 @@ class ClassAccuracyEvaluator(TrainingListener):
         self.feat_train.append(feat.detach().cpu().numpy())
         self.y_train.append(y.detach().cpu().numpy())
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
         feat_train = np.concatenate(self.feat_train)
         y_train = np.concatenate(self.y_train)
         self.metric.fit(feat_train, y_train)
@@ -274,24 +275,27 @@ class ClassAccuracyEvaluator(TrainingListener):
 
 class STSEmbeddingEvaluator(TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
         super(STSEmbeddingEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
+        self.batch_transforms = batch_transforms if batch_transforms is not None else []
+        self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
     def eval(self, model):
         model.eval()
-        feat_test, y_test = [], []
+        phrases, feat_test, y_test = [], [], []
         for cb in self.callbacks:
             cb.on_before_test()
         with torch.no_grad():
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
-
+                for pair in x:
+                    phrases.append(' '.join([word for word in pair[0].split(' ') if word != 'null']))
+                for pair in x:
+                    phrases.append(' '.join([word for word in pair[1].split(' ') if word != 'null']))
                 # Apply custom transformations to the batch before feeding the model
                 for transform in self.batch_transforms:
                     x, y = transform(x, y)
@@ -305,23 +309,26 @@ class STSEmbeddingEvaluator(TrainingListener):
                 y = y.detach().cpu().numpy()
 
                 # Track accuracy
-                feat_test.append((feat1, feat2))
+                feat_test.append(feat1)
+                feat_test.append(feat2)
                 y_test.append(y)
                 self.metric.calculate_batch(feat, None, y)
 
                 for cb in self.callbacks:
                     cb.on_batch_tested(i, feat)
 
+        feat_test = np.concatenate(feat_test)
+        y_test = np.concatenate(y_test)
         for cb in self.callbacks:
-            cb.on_after_test()
-        return feat_test, y_test
+            cb.on_after_test(feat_test, y_test)
+        return phrases, feat_test, y_test
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:
             self.best_metric = checkpoint['accuracy']
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        feat_test, y_test = self.eval(model.to_prediction_model())
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
+        _, feat_test, y_test = self.eval(model.to_prediction_model())
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Spearman: {metric_value:.6f}")
@@ -338,23 +345,27 @@ class STSEmbeddingEvaluator(TrainingListener):
 
 class STSBaselineEvaluator(TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=[], callbacks=[]):
+    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
         super(STSBaselineEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms
-        self.callbacks = callbacks
+        self.batch_transforms = batch_transforms if batch_transforms is not None else []
+        self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
-    def _eval(self, model):
+    def eval(self, model):
         model.eval()
-        feat_test, logits_test, y_test = [], [], []
+        phrases, feat_test, logits_test, y_test = [], [], [], []
         for cb in self.callbacks:
             cb.on_before_test()
         with torch.no_grad():
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
+                for pair in x:
+                    phrases.append(' '.join([word for word in pair[0].split(' ') if word != 'null']))
+                for pair in x:
+                    phrases.append(' '.join([word for word in pair[1].split(' ') if word != 'null']))
 
                 # Apply custom transformations to the batch before feeding the model
                 for transform in self.batch_transforms:
@@ -362,12 +373,15 @@ class STSBaselineEvaluator(TrainingListener):
 
                 # Feed Forward
                 feat, logits = model(x, y)
-                feat = feat.detach().cpu().numpy()
+
+                feat1, feat2 = torch.split(feat, feat.size(1) // 2, dim=1)
+                feat1, feat2 = feat1.detach().cpu().numpy(), feat2.detach().cpu().numpy()
                 logits = logits.detach().cpu().numpy()
                 y = y.detach().cpu().numpy()
 
                 # Track accuracy
-                feat_test.append(feat)
+                feat_test.append(feat1)
+                feat_test.append(feat2)
                 logits_test.append(logits)
                 y_test.append(y)
                 self.metric.calculate_batch(feat, logits, y)
@@ -375,16 +389,17 @@ class STSBaselineEvaluator(TrainingListener):
                 for cb in self.callbacks:
                     cb.on_batch_tested(i, feat)
 
+        feat_test, y_test = np.concatenate(feat_test), np.concatenate(y_test)
         for cb in self.callbacks:
-            cb.on_after_test()
-        return np.concatenate(feat_test), np.concatenate(y_test)
+            cb.on_after_test(feat_test, y_test)
+        return phrases, feat_test, y_test
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:
             self.best_metric = checkpoint['accuracy']
 
-    def on_after_epoch(self, epoch, model, loss_fn, optim, mean_loss):
-        feat_test, y_test = self._eval(model)
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
+        phrases, feat_test, y_test = self.eval(model)
         metric_value = self.metric.get()
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Spearman: {metric_value:.6f}")
