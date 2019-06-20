@@ -23,7 +23,6 @@ class STSBaselineNet(nn.Module):
         for i, word in enumerate(tokens):
             pretrained_weight[i] = vec_vocab[word].numpy()
         self.word_embedding.weight.data.copy_(torch.from_numpy(pretrained_weight))
-        self.word_embedding.weight.requires_grad = False
         self.lstm = nn.LSTM(input_size=nfeat_word, hidden_size=nfeat_sent // 2,
                             num_layers=1, bidirectional=True)
 

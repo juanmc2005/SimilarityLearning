@@ -293,9 +293,9 @@ class STSEmbeddingEvaluator(TrainingListener):
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
                 for pair in x:
-                    phrases.append(' '.join([word for word in pair[0].split(' ') if word != 'null']))
+                    phrases.append(' '.join([word for word in pair[0] if word != 'null']))
                 for pair in x:
-                    phrases.append(' '.join([word for word in pair[1].split(' ') if word != 'null']))
+                    phrases.append(' '.join([word for word in pair[1] if word != 'null']))
                 # Apply custom transformations to the batch before feeding the model
                 for transform in self.batch_transforms:
                     x, y = transform(x, y)
@@ -363,9 +363,9 @@ class STSBaselineEvaluator(TrainingListener):
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
                 for pair in x:
-                    phrases.append(' '.join([word for word in pair[0].split(' ') if word != 'null']))
+                    phrases.append(' '.join([word for word in pair[0] if word != 'null']))
                 for pair in x:
-                    phrases.append(' '.join([word for word in pair[1].split(' ') if word != 'null']))
+                    phrases.append(' '.join([word for word in pair[1] if word != 'null']))
 
                 # Apply custom transformations to the batch before feeding the model
                 for transform in self.batch_transforms:

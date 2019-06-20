@@ -38,7 +38,8 @@ parser.add_argument('--task', type=str, default='mnist', help='The task to train
 parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
 parser.add_argument('--margin', type=float, default=2., help='The margin to use for the losses that need it')
 parser.add_argument('--t', type=float, default=3., help='The threshold for STS to consider a pair positive or negative')
-parser.add_argument('--exp-id', type=str, default=f"EXP {launch_datetime}", help='An identifier for the experience')
+parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
+                    help='An identifier for the experience')
 parser.add_argument('--seed', type=int, default=None, help='Random seed')
 args = parser.parse_args()
 
@@ -83,7 +84,7 @@ if args.log_interval in range(1, 101):
     print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
     test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
-                                       log_file_path=f"tmp/{args.task}-{args.loss}-logs-{launch_datetime}.txt"))
+                                       log_file_path=f"tmp/{args.exp_id}-logs.txt"))
 else:
     print(f"[Logging: {enabled_str(False)}]")
 

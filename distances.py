@@ -5,37 +5,6 @@ import torch.nn.functional as F
 import numpy as np
 
 
-# TODO remove this function and use pyannote function directly
-# def to_condensed(n, i, j):
-#     """
-#     Borrowed from pyannote: https://github.com/pyannote/pyannote-core
-#     Compute index in condensed pdist matrix
-#                 V
-#         0 | . 0 1 2 3
-#      -> 1 | . . 4 5 6 <-   ==>   0 1 2 3 4 5 6 7 8 9
-#         2 | . . . 7 8                    ^
-#         3 | . . . . 9
-#         4 | . . . . .
-#            ----------
-#             0 1 2 3 4
-#     Parameters
-#     ----------
-#     n : int
-#         Number of inputs in squared pdist matrix
-#     i, j : `int` or `numpy.ndarray`
-#         Indices in squared pdist matrix
-#     Returns
-#     -------
-#     k : `int` or `numpy.ndarray`
-#         Index in condensed pdist matrix
-#     """
-#     i, j = np.array(i), np.array(j)
-#     if np.any(i == j):
-#         raise ValueError('i and j should be different.')
-#     i, j = np.minimum(i, j), np.maximum(i, j)
-#     return np.int64(i * n - i * i / 2 - 3 * i / 2 + j - 1)
-
-
 class Distance:
     """
     A distance function implementing pairwise distance
@@ -124,7 +93,7 @@ class EuclideanDistance(Distance):
         return 'euclidean'
 
     def dist(self, x, y):
-        return torch.sqrt(torch.sum(torch.pow(x - y, 2), 1))
+        return torch.dist(x, y, p=2)
     
     def sqdist_sum(self, x, y):
         return (x - y).pow(2).sum()
