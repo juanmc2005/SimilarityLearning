@@ -9,6 +9,7 @@ from pyannote.core.utils.distance import cdist
 from pyannote.core import Timeline
 from distances import Distance
 from losses.base import TrainingListener
+import common
 
 
 class Metric:
@@ -124,10 +125,9 @@ class SpeakerVerificationEvaluator(TrainingListener):
             segments = (try_with,)
         return hash((uri, segments))
 
-    def __init__(self, device: str, batch_size: int, distance: Distance,
-                 eval_interval: int, config: SpeakerValidationConfig, callbacks=None):
+    def __init__(self, batch_size: int, distance: Distance, eval_interval: int,
+                 config: SpeakerValidationConfig, callbacks=None):
         super(SpeakerVerificationEvaluator, self).__init__()
-        self.device = device
         self.batch_size = batch_size
         self.distance = distance
         self.eval_interval = eval_interval
@@ -142,7 +142,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
                                                duration=self.config.duration,
                                                step=.5 * self.config.duration,
                                                batch_size=self.batch_size,
-                                               device=self.device)
+                                               device=common.DEVICE)
         protocol = get_protocol(self.config.protocol_name, progress=False, preprocessors=self.config.preprocessors)
 
         y_true, y_pred, cache = [], [], {}
