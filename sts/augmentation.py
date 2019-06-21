@@ -18,7 +18,7 @@ def pad_sent(s1: list, s2: list) -> tuple:
     return s1, s2
 
 
-def remove_pairs_with_score(a: list, b: list, sim: list, targets: tuple):
+def remove_pairs_with_score(a: list, b: list, sim: list, targets: list):
     anew, bnew, simnew = [], [], []
     for i in range(len(a)):
         if math.floor(sim[i]) not in targets:
@@ -71,9 +71,9 @@ class BinaryScoreFormatter(ScoreFormatter):
 
 class NoAugmentation(SemEvalAugmentationStrategy):
 
-    def __init__(self, allow_redundancy: bool = False, remove_scores: tuple = (), formatter: ScoreFormatter = None):
+    def __init__(self, allow_redundancy: bool = False, remove_scores: list = None, formatter: ScoreFormatter = None):
         self.allow_redundancy = allow_redundancy
-        self.remove_scores = remove_scores
+        self.remove_scores = remove_scores if remove_scores is not None else []
         self.formatter = formatter
 
     def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
@@ -208,11 +208,11 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
 
 class SemEvalAugmentationStrategyFactory:
 
-    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: tuple = ()):
+    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: list = None):
         self.loss = loss
         self.threshold = threshold
         self.allow_redundancy = allow_redundancy
-        self.remove_scores = remove_scores
+        self.remove_scores = remove_scores if remove_scores is not None else []
 
     def new(self):
         if self.loss == 'kldiv':
