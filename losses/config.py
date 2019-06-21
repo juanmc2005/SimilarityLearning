@@ -134,7 +134,7 @@ class ContrastiveConfig(LossConfig):
             optimizers = sincnet_optims(model)
             schedulers = []
         elif task == 'sts':
-            optimizers = [optim.RMSprop(model.parameters(), lr=1e-5)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.001)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
@@ -144,6 +144,7 @@ class ContrastiveConfig(LossConfig):
 class TripletConfig(LossConfig):
 
     def __init__(self, device, margin: float = 2, distance=EuclideanDistance(), sampling=BatchAll()):
+        # TODO update constructor call with new parameters
         loss = TripletLoss(device, margin, distance, sampling)
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 

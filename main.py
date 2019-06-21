@@ -36,11 +36,22 @@ parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT
 parser.set_defaults(save=True)
 parser.add_argument('--task', type=str, default='mnist', help='The task to train')
 parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
-parser.add_argument('--margin', type=float, default=2., help='The margin to use for the losses that need it')
-parser.add_argument('--t', type=float, default=3., help='The threshold for STS to consider a pair positive or negative')
-parser.add_argument('--exp-id', type=str, default=f"EXP {launch_datetime}", help='An identifier for the experience')
+parser.add_argument('-m', '--margin', type=float, default=2., help='The margin to use for the losses that need it')
+parser.add_argument('-t', '--threshold', type=float, default=3.,
+                    help='The threshold for STS to consider a pair positive or negative')
+parser.add_argument('--remove-scores', type=list, default=[],
+                    help='A list of scores to remove from the STS training set')
+parser.add_argument('--redundancy', dest='redundancy', action='store_true',
+                    help='Allow redundancy in SemEval training set')
+parser.add_argument('--no-redundancy', dest='redundancy', action='store_false',
+                    help='Do NOT allow redundancy in SemEval training set')
+parser.set_defaults(redundancy=False)
+parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
+                    help='An identifier for the experience')
 parser.add_argument('--seed', type=int, default=None, help='Random seed')
 args = parser.parse_args()
+
+args.remove_scores = [int(s) for s in args.remove_scores]
 
 # Set custom seed before doing anything
 set_custom_seed(args.seed)
@@ -61,11 +72,13 @@ elif args.task == 'speaker':
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
 elif args.task == 'sts' and args.path is not None:
-    print(f"[Threshold: {args.t}]")
+    print(f"[Threshold: {args.threshold}]")
+    print(f"[Scores Removed: {args.remove_scores}]")
     nfeat = 500
     mode = STSForwardModeFactory().new(args.loss)
-    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=args.t,
-                                                      allow_redundancy=False, remove_scores=(0,))
+    augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=args.threshold,
+                                                      allow_redundancy=args.redundancy,
+                                                      remove_scores=args.remove_scores)
     partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
     dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), partition_factory)
     config = get_config(args.loss, nfeat, dataset.nclass, args.task, args.margin)
@@ -83,7 +96,7 @@ if args.log_interval in range(1, 101):
     print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
     test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
-                                       log_file_path=f"tmp/{args.task}-{args.loss}-logs-{launch_datetime}.txt"))
+                                       log_file_path=f"tmp/{args.exp_id}-logs.txt"))
 else:
     print(f"[Logging: {enabled_str(False)}]")
 
@@ -100,7 +113,7 @@ if args.task == 'mnist':
                                        batch_transforms, test_callbacks)
 elif args.task == 'speaker':
     train_callbacks.append(RegularModelSaver(args.task, args.loss, 'tmp', interval=5, experience_name=args.exp_id))
-    evaluator = SpeakerVerificationEvaluator(DEVICE, args.batch_size, config.test_distance,
+    evaluator = SpeakerVerificationEvaluator(args.batch_size, config.test_distance,
                                              args.eval_interval, dataset.config, test_callbacks)
 # STS
 elif args.loss == 'kldiv':

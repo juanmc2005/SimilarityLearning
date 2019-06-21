@@ -273,7 +273,7 @@ class RegularModelSaver(TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.interval == 0:
-            filepath = join(self.base_path, f"EXP {self.experience_name}-{self.task}-{self.loss_name}-epoch={epoch}.pt")
+            filepath = join(self.base_path, f"{self.experience_name}-{self.task}-{self.loss_name}-epoch={epoch}.pt")
             self.saver.save(epoch, model, loss_fn, optim, 0, filepath)
 
 

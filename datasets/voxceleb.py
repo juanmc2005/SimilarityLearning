@@ -37,16 +37,20 @@ class VoxCelebPartition(SimDatasetPartition):
 
 
 class VoxCeleb1(SimDataset):
+    sample_rate = 16000
+
+    @staticmethod
+    def config(segment_size_s: float):
+        return SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
+                                       feature_extraction=RawAudio(sample_rate=VoxCeleb1.sample_rate),
+                                       preprocessors={'audio': FileFinder()},
+                                       duration=segment_size_s)
 
     def __init__(self, batch_size: int, segment_size_millis: int):
-        sample_rate = 16000
         self.batch_size = batch_size
         self.segment_size_s = segment_size_millis / 1000
-        self.nfeat = sample_rate * segment_size_millis // 1000
-        self.config = SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
-                                              feature_extraction=RawAudio(sample_rate=sample_rate),
-                                              preprocessors={'audio': FileFinder()},
-                                              duration=self.segment_size_s)
+        self.nfeat = VoxCeleb1.sample_rate * segment_size_millis // 1000
+        self.config = VoxCeleb1.config(self.segment_size_s)
         self.protocol = get_protocol(self.config.protocol_name, preprocessors=self.config.preprocessors)
         self.train_gen, self.dev_gen, self.test_gen = None, None, None
         print(f"Segment Size = {self.segment_size_s}s")

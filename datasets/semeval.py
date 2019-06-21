@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from datasets.base import SimDataset, SimDatasetPartition
-from sts.augmentation import SemEvalAugmentationStrategy
+from sts.augmentation import SemEvalAugmentationStrategy, pad_sent
 from sts import utils as sts
 
 
@@ -79,20 +79,6 @@ class SemEvalPartitionFactory:
 
 class SemEval(SimDataset):
 
-    @staticmethod
-    def pad_sent(s1, s2):
-        if len(s1) == len(s2):
-            return s1, s2
-        elif len(s1) > len(s2):
-            d = len(s2)
-            for i in range(d, len(s1)):
-                s2 += ' null'
-        else:
-            d = len(s1)
-            for i in range(d, len(s2)):
-                s1 += ' null'
-        return s1, s2
-
     def __init__(self, path: str, vector_path: str, vocab_path: str,
                  augmentation: SemEvalAugmentationStrategy, partition_factory: SemEvalPartitionFactory):
         self.path = path
@@ -104,8 +90,15 @@ class SemEval(SimDataset):
         adev, bdev, simdev = self._load_partition('dev')
         atest, btest, simtest = self._load_partition('test')
         self.train_sents = self.augmentation.augment(atrain, btrain, simtrain)
-        self.dev_sents = np.array(list(zip(zip(adev, bdev), simdev)))
-        self.test_sents = np.array(list(zip(zip(atest, btest), simtest)))
+        self.dev_sents = np.array(list(zip(self._split_and_pad(adev, bdev), simdev)))
+        self.test_sents = np.array(list(zip(self._split_and_pad(atest, btest), simtest)))
+
+    def _split_and_pad(self, asents, bsents):
+        result = []
+        for a, b in zip(asents, bsents):
+            apad, bpad = pad_sent(a.split(' '), b.split(' '))
+            result.append((apad, bpad))
+        return result
 
     def _load_partition(self, partition):
         with open(join(self.path, partition, 'a.toks')) as afile, \
@@ -114,8 +107,6 @@ class SemEval(SimDataset):
             a = [line.strip() for line in afile.readlines()]
             b = [line.strip() for line in bfile.readlines()]
             sim = [float(line.strip()) for line in simfile.readlines()]
-            for i in range(len(a)):
-                a[i], b[i] = self.pad_sent(a[i], b[i])
             return a, b, sim
 
     @property

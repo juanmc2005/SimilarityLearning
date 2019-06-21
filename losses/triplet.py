@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
 import numpy as np
+from distances import Distance
 from scipy.spatial.distance import squareform
 from pyannote.core.utils.distance import to_condensed
 
@@ -102,14 +104,17 @@ class TripletLoss(nn.Module):
     :param strategy: a TripletSamplingStrategy
     """
 
-    def __init__(self, device, margin, distance, sampling=BatchAll()):
+    def __init__(self, device: str, margin: float, distance: Distance,
+                 size_average: bool, online: bool = True, sampling=BatchAll()):
         super(TripletLoss, self).__init__()
         self.device = device
         self.margin = margin
         self.distance = distance
+        self.size_average = size_average
+        self.online = online
         self.sampling = sampling
     
-    def calculate_distances(self, x, y):
+    def _calculate_distances(self, x, y):
         """
         Calculate the distances to positives and negatives for each anchor in the batch
         :param x: a tensor corresponding to a batch of size (N, d), where
@@ -140,10 +145,16 @@ class TripletLoss(nn.Module):
         :param y: a non one-hot label tensor corresponding to the batch
         :return: the triplet loss value
         """
-        # Calculate the distances to positives and negatives for each anchor
-        # using the normalized features
-        dpos, dneg = self.calculate_distances(feat, y)
+        if self.online:
+            # Calculate the distances to positives and negatives for each anchor
+            dpos, dneg = self._calculate_distances(feat, y)
+        else:
+            # 'feat' is already separated into triplets
+            anchors, positives, negatives = feat
+            # Calculate the distances to positives and negatives for each anchor
+            dpos = self.distance.dist(anchors, positives)
+            dneg = self.distance.dist(anchors, negatives)
+
         # Calculate the loss using the margin
-        loss = dpos.pow(2) - dneg.pow(2) + self.margin
-        # Keep only positive values and return the normalized mean
-        return torch.clamp(loss, min=0).mean()
+        loss = F.relu(dpos - dneg + self.margin)
+        return loss.mean() if self.size_average else loss.sum()

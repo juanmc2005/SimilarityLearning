@@ -1,6 +1,31 @@
 import numpy as np
 import math
 from sts import utils
+from tqdm import tqdm
+
+
+def pad_sent(s1: list, s2: list) -> tuple:
+    if len(s1) == len(s2):
+        return s1, s2
+    elif len(s1) > len(s2):
+        d = len(s2)
+        for i in range(d, len(s1)):
+            s2.append('null')
+    else:
+        d = len(s1)
+        for i in range(d, len(s2)):
+            s1.append('null')
+    return s1, s2
+
+
+def remove_pairs_with_score(a: list, b: list, sim: list, targets: list):
+    anew, bnew, simnew = [], [], []
+    for i in range(len(a)):
+        if math.floor(sim[i]) not in targets:
+            anew.append(a[i])
+            bnew.append(b[i])
+            simnew.append(sim[i])
+    return anew, bnew, simnew
 
 
 class SemEvalAugmentationStrategy:
@@ -46,33 +71,29 @@ class BinaryScoreFormatter(ScoreFormatter):
 
 class NoAugmentation(SemEvalAugmentationStrategy):
 
-    @staticmethod
-    def remove_pairs_with_score(a: list, b: list, sim: list, targets: tuple):
-        anew, bnew, simnew = [], [], []
-        for i in range(len(a)):
-            if math.floor(sim[i]) not in targets:
-                anew.append(a[i])
-                bnew.append(b[i])
-                simnew.append(sim[i])
-        return anew, bnew, simnew
-
-    def __init__(self, allow_redundancy: bool = False, remove_scores: tuple = (), formatter: ScoreFormatter = None):
+    def __init__(self, allow_redundancy: bool = False, remove_scores: list = None, formatter: ScoreFormatter = None):
         self.allow_redundancy = allow_redundancy
-        self.remove_scores = remove_scores
+        self.remove_scores = remove_scores if remove_scores is not None else []
         self.formatter = formatter
 
     def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
-        atrain, btrain, simtrain = self.remove_pairs_with_score(train_sents_a, train_sents_b,
-                                                                train_scores, self.remove_scores)
+        atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
+                                                           train_scores, self.remove_scores)
         print(f"Total Train Pairs: {len(atrain)}")
         if self.allow_redundancy:
-            pairs = zip(atrain, btrain)
+            train_data = zip(atrain, btrain, simtrain)
             sim = simtrain
         else:
-            unique_train_data = list(set(zip(atrain, btrain, simtrain)))
-            pairs = [(x1, x2) for x1, x2, _ in unique_train_data]
-            sim = [y for _, _, y in unique_train_data]
-            print(f"Unique Train Pairs: {len(unique_train_data)}")
+            train_data = list(set(zip(atrain, btrain, simtrain)))
+            sim = [y for _, _, y in train_data]
+            print(f"Unique Train Pairs: {len(train_data)}")
+
+        a, b = [], []
+        for s1, s2, _ in train_data:
+            s1pad, s2pad = pad_sent(s1.split(' '), s2.split(' '))
+            a.append(s1pad)
+            b.append(s2pad)
+        pairs = zip(a, b)
 
         sim = self.formatter.format(sim) if self.formatter is not None else sim
         print(f"Redundancy in the training set: {'YES' if self.allow_redundancy else 'NO'}")
@@ -142,9 +163,9 @@ class PairAugmentation(SemEvalAugmentationStrategy):
 
 class TripletAugmentation(SemEvalAugmentationStrategy):
 
-    def __init__(self, threshold):
-        # Threshold can be a pair (low, high) or a float, which is the same as (value, value)
+    def __init__(self, threshold: float, remove_scores: tuple = ()):
         self.threshold = threshold
+        self.remove_scores = remove_scores
 
     def _triplets(self, sents_a, sents_b, scores):
         segment_a = utils.SemEvalSegment(sents_a)
@@ -155,17 +176,43 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
         return np.array([(a.split(' '), p.split(' '), n.split(' '))
                          for a, p, n in zip(anchors, positives, negatives)])
 
+    def _anchor_related(self, anchor, train_data, is_score_valid):
+        pos = []
+        for sent1, sent2, score in train_data:
+            is_sent1 = sent1 == anchor
+            is_sent2 = sent2 == anchor
+            if (is_sent1 or is_sent2) and is_score_valid(score):
+                pos.append(sent1 if is_sent2 else sent2)
+        return pos
+
     def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
-        return self._triplets(train_sents_a, train_sents_b, train_scores)
+        atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
+                                                           train_scores, self.remove_scores)
+        unique_train_data = list(set(zip(atrain, btrain, simtrain)))
+        unique_sents = list(set(atrain + btrain))
+        anchors, positives, negatives = [], [], []
+        for anchor in tqdm(unique_sents, total=len(unique_sents),
+                           desc=f"Generating triplets with threshold={self.threshold}"):
+            for positive in self._anchor_related(anchor, unique_train_data, lambda s: s >= self.threshold):
+                for negative in self._anchor_related(anchor, unique_train_data, lambda s: s < self.threshold):
+                    anchors.append(anchor)
+                    positives.append(positive)
+                    negatives.append(negative)
+        triplets = list(zip(anchors, positives, negatives))
+        unused_y = np.zeros(len(anchors))
+        print(f"Unique Train Pairs: {len(unique_train_data)}")
+        print(f"Unique Train Sentences: {len(unique_sents)}")
+        print(f"Triplets: {len(anchors)}")
+        return np.array(list(zip(triplets, unused_y)))
 
 
 class SemEvalAugmentationStrategyFactory:
 
-    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: tuple = ()):
+    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: list = None):
         self.loss = loss
         self.threshold = threshold
         self.allow_redundancy = allow_redundancy
-        self.remove_scores = remove_scores
+        self.remove_scores = remove_scores if remove_scores is not None else []
 
     def new(self):
         if self.loss == 'kldiv':

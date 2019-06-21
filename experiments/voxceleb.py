@@ -15,9 +15,8 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
         loss_name = model_loader.get_trained_loss()
         model_loader.load(self.model, loss_name)
         self.model = self.model.to_prediction_model().to(common.DEVICE)
-        dataset = VoxCeleb1(batch_size, segment_size_millis=200)
-        self.evaluator = SpeakerVerificationEvaluator(common.DEVICE, batch_size, distance,
-                                                      eval_interval=0, config=dataset.config)
+        config = VoxCeleb1.config(segment_size_s=0.2)
+        self.evaluator = SpeakerVerificationEvaluator(batch_size, distance, eval_interval=0, config=config)
 
     def evaluate_on_dev(self, plot: bool) -> float:
         inverse_eer = self.evaluator.eval(self.model, partition='development')
