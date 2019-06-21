@@ -10,6 +10,7 @@ from pyannote.core import Timeline
 from distances import Distance
 from losses.base import TrainingListener
 import common
+import visual
 
 
 class Metric:
@@ -135,6 +136,17 @@ class SpeakerVerificationEvaluator(TrainingListener):
         self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
+    def _file_embedding(self, file_dict: dict, sequence_embedding: SequenceEmbedding, cache: dict):
+        file1 = file_dict
+        f_hash = self.get_hash(file1)
+        if f_hash in cache:
+            emb = cache[f_hash]
+        else:
+            emb = sequence_embedding.crop(file1, file1['try_with'])
+            emb = np.mean(np.stack(emb), axis=0, keepdims=True)
+            cache[f_hash] = emb
+        return emb
+
     def eval(self, model, partition: str = 'development'):
         model.eval()
         sequence_embedding = SequenceEmbedding(model=model,
@@ -149,34 +161,20 @@ class SpeakerVerificationEvaluator(TrainingListener):
 
         for trial in getattr(protocol, f"{partition}_trial")():
 
-            # compute embedding for file1
-            file1 = trial['file1']
-            hash1 = self.get_hash(file1)
-            if hash1 in cache:
-                emb1 = cache[hash1]
-            else:
-                emb1 = sequence_embedding.crop(file1, file1['try_with'])
-                emb1 = np.mean(np.stack(emb1), axis=0, keepdims=True)
-                cache[hash1] = emb1
+            # Compute embeddings
+            emb1 = self._file_embedding(trial['file1'], sequence_embedding, cache)
+            emb2 = self._file_embedding(trial['file2'], sequence_embedding, cache)
 
-            # compute embedding for file2
-            file2 = trial['file2']
-            hash2 = self.get_hash(file2)
-            if hash2 in cache:
-                emb2 = cache[hash2]
-            else:
-                emb2 = sequence_embedding.crop(file2, file2['try_with'])
-                emb2 = np.mean(np.stack(emb2), axis=0, keepdims=True)
-                cache[hash2] = emb2
-
-            # compare embeddings
+            # Compare embeddings
             dist = cdist(emb1, emb2, metric=self.distance.to_sklearn_metric())[0, 0]
+
             y_pred.append(dist)
             y_true.append(trial['reference'])
 
         _, _, _, eer = det_curve(np.array(y_true), np.array(y_pred), distances=True)
+
         # Returning 1-eer because the evaluator keeps track of the highest metric value
-        return 1 - eer
+        return 1 - eer, y_pred, y_true
 
     def on_before_train(self, checkpoint):
         if checkpoint is not None:
@@ -184,7 +182,10 @@ class SpeakerVerificationEvaluator(TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
-            metric_value = self.eval(model.to_prediction_model())
+            metric_value, dists, y_true = self.eval(model.to_prediction_model())
+            visual.plot_pred_hists(dists, y_true,
+                                   f'Distance distribution for Dev speakers (Epoch {epoch})',
+                                   f'speaker-dists-epoch={epoch}')
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
             print(f"Dev EER: {1 - metric_value:.6f}")
             if self.best_epoch != -1:

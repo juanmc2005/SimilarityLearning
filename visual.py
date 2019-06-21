@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 import time
+import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 
@@ -44,6 +45,19 @@ def plot_dists(dists, title, filename):
     plt.ion()
     plt.clf()
     plt.plot(dists, '.')
+    plt.title(title)
+    plt.savefig(f"./images/{filename}.jpg")
+    plt.draw()
+    plt.pause(0.001)
+
+
+def plot_pred_hists(dists, y_true, title, filename):
+    bins = np.arange(0, 1, step=0.005)
+    plt.ion()
+    plt.clf()
+    plt.hist([dist for dist, y in zip(dists, y_true) if y == 1], bins, alpha=0.5, label='Same', color='green')
+    plt.hist([dist for dist, y in zip(dists, y_true) if y == 0], bins, alpha=0.5, label='Different', color='red')
+    plt.legend(loc='upper right')
     plt.title(title)
     plt.savefig(f"./images/{filename}.jpg")
     plt.draw()
