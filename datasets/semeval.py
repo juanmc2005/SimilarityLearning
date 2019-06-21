@@ -7,7 +7,7 @@ import numpy as np
 import torch
 
 from datasets.base import SimDataset, SimDatasetPartition
-from sts.augmentation import SemEvalAugmentationStrategy, pad_sent
+from sts.augmentation import SemEvalAugmentationStrategy, pad_sent_pair
 from sts import utils as sts
 
 
@@ -19,7 +19,7 @@ class SemEvalPartition(SimDatasetPartition):
         self.train = train
         self.generator = self._generate()
 
-    def _transform_batch(self, batch):
+    def _transform_batch(self, x, y):
         raise NotImplementedError("The class should implement 'transform_batch'")
 
     def _generate(self):
@@ -34,28 +34,29 @@ class SemEvalPartition(SimDatasetPartition):
         return math.ceil(len(self.data) / self.batch_size)
 
     def __next__(self):
-        return self._transform_batch(next(self.generator))
+        batch = next(self.generator)
+        x, y = [x for x, _ in batch], torch.Tensor([y for _, y in batch])
+        return self._transform_batch(x, y)
 
 
 class SemEvalBaselinePartition(SemEvalPartition):
 
-    def _transform_batch(self, batch):
-        x = [x for x, _ in batch]
-        y = torch.Tensor([y for _, y in batch]).float()
+    def _transform_batch(self, x, y):
+        y = y.float()
         y = y.view(-1, 6) if self.train else y
         return x, y
 
 
-class SemEvalClusterizedPartition(SemEvalPartition):
+class SemEvalLongLabelPartition(SemEvalPartition):
 
-    def _transform_batch(self, batch):
-        return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).long()
+    def _transform_batch(self, x, y):
+        return x, y.long()
 
 
-class SemEvalContrastivePartition(SemEvalPartition):
+class SemEvalFloatLabelPartition(SemEvalPartition):
 
-    def _transform_batch(self, batch):
-        return [x for x, _ in batch], torch.Tensor([y for _, y in batch]).float()
+    def _transform_batch(self, x, y):
+        return x, y.float()
 
 
 class SemEvalPartitionFactory:
@@ -65,16 +66,13 @@ class SemEvalPartitionFactory:
         self.batch_size = batch_size
 
     def new(self, data, train: bool):
-        # TODO add 'triplets' mode
         if self.loss == 'kldiv':
             return SemEvalBaselinePartition(data, self.batch_size, train)
-        elif self.loss == 'contrastive':
-            return SemEvalContrastivePartition(data, self.batch_size, train)
-        elif self.loss == 'triplet':
-            raise NotImplementedError('Triplet loss SemEval partition is not implemented yet')
+        elif self.loss == 'contrastive' or self.loss == 'triplet':
+            return SemEvalFloatLabelPartition(data, self.batch_size, train)
         else:
             # Softmax based loss, classes are simulated with clusters
-            return SemEvalClusterizedPartition(data, self.batch_size, train)
+            return SemEvalLongLabelPartition(data, self.batch_size, train)
 
 
 class SemEval(SimDataset):
@@ -96,7 +94,7 @@ class SemEval(SimDataset):
     def _split_and_pad(self, asents, bsents):
         result = []
         for a, b in zip(asents, bsents):
-            apad, bpad = pad_sent(a.split(' '), b.split(' '))
+            apad, bpad = pad_sent_pair(a.split(' '), b.split(' '))
             result.append((apad, bpad))
         return result
 

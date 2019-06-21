@@ -4,7 +4,7 @@ from sts import utils
 from tqdm import tqdm
 
 
-def pad_sent(s1: list, s2: list) -> tuple:
+def pad_sent_pair(s1: list, s2: list) -> tuple:
     if len(s1) == len(s2):
         return s1, s2
     elif len(s1) > len(s2):
@@ -16,6 +16,21 @@ def pad_sent(s1: list, s2: list) -> tuple:
         for i in range(d, len(s2)):
             s1.append('null')
     return s1, s2
+
+
+def pad_sent_triplet(s1: list, s2: list, s3: list) -> tuple:
+    len1, len2, len3 = len(s1), len(s2), len(s3)
+    maxlen = max(len1, len2, len3)
+    if maxlen == len1:
+        _, s2 = pad_sent_pair(s1, s2)
+        _, s3 = pad_sent_pair(s1, s3)
+    elif maxlen == len2:
+        _, s1 = pad_sent_pair(s2, s1)
+        _, s3 = pad_sent_pair(s2, s3)
+    else:
+        _, s1 = pad_sent_pair(s3, s1)
+        _, s2 = pad_sent_pair(s3, s2)
+    return s1, s2, s3
 
 
 def remove_pairs_with_score(a: list, b: list, sim: list, targets: list):
@@ -90,7 +105,7 @@ class NoAugmentation(SemEvalAugmentationStrategy):
 
         a, b = [], []
         for s1, s2, _ in train_data:
-            s1pad, s2pad = pad_sent(s1.split(' '), s2.split(' '))
+            s1pad, s2pad = pad_sent_pair(s1.split(' '), s2.split(' '))
             a.append(s1pad)
             b.append(s2pad)
         pairs = zip(a, b)
@@ -163,9 +178,9 @@ class PairAugmentation(SemEvalAugmentationStrategy):
 
 class TripletAugmentation(SemEvalAugmentationStrategy):
 
-    def __init__(self, threshold: float, remove_scores: tuple = ()):
+    def __init__(self, threshold: float, remove_scores: list = None):
         self.threshold = threshold
-        self.remove_scores = remove_scores
+        self.remove_scores = remove_scores if remove_scores is not None else []
 
     def _triplets(self, sents_a, sents_b, scores):
         segment_a = utils.SemEvalSegment(sents_a)
@@ -198,7 +213,15 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
                     anchors.append(anchor)
                     positives.append(positive)
                     negatives.append(negative)
-        triplets = list(zip(anchors, positives, negatives))
+
+        a, p, n = [], [], []
+        for s1, s2, s3 in zip(anchors, positives, negatives):
+            s1pad, s2pad, s3pad = pad_sent_triplet(s1.split(' '), s2.split(' '), s3.split(' '))
+            a.append(s1pad)
+            p.append(s2pad)
+            n.append(s3pad)
+        triplets = zip(a, p, n)
+
         unused_y = np.zeros(len(anchors))
         print(f"Unique Train Pairs: {len(unique_train_data)}")
         print(f"Unique Train Sentences: {len(unique_sents)}")

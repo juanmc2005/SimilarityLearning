@@ -73,7 +73,6 @@ class ArcFaceConfig(LossConfig):
         super(ArcFaceConfig, self).__init__('ArcFace Loss', f"m={margin} s={s}", self.loss_module, loss, CosineDistance())
 
     def optimizer(self, model, task):
-        # TODO add STS
         if task == 'mnist':
             params = model.all_params()
             optimizers = [optim.SGD(params[0], lr=0.005, momentum=0.9, weight_decay=0.0005),
@@ -84,6 +83,8 @@ class ArcFaceConfig(LossConfig):
             optimizers = sincnet_optims(model)
             optimizers.append(optim.SGD(self.loss_module.parameters(), lr=0.01))
             schedulers = [lr_scheduler.StepLR(optimizers[-1], 8, gamma=0.8)]
+        elif task == 'sts':
+            optimizers, schedulers = [optim.RMSprop(model.parameters(), lr=0.0001)], []
         else:
             raise ValueError
         return base.Optimizer(optimizers, schedulers)
@@ -134,7 +135,7 @@ class ContrastiveConfig(LossConfig):
             optimizers = sincnet_optims(model)
             schedulers = []
         elif task == 'sts':
-            optimizers = [optim.RMSprop(model.parameters(), lr=0.01)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.001, momentum=0.9)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
@@ -143,9 +144,9 @@ class ContrastiveConfig(LossConfig):
 
 class TripletConfig(LossConfig):
 
-    def __init__(self, device, margin: float = 2, distance=EuclideanDistance(), sampling=BatchAll()):
-        # TODO update constructor call with new parameters
-        loss = TripletLoss(device, margin, distance, sampling)
+    def __init__(self, device, margin: float = 2, distance=EuclideanDistance(),
+                 size_average: bool = True, online: bool = True, sampling=BatchAll()):
+        loss = TripletLoss(device, margin, distance, size_average, online, sampling)
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 
     def optimizer(self, model, task):
@@ -156,7 +157,7 @@ class TripletConfig(LossConfig):
             optimizers = sincnet_optims(model)
             schedulers = []
         elif task == 'sts':
-            optimizers = [optim.RMSprop(model.parameters(), lr=0.0001)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=0.001, momentum=0.9)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')

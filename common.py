@@ -66,7 +66,11 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
                                     online=task != 'sts')
     elif loss == 'triplet':
         print(f"[Margin: {margin}]")
-        return cf.TripletConfig(DEVICE, margin=margin)
+        return cf.TripletConfig(DEVICE,
+                                margin=margin,
+                                distance=CosineDistance(),
+                                size_average=False,
+                                online=task != 'sts')
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")
         return cf.ArcFaceConfig(DEVICE, nfeat, nclass, margin=margin)
