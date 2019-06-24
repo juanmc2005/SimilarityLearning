@@ -45,7 +45,7 @@ class TestListener:
     def on_batch_tested(self, ibatch, feat):
         pass
     
-    def on_after_test(self, feat_test, y_test):
+    def on_after_test(self, feat_test, y_test, metric_value):
         pass
     
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
@@ -121,13 +121,13 @@ class ScreenProgressLogger:
 
 class TrainLogger(TrainingListener):
     
-    def __init__(self, interval, nbatches, log_file_path: str):
+    def __init__(self, interval, nbatches, loss_log_path: str):
         super(TrainLogger, self).__init__()
         self.nbatches = nbatches
         self.logger = ScreenProgressLogger(interval, nbatches)
         self.total_loss = 0
-        self.log_file_path = log_file_path
-        open(log_file_path, 'w').close()
+        self.log_file_path = loss_log_path
+        open(loss_log_path, 'w').close()
     
     def on_before_epoch(self, epoch):
         self.total_loss = 0
@@ -146,15 +146,23 @@ class TrainLogger(TrainingListener):
 
 class TestLogger(TestListener):
 
-    def __init__(self, interval, n_batch):
+    def __init__(self, interval, n_batch, metric_log_path: str = None):
         super(TestLogger, self).__init__()
         self.logger = ScreenProgressLogger(interval, n_batch)
+        self.log_file_path = metric_log_path
+        if metric_log_path is not None:
+            open(metric_log_path, 'w').close()
     
     def on_before_test(self):
         self.logger.restart()
     
     def on_batch_tested(self, ibatch, feat):
         self.logger.on_test_batch(ibatch)
+
+    def on_after_test(self, feat_test, y_test, metric_value):
+        if self.log_file_path is not None:
+            with open(self.log_file_path, 'a') as logfile:
+                logfile.write(str(metric_value) + '\n')
 
 
 class Visualizer(TestListener):
@@ -180,7 +188,7 @@ class TSNEVisualizer(TestListener):
         self.distance = distance
         self.param_desc = param_desc
 
-    def on_after_test(self, feat_test, y_test):
+    def on_after_test(self, feat_test, y_test, metric_value):
         plot_name = f"embeddings-{self.loss}"
         plot_title = f"{self.loss.capitalize()} Embeddings"
         if self.param_desc is not None:

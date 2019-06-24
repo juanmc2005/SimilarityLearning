@@ -1,5 +1,7 @@
 import argparse
 import time
+import os
+from os.path import join
 
 from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
@@ -92,14 +94,18 @@ train = dataset.training_partition()
 
 print('[Dataset Loaded]')
 
+log_path = f"tmp/{args.exp_id}"
+os.mkdir(log_path)
+
 # Create plugins
 test_callbacks = []
 train_callbacks = []
 if args.log_interval in range(1, 101):
     print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
-    test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
+    test_callbacks.append(TestLogger(args.log_interval, dev.nbatches(),
+                                     metric_log_path=join(log_path, f"metric.log")))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
-                                       log_file_path=f"tmp/{args.exp_id}-logs.txt"))
+                                       loss_log_path=join(log_path, f"loss.log")))
 else:
     print(f"[Logging: {enabled_str(False)}]")
 
@@ -109,13 +115,13 @@ if args.plot:
 
 print(f"[Model Saving: {enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(BestModelSaver(args.task, args.loss, 'tmp', args.exp_id))
+    test_callbacks.append(BestModelSaver(args.task, args.loss, log_path, args.exp_id))
 
 if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance),
                                        batch_transforms, test_callbacks)
 elif args.task == 'speaker':
-    train_callbacks.append(RegularModelSaver(args.task, args.loss, 'tmp', interval=5, experience_name=args.exp_id))
+    train_callbacks.append(RegularModelSaver(args.task, args.loss, log_path, interval=5, experience_name=args.exp_id))
     evaluator = SpeakerVerificationEvaluator(args.batch_size, config.test_distance,
                                              args.eval_interval, dataset.config, test_callbacks)
 # STS
