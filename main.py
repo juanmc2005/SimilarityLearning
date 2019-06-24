@@ -94,7 +94,7 @@ train = dataset.training_partition()
 
 print('[Dataset Loaded]')
 
-log_path = f"tmp/{args.exp_id}"
+log_path = f"tmp/{args.exp_id}-{args.loss}"
 os.mkdir(log_path)
 
 # Create plugins
