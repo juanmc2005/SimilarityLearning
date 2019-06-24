@@ -183,11 +183,12 @@ class SpeakerVerificationEvaluator(TrainingListener):
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
             metric_value, dists, y_true = self.eval(model.to_prediction_model())
+            eer = 1 - metric_value
             visual.plot_pred_hists(dists, y_true,
-                                   f'Distance distribution for Dev speakers (Epoch {epoch})',
+                                   f'Distance distribution for dev speakers (Epoch {epoch}) - EER {eer}',
                                    f'speaker-dists-epoch={epoch}')
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
-            print(f"Dev EER: {1 - metric_value:.6f}")
+            print(f"Dev EER: {eer:.6f}")
             if self.best_epoch != -1:
                 print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")
             print("------------------------------------------------")

@@ -67,10 +67,11 @@ if args.task == 'mnist' and args.path is not None:
     model = MNISTNet(nfeat, loss_module=config.loss_module)
     dataset = MNIST(args.path, args.batch_size)
 elif args.task == 'speaker':
-    nfeat, nclass = 256, 1251
+    dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
+    nfeat, nclass = 256, dataset.training_partition().nclass
     config = get_config(args.loss, nfeat, nclass, args.task, args.margin)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
-    dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
+    print(f"Train Classes: {nclass}")
 elif args.task == 'sts' and args.path is not None:
     print(f"[Threshold: {args.threshold}]")
     print(f"[Scores Removed: {args.remove_scores}]")
@@ -85,8 +86,10 @@ elif args.task == 'sts' and args.path is not None:
     model = SemanticNet(DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 else:
     raise ValueError('Unrecognized task or dataset path missing')
+
 dev = dataset.dev_partition()
 train = dataset.training_partition()
+
 print('[Dataset Loaded]')
 
 # Create plugins

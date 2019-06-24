@@ -16,6 +16,7 @@ class VoxCelebPartition(SimDatasetPartition):
         self.generator = generator()
         self.batches_per_epoch = generator.batches_per_epoch
         self.segment_size = segment_size
+        self.nclass = len(generator.specifications['y']['classes'])
 
     def nbatches(self):
         return self.batches_per_epoch
