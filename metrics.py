@@ -185,7 +185,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
             metric_value, dists, y_true = self.eval(model.to_prediction_model())
             eer = 1 - metric_value
             visual.plot_pred_hists(dists, y_true,
-                                   f'Distance distribution for dev speakers (Epoch {epoch}) - EER {eer}',
+                                   f'Distance distribution for dev speakers (Epoch {epoch}) - EER {eer:.3f}',
                                    f'speaker-dists-epoch={epoch}')
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
             print(f"Dev EER: {eer:.6f}")

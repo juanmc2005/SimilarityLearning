@@ -2,7 +2,7 @@ import torch
 import numpy as np
 import random
 import losses.config as cf
-from distances import CosineDistance
+from distances import CosineDistance, EuclideanDistance
 
 
 """
@@ -68,7 +68,7 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
         print(f"[Margin: {margin}]")
         return cf.TripletConfig(DEVICE,
                                 margin=margin,
-                                distance=CosineDistance(),
+                                distance=EuclideanDistance(),
                                 size_average=False,
                                 online=task != 'sts')
     elif loss == 'arcface':

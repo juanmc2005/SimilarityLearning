@@ -44,7 +44,7 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
         if plot:
             plot_name = f"embeddings-{self.loss_name}"
             plot_title = f"{self.loss_name.capitalize()} Embeddings"
-            visual.visualize_tsne(feat_test, phrases, plot_title, plot_name)
+            visual.visualize_tsne_neighbors(feat_test, phrases, self.distance, plot_title, plot_name)
         return self.dev_evaluator.metric.get()
 
     def evaluate_on_test(self) -> float:

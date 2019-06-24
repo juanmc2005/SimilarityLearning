@@ -4,6 +4,10 @@ import time
 import numpy as np
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
+from sklearn.neighbors import NearestNeighbors
+
+colors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff',
+          '#ff00ff', '#990000', '#999900', '#009900', '#009999']
 
 
 def visualize(feat, labels, title, filename):
@@ -20,21 +24,46 @@ def visualize(feat, labels, title, filename):
     plt.pause(0.001)
 
 
-def visualize_tsne(feat, phrases, title, filename):
-    indices_to_annotate = [528, 1830, 1369, 1009, 35, 754, 462, 756, 1451, 639]
-    # indices_to_annotate = np.random.choice(feat.shape[0], 10, replace=False)
+def visualize_tsne_neighbors(feat, phrases, distance, title, filename):
+    feat_unique, phrases_unique = [], []
+    phrases_seen = set()
+    for i in range(len(feat)):
+        if phrases[i] not in phrases_seen:
+            feat_unique.append(feat[i])
+            phrases_unique.append(phrases[i])
+            phrases_seen.add(phrases[i])
+    feat = np.vstack(feat_unique)
+    phrases = phrases_unique
+
     time_start = time.time()
-    tsne = TSNE(n_components=2, verbose=1, perplexity=20, n_iter=300)
+    tsne = TSNE(n_components=2, verbose=1, perplexity=30, n_iter=300, metric=distance.to_sklearn_metric())
     tsne_results = tsne.fit_transform(feat)
     print(f"t-SNE done! Time elapsed: {time.time() - time_start} seconds")
+
     plt.ion()
     plt.clf()
     x = tsne_results[:, 0]
     y = tsne_results[:, 1]
-    plt.plot(x, y, '.', c='#00ffff')
-    for i in indices_to_annotate:
-        print(f"Phrase {i}: {phrases[i]}")
-        plt.annotate(str(i), (x[i], y[i]))
+
+    if phrases is not None:
+        with open(f"./images/{filename}-reference.txt", 'w') as reffile:
+            centers = [1061, 999, 782, 2518, 94]
+            # centers = np.random.choice(feat.shape[0], 6, replace=False)
+            nn = NearestNeighbors(n_neighbors=5, metric=distance.to_sklearn_metric())
+            nn.fit(tsne_results)
+            distances, indices = nn.kneighbors(tsne_results[centers, :])
+            for i in range(len(centers)):
+                c = centers[i]
+                reffile.write(f"Phrase {c}: {phrases[c]}\nNeighbors:\n")
+                for j in range(len(indices[i])):
+                    nid = indices[i, j]
+                    if nid != c:
+                        reffile.write(f"\tPhrase {nid} at distance {distances[i, j]}: {phrases[nid]}\n")
+                inds = [indices[i, j] for j in range(len(indices[i]))]
+                plt.plot(x[inds], y[inds], '.', c=colors[i])
+            plt.legend([str(center) for center in centers], loc='upper right')
+    plt.axhline(y=0, color='black')
+    plt.axvline(x=0, color='black')
     plt.title(title)
     plt.savefig(f"./images/{filename}.jpg")
     plt.draw()

@@ -7,6 +7,7 @@ import visual
 from os.path import join
 from models import SimNet
 from datasets.base import SimDatasetPartition
+from distances import Distance
 import common
 
 
@@ -174,8 +175,9 @@ class Visualizer(TestListener):
 
 class TSNEVisualizer(TestListener):
 
-    def __init__(self, loss: str, param_desc: str = None):
+    def __init__(self, loss: str, distance: Distance, param_desc: str = None):
         self.loss = loss
+        self.distance = distance
         self.param_desc = param_desc
 
     def on_after_test(self, feat_test, y_test):
@@ -185,7 +187,7 @@ class TSNEVisualizer(TestListener):
             plot_title += f" - {self.param_desc}"
         print(f"Saving TSNE plot as {plot_name}")
         unique_feat = np.unique(feat_test, axis=0)
-        visual.visualize_tsne(unique_feat, plot_title, plot_name)
+        visual.visualize_tsne_neighbors(unique_feat, None, self.distance, plot_title, plot_name)
 
 
 class DeviceMapperTransform:
