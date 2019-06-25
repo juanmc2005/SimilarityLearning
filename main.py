@@ -3,11 +3,15 @@ import time
 import os
 from os.path import join
 
+from core.base import Trainer
+from core.plugins.logging import TrainLogger, TestLogger
+from core.plugins.visual import Visualizer, SpeakerDistanceVisualizer
+from core.plugins.storage import BestModelSaver, ModelLoader, RegularModelSaver
+
 from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from datasets.voxceleb import VoxCeleb1
-from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer,\
-    BestModelSaver, ModelLoader, DeviceMapperTransform, RegularModelSaver, SpeakerDistanceVisualizer
+
 from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, \
     DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator, \
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
@@ -66,7 +70,6 @@ set_custom_seed(args.seed)
 print(f"[Task: {args.task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
-batch_transforms = [DeviceMapperTransform(DEVICE)]
 if args.task == 'mnist' and args.path is not None:
     nfeat, nclass = 2, 10
     config = get_config(args.loss, nfeat, nclass, args.task, args.margin)
@@ -118,8 +121,7 @@ if args.save:
     test_callbacks.append(BestModelSaver(args.task, args.loss, log_path, args.exp_id))
 
 if args.task == 'mnist':
-    evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance),
-                                       batch_transforms, test_callbacks)
+    evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance), test_callbacks)
 elif args.task == 'speaker':
     train_callbacks.append(RegularModelSaver(args.task, args.loss, log_path, interval=5, experience_name=args.exp_id))
     test_callbacks.append(SpeakerDistanceVisualizer(log_path))
@@ -128,18 +130,17 @@ elif args.task == 'speaker':
 # STS
 elif args.loss == 'kldiv':
     metric = LogitsSpearmanMetric()
-    evaluator = STSBaselineEvaluator(DEVICE, dev, metric, batch_transforms, test_callbacks)
+    evaluator = STSBaselineEvaluator(DEVICE, dev, metric, test_callbacks)
 else:
     metric = DistanceSpearmanMetric(config.test_distance)
-    evaluator = STSEmbeddingEvaluator(DEVICE, dev, metric, batch_transforms, test_callbacks)
+    evaluator = STSEmbeddingEvaluator(DEVICE, dev, metric, test_callbacks)
 
 train_callbacks.append(evaluator)
 
 # Configure trainer
-trainer = BaseTrainer(args.loss, model, config.loss, train, config.optimizer(model, args.task),
-                      model_loader=ModelLoader(args.recover) if args.recover is not None else None,
-                      batch_transforms=batch_transforms,
-                      callbacks=train_callbacks)
+trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, args.task),
+                  model_loader=ModelLoader(args.recover) if args.recover is not None else None,
+                  callbacks=train_callbacks)
 
 print()
 

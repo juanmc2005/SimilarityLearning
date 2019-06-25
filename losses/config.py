@@ -9,7 +9,7 @@ from losses.arcface import ArcLinear
 from losses.coco import CocoLinear
 from losses.contrastive import ContrastiveLoss
 from losses.triplet import TripletLoss, BatchAll
-import losses.base as base
+import core.base as base
 
 
 def sincnet_optims(model):

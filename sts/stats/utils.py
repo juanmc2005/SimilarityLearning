@@ -40,7 +40,7 @@ def plot_stats(sents, index, partition, segment, filename, step):
     icounts, counts = get_bar_data(index.index.items(), counter)
     plt.figure(figsize=(15,5))
     plt.title(f"Partition: {partition[0].upper()}{partition[1:].lower()} - Segment: {segment}")
-    #plt.xticks(np.arange(len(icounts), step=step))
+    # plt.xticks(np.arange(len(icounts), step=step))
     plt.bar(icounts, counts, color='SkyBlue')
     plt.plot(icounts, counts, color='orange')
     plt.legend(['Occurrences'], loc='upper right')
@@ -147,8 +147,7 @@ class Segment:
                         stack.append((k, other_seg, seg, equals_this))
                         added.add((k, other_seg))
         return pos, neg
-                    
-    
+
     def __str__(self):
         return self.code.upper()
     

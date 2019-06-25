@@ -1,6 +1,7 @@
 from models import SemanticNet
 from distances import Distance
-from losses.base import ModelLoader, DeviceMapperTransform, TestLogger, TSNEVisualizer
+from core.plugins.storage import ModelLoader
+from core.plugins.logging import TestLogger
 from losses.wrappers import STSBaselineClassifier
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from sts.augmentation import NoAugmentation
@@ -8,7 +9,7 @@ from sts.modes import STSForwardMode, PairSTSForwardMode, ConcatSTSForwardMode
 from metrics import STSEmbeddingEvaluator, STSBaselineEvaluator, DistanceSpearmanMetric, LogitsSpearmanMetric
 from experiments.base import ModelEvaluationExperiment
 from common import DEVICE
-import visual
+import visual_utils
 
 
 class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
@@ -45,7 +46,7 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
         if plot:
             plot_name = f"embeddings-{self.loss_name}"
             plot_title = f"{self.loss_name.capitalize()} Embeddings"
-            visual.visualize_tsne_neighbors(feat_test, phrases, self.distance, plot_title, self.base_dir, plot_name)
+            visual_utils.visualize_tsne_neighbors(feat_test, phrases, self.distance, plot_title, self.base_dir, plot_name)
         return self.dev_evaluator.metric.get()
 
     def evaluate_on_test(self) -> float:
@@ -71,7 +72,6 @@ class SemEvalEmbeddingEvaluationExperiment(SemEvalEvaluationExperiment):
 
     def _build_evaluator(self, partition):
         return STSEmbeddingEvaluator(DEVICE, partition, DistanceSpearmanMetric(self.distance),
-                                     batch_transforms=[DeviceMapperTransform(DEVICE)],
                                      callbacks=[TestLogger(self.log_interval, partition.nbatches())])
 
     def _get_model_mode(self) -> STSForwardMode:
@@ -88,7 +88,6 @@ class SemEvalBaselineModelEvaluationExperiment(SemEvalEvaluationExperiment):
 
     def _build_evaluator(self, partition):
         return STSBaselineEvaluator(DEVICE, partition, LogitsSpearmanMetric(),
-                                    batch_transforms=[DeviceMapperTransform(DEVICE)],
                                     callbacks=[TestLogger(self.log_interval, partition.nbatches())])
 
     def _get_model_mode(self) -> STSForwardMode:

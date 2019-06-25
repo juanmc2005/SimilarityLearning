@@ -1,7 +1,7 @@
 from experiments.base import ModelEvaluationExperiment
 from datasets.voxceleb import VoxCeleb1
 from models import SpeakerNet
-from losses.base import ModelLoader
+from core.plugins.storage import ModelLoader
 from metrics import SpeakerVerificationEvaluator
 from distances import Distance
 import common

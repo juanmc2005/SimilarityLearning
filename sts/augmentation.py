@@ -272,7 +272,7 @@ class SemEvalAugmentationStrategyFactory:
             # return PairAugmentation(self.threshold)
             return NoAugmentation(self.allow_redundancy, self.remove_scores, BinaryScoreFormatter(self.threshold))
         elif self.loss == 'triplet':
-            return TripletAugmentation(self.threshold)
+            return TripletAugmentation(self.threshold, self.remove_scores)
         else:
             # Softmax based loss
             return ClusterAugmentation(self.threshold)

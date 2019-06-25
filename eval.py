@@ -2,7 +2,7 @@ import argparse
 import time
 import os
 from common import set_custom_seed
-from losses.base import ModelLoader
+from core.plugins.storage import ModelLoader
 from distances import EuclideanDistance, CosineDistance
 from experiments.semeval import SemEvalEmbeddingEvaluationExperiment, SemEvalBaselineModelEvaluationExperiment
 from experiments.voxceleb import VoxCeleb1ModelEvaluationExperiment

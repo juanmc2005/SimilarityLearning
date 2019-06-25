@@ -8,9 +8,8 @@ from pyannote.metrics.binary_classification import det_curve
 from pyannote.core.utils.distance import cdist
 from pyannote.core import Timeline
 from distances import Distance
-from losses.base import TrainingListener
+import core.base as base
 import common
-import visual
 
 
 class Metric:
@@ -114,7 +113,7 @@ class SpeakerValidationConfig:
 
 # TODO These evaluator classes need to be refactored, they share a lot of code
 
-class SpeakerVerificationEvaluator(TrainingListener):
+class SpeakerVerificationEvaluator(base.TrainingListener):
 
     @staticmethod
     def get_hash(trial_file):
@@ -199,14 +198,13 @@ class SpeakerVerificationEvaluator(TrainingListener):
                     cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, None, None)
 
 
-class ClassAccuracyEvaluator(TrainingListener):
+class ClassAccuracyEvaluator(base.TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
+    def __init__(self, device, loader, metric, callbacks=None):
         super(ClassAccuracyEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms if batch_transforms is not None else []
         self.callbacks = callbacks if callbacks is not None else []
         self.feat_train, self.y_train = None, None
         self.best_metric, self.best_epoch = 0, -1
@@ -220,9 +218,10 @@ class ClassAccuracyEvaluator(TrainingListener):
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
 
-                # Apply custom transformations to the batch before feeding the model
-                for transform in self.batch_transforms:
-                    x, y = transform(x, y)
+                if isinstance(x, torch.Tensor):
+                    x = x.to(common.DEVICE)
+                if isinstance(y, torch.Tensor):
+                    y = y.to(common.DEVICE)
 
                 # Feed Forward
                 feat, logits = model(x, y)
@@ -274,14 +273,13 @@ class ClassAccuracyEvaluator(TrainingListener):
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
 
 
-class STSEmbeddingEvaluator(TrainingListener):
+class STSEmbeddingEvaluator(base.TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
+    def __init__(self, device, loader, metric, callbacks=None):
         super(STSEmbeddingEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms if batch_transforms is not None else []
         self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
@@ -293,13 +291,14 @@ class STSEmbeddingEvaluator(TrainingListener):
         with torch.no_grad():
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
+
                 for pair in x:
                     phrases.append(' '.join([word for word in pair[0] if word != 'null']))
                 for pair in x:
                     phrases.append(' '.join([word for word in pair[1] if word != 'null']))
-                # Apply custom transformations to the batch before feeding the model
-                for transform in self.batch_transforms:
-                    x, y = transform(x, y)
+
+                if isinstance(y, torch.Tensor):
+                    y = y.to(common.DEVICE)
 
                 # Feed Forward
                 feat = model(x)
@@ -344,14 +343,13 @@ class STSEmbeddingEvaluator(TrainingListener):
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
 
 
-class STSBaselineEvaluator(TrainingListener):
+class STSBaselineEvaluator(base.TrainingListener):
 
-    def __init__(self, device, loader, metric, batch_transforms=None, callbacks=None):
+    def __init__(self, device, loader, metric, callbacks=None):
         super(STSBaselineEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
-        self.batch_transforms = batch_transforms if batch_transforms is not None else []
         self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
@@ -363,14 +361,14 @@ class STSBaselineEvaluator(TrainingListener):
         with torch.no_grad():
             for i in range(self.loader.nbatches()):
                 x, y = next(self.loader)
+
                 for pair in x:
                     phrases.append(' '.join([word for word in pair[0] if word != 'null']))
                 for pair in x:
                     phrases.append(' '.join([word for word in pair[1] if word != 'null']))
 
-                # Apply custom transformations to the batch before feeding the model
-                for transform in self.batch_transforms:
-                    x, y = transform(x, y)
+                if isinstance(y, torch.Tensor):
+                    y = y.to(common.DEVICE)
 
                 # Feed Forward
                 feat, logits = model(x, y)

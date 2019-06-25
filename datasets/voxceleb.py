@@ -7,7 +7,7 @@ from pyannote.audio.embedding.generators import SpeechSegmentGenerator
 from pyannote.database import get_protocol
 from pyannote.database import FileFinder
 from datasets.base import SimDataset, SimDatasetPartition
-from metrics import SpeakerValidationConfig
+import metrics
 
 
 class VoxCelebPartition(SimDatasetPartition):
@@ -42,10 +42,10 @@ class VoxCeleb1(SimDataset):
 
     @staticmethod
     def config(segment_size_s: float):
-        return SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
-                                       feature_extraction=RawAudio(sample_rate=VoxCeleb1.sample_rate),
-                                       preprocessors={'audio': FileFinder()},
-                                       duration=segment_size_s)
+        return metrics.SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
+                                               feature_extraction=RawAudio(sample_rate=VoxCeleb1.sample_rate),
+                                               preprocessors={'audio': FileFinder()},
+                                               duration=segment_size_s)
 
     def __init__(self, batch_size: int, segment_size_millis: int):
         self.batch_size = batch_size
