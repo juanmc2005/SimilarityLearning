@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 import time
 import numpy as np
+from os.path import join
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.neighbors import NearestNeighbors
@@ -10,21 +11,19 @@ colors = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff',
           '#ff00ff', '#990000', '#999900', '#009900', '#009999']
 
 
-def visualize(feat, labels, title, filename):
+def visualize(feat, labels, title, dir_path, filename):
     plt.ion()
-    c = ['#ff0000', '#ffff00', '#00ff00', '#00ffff', '#0000ff',
-         '#ff00ff', '#990000', '#999900', '#009900', '#009999']
     plt.clf()
     for i in range(10):
-        plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=c[i])
+        plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=colors[i])
     plt.legend(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], loc='upper right')
     plt.title(title)
-    plt.savefig(f"./images/{filename}.jpg")
+    plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()
     plt.pause(0.001)
 
 
-def visualize_tsne_neighbors(feat, phrases, distance, title, filename):
+def visualize_tsne_neighbors(feat, phrases, distance, title, dir_path, filename):
     feat_unique, phrases_unique = [], []
     phrases_seen = set()
     for i in range(len(feat)):
@@ -46,7 +45,7 @@ def visualize_tsne_neighbors(feat, phrases, distance, title, filename):
     y = tsne_results[:, 1]
 
     if phrases is not None:
-        with open(f"./images/{filename}-reference.txt", 'w') as reffile:
+        with open(join(dir_path, f"{filename}-reference.txt"), 'w') as reffile:
             centers = [1061, 999, 782, 2518, 94]
             # centers = np.random.choice(feat.shape[0], 6, replace=False)
             nn = NearestNeighbors(n_neighbors=5, metric=distance.to_sklearn_metric())
@@ -65,22 +64,12 @@ def visualize_tsne_neighbors(feat, phrases, distance, title, filename):
     plt.axhline(y=0, color='black')
     plt.axvline(x=0, color='black')
     plt.title(title)
-    plt.savefig(f"./images/{filename}.jpg")
+    plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()
     plt.pause(0.001)
 
 
-def plot_dists(dists, title, filename):
-    plt.ion()
-    plt.clf()
-    plt.plot(dists, '.')
-    plt.title(title)
-    plt.savefig(f"./images/{filename}.jpg")
-    plt.draw()
-    plt.pause(0.001)
-
-
-def plot_pred_hists(dists, y_true, title, filename):
+def plot_pred_hists(dists, y_true, title, dir_path, filename):
     bins = np.arange(0, 1, step=0.005)
     plt.ion()
     plt.clf()
@@ -88,6 +77,6 @@ def plot_pred_hists(dists, y_true, title, filename):
     plt.hist([dist for dist, y in zip(dists, y_true) if y == 0], bins, alpha=0.5, label='Different', color='red')
     plt.legend(loc='upper right')
     plt.title(title)
-    plt.savefig(f"./images/{filename}.jpg")
+    plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()
     plt.pause(0.001)

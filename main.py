@@ -7,7 +7,7 @@ from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from datasets.voxceleb import VoxCeleb1
 from losses.base import BaseTrainer, TrainLogger, TestLogger, Visualizer,\
-    BestModelSaver, ModelLoader, DeviceMapperTransform, RegularModelSaver
+    BestModelSaver, ModelLoader, DeviceMapperTransform, RegularModelSaver, SpeakerDistanceVisualizer
 from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, \
     DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator, \
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
@@ -55,6 +55,10 @@ args = parser.parse_args()
 
 args.remove_scores = [int(s) for s in args.remove_scores]
 
+log_path = f"tmp/{args.exp_id}-{args.task}-{args.loss}"
+os.mkdir(log_path)
+print(f"Logging to {log_path}")
+
 # Set custom seed before doing anything
 set_custom_seed(args.seed)
 
@@ -94,9 +98,6 @@ train = dataset.training_partition()
 
 print('[Dataset Loaded]')
 
-log_path = f"tmp/{args.exp_id}-{args.loss}"
-os.mkdir(log_path)
-
 # Create plugins
 test_callbacks = []
 train_callbacks = []
@@ -122,6 +123,7 @@ if args.task == 'mnist':
                                        batch_transforms, test_callbacks)
 elif args.task == 'speaker':
     train_callbacks.append(RegularModelSaver(args.task, args.loss, log_path, interval=5, experience_name=args.exp_id))
+    test_callbacks.append(SpeakerDistanceVisualizer(log_path))
     evaluator = SpeakerVerificationEvaluator(args.batch_size, config.test_distance,
                                              args.eval_interval, dataset.config, test_callbacks)
 # STS

@@ -185,10 +185,7 @@ class SpeakerVerificationEvaluator(TrainingListener):
             metric_value, dists, y_true = self.eval(model.to_prediction_model())
             eer = 1 - metric_value
             for cb in self.callbacks:
-                cb.on_after_test(dists, y_true, eer)
-            visual.plot_pred_hists(dists, y_true,
-                                   f'Distance distribution for dev speakers (Epoch {epoch}) - EER {eer:.3f}',
-                                   f'speaker-dists-epoch={epoch}')
+                cb.on_after_test(epoch, dists, y_true, eer)
             print(f"--------------- Epoch {epoch:02d} Results ---------------")
             print(f"Dev EER: {eer:.6f}")
             if self.best_epoch != -1:
@@ -263,7 +260,7 @@ class ClassAccuracyEvaluator(TrainingListener):
         feat_test, y_test = self._eval(model)
         metric_value = self.metric.get()
         for cb in self.callbacks:
-            cb.on_after_test(feat_test, y_test, metric_value)
+            cb.on_after_test(epoch, feat_test, y_test, metric_value)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Accuracy: {metric_value:.6f}")
         if self.best_epoch != -1:
@@ -333,7 +330,7 @@ class STSEmbeddingEvaluator(TrainingListener):
         _, feat_test, y_test = self.eval(model.to_prediction_model())
         metric_value = self.metric.get()
         for cb in self.callbacks:
-            cb.on_after_test(feat_test, y_test, metric_value)
+            cb.on_after_test(epoch, feat_test, y_test, metric_value)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Spearman: {metric_value:.6f}")
         if self.best_epoch != -1:
@@ -404,7 +401,7 @@ class STSBaselineEvaluator(TrainingListener):
         phrases, feat_test, y_test = self.eval(model)
         metric_value = self.metric.get()
         for cb in self.callbacks:
-            cb.on_after_test(feat_test, y_test, metric_value)
+            cb.on_after_test(epoch, feat_test, y_test, metric_value)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
         print(f"Dev Spearman: {metric_value:.6f}")
         if self.best_epoch != -1:

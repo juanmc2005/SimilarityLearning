@@ -84,6 +84,15 @@ class BinaryScoreFormatter(ScoreFormatter):
         return [0 if s >= self.threshold else 1 for s in scores]
 
 
+class PairBinaryScoreFormatter(ScoreFormatter):
+
+    def __init__(self, threshold: float):
+        self.threshold = threshold
+
+    def format(self, scores):
+        return [(0, s) if s >= self.threshold else (1, s) for s in scores]
+
+
 class NoAugmentation(SemEvalAugmentationStrategy):
 
     def __init__(self, allow_redundancy: bool = False, remove_scores: list = None, formatter: ScoreFormatter = None):

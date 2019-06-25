@@ -14,13 +14,14 @@ import visual
 class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
 
     def __init__(self, model_loader: ModelLoader, nfeat: int, data_path: str, word2vec_path: str,
-                 vocab_path: str, distance: Distance, log_interval: int, batch_size: int):
+                 vocab_path: str, distance: Distance, log_interval: int, batch_size: int, base_dir: str):
 
         self.loss_name = model_loader.get_trained_loss()
         self.dev_evaluator, self.test_evaluator = None, None
         self.log_interval = log_interval
         self.distance = distance
         self.nfeat = nfeat
+        self.base_dir = base_dir
 
         # The augmentation is only done for the training set, so it doesn't matter which one we choose.
         # Here I'm choosing NoAugmentation allowing redundancy because it's the cheapest to compute
@@ -44,7 +45,7 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
         if plot:
             plot_name = f"embeddings-{self.loss_name}"
             plot_title = f"{self.loss_name.capitalize()} Embeddings"
-            visual.visualize_tsne_neighbors(feat_test, phrases, self.distance, plot_title, plot_name)
+            visual.visualize_tsne_neighbors(feat_test, phrases, self.distance, plot_title, self.base_dir, plot_name)
         return self.dev_evaluator.metric.get()
 
     def evaluate_on_test(self) -> float:
