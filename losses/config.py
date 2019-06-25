@@ -13,7 +13,7 @@ import losses.base as base
 
 
 def sincnet_optims(model):
-    return [optim.RMSprop(l.parameters(), 1e-5, alpha=0.95) for l in model.layers()]
+    return [optim.RMSprop(l.parameters(), 1e-6, alpha=0.95) for l in model.layers()]
 
 
 class LossConfig:
@@ -55,7 +55,7 @@ class SoftmaxConfig(LossConfig):
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
         elif task == 'speaker':
             optimizers = sincnet_optims(model)
-            optimizers.append(optim.RMSprop(self.loss_module.parameters(), 1e-5, alpha=0.95))
+            optimizers.append(optim.RMSprop(self.loss_module.parameters(), 1e-6, alpha=0.95))
             schedulers = []
         elif task == 'sts':
             optimizers = [optim.RMSprop(model.parameters(), lr=0.005)]

@@ -163,18 +163,23 @@ class SemEvalSegment:
                 other_sent = seg.sents[j]
                 # Create the pair
                 equals_this = False
+                candidate = (s, other_sent)
                 if scores[j] >= thigh:
                     if equals_last:
                         # A = B = C --> A = C
-                        pos.append((s, other_sent))
-                        equals_this = True
-                    else:
+                        if candidate not in neg:
+                            # We don't want to add a pair that we already counted as negative
+                            pos.append(candidate)
+                            equals_this = True
+                    elif candidate not in pos:
+                        # We don't want to add a pair that we already counted as positive
                         # A != B and B = C --> A != C
-                        neg.append((s, other_sent))
-                elif scores[j] <= tlow and equals_last:
+                        neg.append(candidate)
+                elif scores[j] <= tlow and equals_last and candidate not in pos:
+                    # We don't want to add a pair that we already counted as positive
                     # A = B and B != C --> A != C
-                    neg.append((s, other_sent))
-                # Add dependencies
+                    neg.append(candidate)
+                # Add next sentences to the stack
                 for k, x in enumerate(seg.sents):
                     if k != j and (k, other_seg) not in added and x == other_sent:
                         stack.append((k, other_seg, seg, equals_this))

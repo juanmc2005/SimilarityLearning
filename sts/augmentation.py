@@ -34,6 +34,7 @@ def pad_sent_triplet(s1: list, s2: list, s3: list) -> tuple:
 
 
 def remove_pairs_with_score(a: list, b: list, sim: list, targets: list):
+    print(f"[Removing Scores: {targets}]")
     anew, bnew, simnew = [], [], []
     for i in range(len(a)):
         if math.floor(sim[i]) not in targets:
@@ -197,8 +198,7 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
         unique_sents = set(sents_a + sents_b)
         pos, neg = utils.pairs(segment_a, segment_b, scores, self.threshold)
         anchors, positives, negatives = utils.triplets(unique_sents, pos, neg)
-        return np.array([(a.split(' '), p.split(' '), n.split(' '))
-                         for a, p, n in zip(anchors, positives, negatives)])
+        return list(pos), list(neg), anchors, positives, negatives
 
     def _anchor_related(self, anchor, train_data, is_score_valid):
         pos = []
@@ -209,7 +209,16 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
                 pos.append(sent1 if is_sent2 else sent2)
         return pos
 
-    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+    def _pad(self, anchors, positives, negatives):
+        a, p, n = [], [], []
+        for s1, s2, s3 in zip(anchors, positives, negatives):
+            s1pad, s2pad, s3pad = pad_sent_triplet(s1.split(' '), s2.split(' '), s3.split(' '))
+            a.append(s1pad)
+            p.append(s2pad)
+            n.append(s3pad)
+        return zip(a, p, n)
+
+    def _normal_triplets(self, train_sents_a: list, train_sents_b: list, train_scores: list):
         atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
                                                            train_scores, self.remove_scores)
         unique_train_data = list(set(zip(atrain, btrain, simtrain)))
@@ -223,18 +232,28 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
                     positives.append(positive)
                     negatives.append(negative)
 
-        a, p, n = [], [], []
-        for s1, s2, s3 in zip(anchors, positives, negatives):
-            s1pad, s2pad, s3pad = pad_sent_triplet(s1.split(' '), s2.split(' '), s3.split(' '))
-            a.append(s1pad)
-            p.append(s2pad)
-            n.append(s3pad)
-        triplets = zip(a, p, n)
-
+        triplets = self._pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
         print(f"Unique Train Pairs: {len(unique_train_data)}")
         print(f"Unique Train Sentences: {len(unique_sents)}")
         print(f"Triplets: {len(anchors)}")
+        return np.array(list(zip(triplets, unused_y)))
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+        atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
+                                                           train_scores, self.remove_scores)
+        pos, neg, anchors, positives, negatives = self._triplets(atrain, btrain, simtrain)
+        dups = []
+        for i in range(len(pos)):
+            for j in range(len(neg)):
+                if pos[i] == neg[j]:
+                    dups.append(pos[i])
+        unique_pairs = list(set(pos + neg))
+        print(f"Pairs which are positive and negative at the same time: {len(dups)}")
+        print(f"Unique Train Pairs: {len(unique_pairs)}")
+        print(f"Triplets: {len(anchors)}")
+        triplets = self._pad(anchors, positives, negatives)
+        unused_y = np.zeros(len(anchors))
         return np.array(list(zip(triplets, unused_y)))
 
 

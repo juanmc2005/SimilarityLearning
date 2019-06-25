@@ -80,7 +80,6 @@ elif args.task == 'speaker':
     print(f"Train Classes: {nclass}")
 elif args.task == 'sts' and args.path is not None:
     print(f"[Threshold: {args.threshold}]")
-    print(f"[Scores Removed: {args.remove_scores}]")
     nfeat = 500
     mode = STSForwardModeFactory().new(args.loss)
     augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=args.threshold,
