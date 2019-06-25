@@ -54,6 +54,7 @@ parser.add_argument('--no-redundancy', dest='redundancy', action='store_false',
 parser.set_defaults(redundancy=False)
 parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
                     help='An identifier for the experience')
+parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
 parser.add_argument('--seed', type=int, default=None, help='Random seed')
 args = parser.parse_args()
 
@@ -138,10 +139,12 @@ else:
 train_callbacks.append(evaluator)
 
 # Configure trainer
-trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, args.task),
+trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, args.task, args.lr),
                   model_loader=ModelLoader(args.recover) if args.recover is not None else None,
                   callbacks=train_callbacks)
 
+print(f"[LR: {args.lr}]")
+print(f"[Batch Size: {args.batch_size}]")
 print()
 
 # Start training
