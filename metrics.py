@@ -54,6 +54,25 @@ class KNNAccuracyMetric(Metric):
         return metric
 
 
+class LogitsAccuracyMetric(Metric):
+
+    def __init__(self):
+        self.correct, self.total = 0, 0
+
+    def fit(self, embeddings, y):
+        pass
+
+    def calculate_batch(self, embeddings, logits, y):
+        pred = logits.argmax(dim=1, keepdim=True)
+        self.correct += pred.eq(y.view_as(pred)).sum().item()
+        self.total += logits.size(0)
+
+    def get(self):
+        metric = self.correct / self.total
+        self.correct, self.total = 0, 0
+        return metric
+
+
 class LogitsSpearmanMetric(Metric):
 
     def __init__(self):

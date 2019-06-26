@@ -26,10 +26,6 @@ parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace
                     help='An identifier for the experience')
 args = parser.parse_args()
 
-log_path = f"tmp/{args.exp_id}-{args.task}-eval-{args.model.split('/')[-1]}"
-os.mkdir(log_path)
-print(f"Logging to {log_path}")
-
 # Set custom seed
 set_custom_seed(args.seed)
 
@@ -64,7 +60,7 @@ elif args.task == 'sts':
                                  distance=distance,
                                  log_interval=args.log_interval,
                                  batch_size=args.batch_size,
-                                 base_dir=log_path)
+                                 base_dir='tmp')
     metric_name = 'Spearman'
 else:
     raise ValueError("Task can only be 'speaker' or 'sts'")

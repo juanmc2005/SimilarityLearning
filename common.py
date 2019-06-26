@@ -1,3 +1,5 @@
+import os
+from os.path import isdir
 import torch
 import numpy as np
 import random
@@ -43,6 +45,22 @@ def enabled_str(value: bool) -> str:
     :return: ENABLED if value is True, DISABLED otherwise
     """
     return 'ENABLED' if value else 'DISABLED'
+
+
+def create_log_dir(exp_id: str, task: str, loss: str):
+    """
+    Create the directory where logs, models, plots and other experiment related files will be stored
+    :param exp_id: the name for this experiment
+    :param task: the name of the task
+    :param loss: the name of the loss function that will be optimized
+    :return: the name of the created directory, or exit the program if the directory exists
+    """
+    log_path = f"tmp/{exp_id}-{task}-{loss}"
+    if isdir(log_path):
+        print(f"The experience directory '{log_path}' already exists")
+        exit(1)
+    os.mkdir(log_path)
+    return log_path
 
 
 def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> cf.LossConfig:

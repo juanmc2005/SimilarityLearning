@@ -1,24 +1,24 @@
 import argparse
 import time
-import os
 from os.path import join
 
 from core.base import Trainer
 from core.plugins.logging import TrainLogger, TestLogger
 from core.plugins.visual import Visualizer, SpeakerDistanceVisualizer
 from core.plugins.storage import BestModelSaver, ModelLoader, RegularModelSaver
+from core.plugins.misc import TrainingMetricCalculator
 
 from datasets.mnist import MNIST
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from datasets.voxceleb import VoxCeleb1
 
-from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, \
+from metrics import KNNAccuracyMetric, LogitsSpearmanMetric, LogitsAccuracyMetric, \
     DistanceSpearmanMetric, STSEmbeddingEvaluator, STSBaselineEvaluator, \
     SpeakerVerificationEvaluator, ClassAccuracyEvaluator
 from models import MNISTNet, SpeakerNet, SemanticNet
 from sts.modes import STSForwardModeFactory
 from sts.augmentation import SemEvalAugmentationStrategyFactory
-from common import LOSS_OPTIONS_STR, get_config, enabled_str, set_custom_seed, DEVICE
+from common import LOSS_OPTIONS_STR, get_config, enabled_str, set_custom_seed, DEVICE, create_log_dir
 
 launch_datetime = time.strftime('%c')
 
@@ -60,8 +60,7 @@ args = parser.parse_args()
 
 args.remove_scores = [int(s) for s in args.remove_scores]
 
-log_path = f"tmp/{args.exp_id}-{args.task}-{args.loss}"
-os.mkdir(log_path)
+log_path = create_log_dir(args.exp_id, args.task, args.loss)
 print(f"Logging to {log_path}")
 
 # Set custom seed before doing anything
@@ -78,10 +77,12 @@ if args.task == 'mnist' and args.path is not None:
     dataset = MNIST(args.path, args.batch_size)
 elif args.task == 'speaker':
     dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
-    nfeat, nclass = 256, dataset.training_partition().nclass
+    train = dataset.training_partition()
+    nfeat, nclass = 256, train.nclass
     config = get_config(args.loss, nfeat, nclass, args.task, args.margin)
     model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
     print(f"Train Classes: {nclass}")
+    print(f"[Batches per Epoch: {train.batches_per_epoch}]")
 elif args.task == 'sts' and args.path is not None:
     print(f"[Threshold: {args.threshold}]")
     nfeat = 500
@@ -124,7 +125,8 @@ if args.save:
 if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance), test_callbacks)
 elif args.task == 'speaker':
-    train_callbacks.append(RegularModelSaver(args.task, args.loss, log_path, interval=5, experience_name=args.exp_id))
+    train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy', metric=LogitsAccuracyMetric()),
+                            RegularModelSaver(args.task, args.loss, log_path, interval=5, experience_name=args.exp_id)])
     test_callbacks.append(SpeakerDistanceVisualizer(log_path))
     evaluator = SpeakerVerificationEvaluator(args.batch_size, config.test_distance,
                                              args.eval_interval, dataset.config, test_callbacks)

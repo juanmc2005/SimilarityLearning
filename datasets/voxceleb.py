@@ -57,21 +57,21 @@ class VoxCeleb1(SimDataset):
         print(f"Segment Size = {self.segment_size_s}s")
         print(f"Embedding Size = {self.nfeat}")
 
-    def training_partition(self) -> SimDatasetPartition:
+    def training_partition(self) -> VoxCelebPartition:
         if self.train_gen is None:
             self.train_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
                                                     subset='train', per_label=1, per_fold=self.batch_size,
-                                                    duration=self.segment_size_s, parallel=3)
+                                                    duration=self.segment_size_s, parallel=3, per_epoch=2)
         return VoxCelebPartition(self.train_gen, self.nfeat)
 
-    def dev_partition(self) -> SimDatasetPartition:
+    def dev_partition(self) -> VoxCelebPartition:
         if self.dev_gen is None:
             self.dev_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
                                                   subset='development', per_label=1, per_fold=self.batch_size,
-                                                  duration=self.segment_size_s, parallel=2)
+                                                  duration=self.segment_size_s, parallel=2, per_epoch=2)
         return VoxCelebPartition(self.dev_gen, self.nfeat)
 
-    def test_partition(self) -> SimDatasetPartition:
+    def test_partition(self) -> VoxCelebPartition:
         if self.test_gen is None:
             self.test_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
                                                    subset='test', per_label=1, per_fold=self.batch_size,
