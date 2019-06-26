@@ -3,7 +3,7 @@ import time
 from os.path import join
 
 from core.base import Trainer
-from core.plugins.logging import TrainLogger, TestLogger
+from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
 from core.plugins.visual import Visualizer, SpeakerDistanceVisualizer
 from core.plugins.storage import BestModelSaver, ModelLoader, RegularModelSaver
 from core.plugins.misc import TrainingMetricCalculator
@@ -107,8 +107,8 @@ test_callbacks = []
 train_callbacks = []
 if args.log_interval in range(1, 101):
     print(f"[Logging: {enabled_str(True)} (every {args.log_interval}%)]")
-    test_callbacks.append(TestLogger(args.log_interval, dev.nbatches(),
-                                     metric_log_path=join(log_path, f"metric.log")))
+    test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
+    test_callbacks.append(MetricFileLogger(log_path=join(log_path, f"metric.log")))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
                                        loss_log_path=join(log_path, f"loss.log")))
 else:
@@ -147,6 +147,7 @@ trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, 
 
 print(f"[LR: {args.lr}]")
 print(f"[Batch Size: {args.batch_size}]")
+print(f"[Epochs: {args.epochs}]")
 print()
 
 # Start training

@@ -59,12 +59,9 @@ class TrainLogger(TrainingListener):
 
 class TestLogger(TestListener):
 
-    def __init__(self, interval, n_batch, metric_log_path: str = None):
+    def __init__(self, interval, n_batch):
         super(TestLogger, self).__init__()
         self.logger = ScreenProgressLogger(interval, n_batch)
-        self.log_file_path = metric_log_path
-        if metric_log_path is not None:
-            open(metric_log_path, 'w').close()
 
     def on_before_test(self):
         self.logger.restart()
@@ -72,7 +69,13 @@ class TestLogger(TestListener):
     def on_batch_tested(self, ibatch, feat):
         self.logger.on_test_batch(ibatch)
 
+
+class MetricFileLogger(TestListener):
+
+    def __init__(self, log_path: str):
+        self.log_file_path = log_path
+        open(log_path, 'w').close()
+
     def on_after_test(self, epoch, feat_test, y_test, metric_value):
-        if self.log_file_path is not None:
-            with open(self.log_file_path, 'a') as logfile:
-                logfile.write(str(metric_value) + '\n')
+        with open(self.log_file_path, 'a') as logfile:
+            logfile.write(str(metric_value) + '\n')

@@ -1,3 +1,5 @@
+import argparse
+import time
 import os
 from os.path import isdir
 import torch
@@ -21,8 +23,6 @@ SEED = 124
 PyTorch device: GPU if available, CPU otherwise
 """
 _use_cuda = torch.cuda.is_available() and True
-# TODO This device is a constant for everyone, we can remove the 'device' parameters and use this directly
-# TODO or maybe create a singleton object
 DEVICE = torch.device('cuda' if _use_cuda else 'cpu')
 
 
@@ -100,3 +100,31 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
         return cf.KLDivergenceConfig(DEVICE, nfeat)
     else:
         raise ValueError(f"Loss function should be one of: {LOSS_OPTIONS_STR}")
+
+
+def get_arg_parser():
+    """
+    :return: an ArgumentParser with the common configuration for all tasks
+    """
+    launch_datetime = time.strftime('%c')
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--loss', type=str, help=LOSS_OPTIONS_STR)
+    parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
+    parser.add_argument('--log-interval', type=int, default=10,
+                        help='Steps (in percentage) to show epoch progress. Default value: 10')
+    parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
+    parser.add_argument('--plot', dest='plot', action='store_true',
+                        help='Plot distance distribution for same and different speakers')
+    parser.add_argument('--no-plot', dest='plot', action='store_false',
+                        help='Do NOT plot distance distribution for same and different speakers')
+    parser.set_defaults(plot=True)
+    parser.add_argument('--save', dest='save', action='store_true', help='Save best accuracy models')
+    parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT save best accuracy models')
+    parser.set_defaults(save=True)
+    parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
+    parser.add_argument('-m', '--margin', type=float, default=2., help='The margin to use for the losses that need it')
+    parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
+                        help='An identifier for the experience')
+    parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--seed', type=int, default=None, help='Random seed')
+    return parser
