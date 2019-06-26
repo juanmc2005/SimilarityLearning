@@ -4,6 +4,7 @@ from os.path import join
 import core.base as base
 from core.optim import Optimizer
 from models import SimNet
+import common
 
 
 class ModelSaver:
@@ -30,10 +31,10 @@ class ModelLoader:
         self.path = path
 
     def get_trained_loss(self):
-        return torch.load(self.path)['trained_loss']
+        return torch.load(self.path, map_location=common.DEVICE)['trained_loss']
 
     def restore(self, model: SimNet, loss_fn: nn.Module, optimizer: Optimizer, current_loss: str):
-        checkpoint = torch.load(self.path)
+        checkpoint = torch.load(self.path, map_location=common.DEVICE)
         model.load_common_state_dict(checkpoint['common_state_dict'])
         if current_loss == checkpoint['trained_loss']:
             loss_fn.load_state_dict(checkpoint['loss_state_dict'])
@@ -44,7 +45,7 @@ class ModelLoader:
         return checkpoint
 
     def load(self, model: SimNet, current_loss: str):
-        checkpoint = torch.load(self.path)
+        checkpoint = torch.load(self.path, map_location=common.DEVICE)
         model.load_common_state_dict(checkpoint['common_state_dict'])
         if current_loss == checkpoint['trained_loss'] and model.loss_module is not None:
             model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])

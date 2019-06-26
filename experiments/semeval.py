@@ -39,9 +39,13 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
         self.model = self._transform_model(self.model)
         self.model = self.model.to(DEVICE)
 
-    def evaluate_on_dev(self, plot: bool) -> float:
+    def get_dev_evaluator(self):
         if self.dev_evaluator is None:
             self.dev_evaluator = self._build_evaluator(self.dataset.dev_partition())
+        return self.dev_evaluator
+
+    def evaluate_on_dev(self, plot: bool) -> float:
+        self.get_dev_evaluator()
         phrases, feat_test, y_test = self.dev_evaluator.eval(self.model)
         if plot:
             plot_name = f"embeddings-{self.loss_name}"
