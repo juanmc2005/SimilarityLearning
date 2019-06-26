@@ -1,6 +1,5 @@
 import argparse
 import time
-import os
 from common import set_custom_seed
 from core.plugins.storage import ModelLoader
 from distances import EuclideanDistance, CosineDistance
