@@ -54,7 +54,7 @@ class TrainLogger(TrainingListener):
         mean_loss = self.total_loss / self.nbatches
         print(f"[Epoch {epoch} finished. Mean Loss: {mean_loss:.6f}]")
         with open(self.log_file_path, 'a') as logfile:
-            logfile.write(str(mean_loss) + '\n')
+            logfile.write(f"{mean_loss}\n")
 
 
 class TestLogger(TestListener):
@@ -78,4 +78,18 @@ class MetricFileLogger(TestListener):
 
     def on_after_test(self, epoch, feat_test, y_test, metric_value):
         with open(self.log_file_path, 'a') as logfile:
-            logfile.write(str(metric_value) + '\n')
+            logfile.write(f"{metric_value}\n")
+
+
+class HeaderPrinter(TrainingListener):
+
+    def __init__(self):
+        self.current_header_size = 0
+
+    def on_before_epoch(self, epoch):
+        header = f"--------------- Epoch {epoch:02d} ---------------"
+        self.current_header_size = len(header)
+        print(header)
+
+    def on_after_epoch(self, epoch, model, loss_fn, optim):
+        print('-' * self.current_header_size)

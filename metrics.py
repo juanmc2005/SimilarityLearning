@@ -144,9 +144,10 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
             segments = (try_with,)
         return hash((uri, segments))
 
-    def __init__(self, batch_size: int, distance: Distance, eval_interval: int,
+    def __init__(self, partition: str, batch_size: int, distance: Distance, eval_interval: int,
                  config: SpeakerValidationConfig, callbacks=None):
         super(SpeakerVerificationEvaluator, self).__init__()
+        self.partition = partition
         self.batch_size = batch_size
         self.distance = distance
         self.eval_interval = eval_interval
@@ -200,19 +201,17 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
-            metric_value, dists, y_true = self.eval(model.to_prediction_model())
+            metric_value, dists, y_true = self.eval(model.to_prediction_model(), self.partition)
             eer = 1 - metric_value
             for cb in self.callbacks:
                 cb.on_after_test(epoch, dists, y_true, eer)
-            print(f"--------------- Epoch {epoch:02d} Results ---------------")
-            print(f"Dev EER: {eer:.6f}")
+            print(f"[{self.partition.capitalize()} EER: {eer:.6f}]")
             if self.best_epoch != -1:
                 print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")
-            print("------------------------------------------------")
             if metric_value > self.best_metric:
                 self.best_metric = metric_value
                 self.best_epoch = epoch
-                print('New Best Dev EER!')
+                print(f"New Best {self.partition.capitalize()} EER!")
                 for cb in self.callbacks:
                     cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, None, None)
 

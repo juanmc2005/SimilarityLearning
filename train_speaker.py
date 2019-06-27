@@ -2,7 +2,7 @@ from os.path import join
 
 import common
 from core.base import Trainer
-from core.plugins.logging import TrainLogger, MetricFileLogger
+from core.plugins.logging import TrainLogger, MetricFileLogger, HeaderPrinter
 from core.plugins.storage import BestModelSaver, RegularModelSaver, ModelLoader
 from core.plugins.visual import SpeakerDistanceVisualizer
 from core.plugins.misc import TrainingMetricCalculator
@@ -40,15 +40,15 @@ print(f"[Batches per Epoch: {train.batches_per_epoch}]")
 print('[Dataset Loaded]')
 
 # Train and evaluation plugins
-test_callbacks = []
-train_callbacks = []
+test_callbacks: list = []
+train_callbacks: list = [HeaderPrinter()]
 
 # Logging configuration
 if args.log_interval in range(1, 101):
     print(f"[Logging: {common.enabled_str(True)} (every {args.log_interval}%)]")
-    test_callbacks.append(MetricFileLogger(log_path=join(log_path, f"metric.log")))
+    test_callbacks.append(MetricFileLogger(log_path=join(log_path, 'metric.log')))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
-                                       loss_log_path=join(log_path, f"loss.log")))
+                                       loss_log_path=join(log_path, 'loss.log')))
 else:
     print(f"[Logging: {common.enabled_str(False)}]")
 
@@ -69,9 +69,12 @@ train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy',
                         RegularModelSaver(task, args.loss, log_path, interval=5, experience_name=args.exp_id)])
 
 # Evaluation configuration
-evaluator = SpeakerVerificationEvaluator(args.batch_size, config.test_distance,
-                                         args.eval_interval, dataset.config, test_callbacks)
-train_callbacks.append(evaluator)
+evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, config.test_distance,
+                                           args.eval_interval, dataset.config, test_callbacks),
+              SpeakerVerificationEvaluator('test', args.batch_size, config.test_distance,
+                                           args.eval_interval, dataset.config,
+                                           callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])]
+train_callbacks.extend(evaluators)
 
 # Training configuration
 trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, args.lr),
