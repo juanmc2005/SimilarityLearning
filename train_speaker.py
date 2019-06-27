@@ -63,7 +63,9 @@ if args.plot:
     test_callbacks.append(SpeakerDistanceVisualizer(log_path))
 
 # Other useful plugins
-train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy', metric=LogitsAccuracyMetric()),
+train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy',
+                                                 metric=LogitsAccuracyMetric(),
+                                                 file_path=join(log_path, 'train-accuracy.log')),
                         RegularModelSaver(task, args.loss, log_path, interval=5, experience_name=args.exp_id)])
 
 # Evaluation configuration

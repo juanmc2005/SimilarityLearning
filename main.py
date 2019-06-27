@@ -125,7 +125,9 @@ if args.save:
 if args.task == 'mnist':
     evaluator = ClassAccuracyEvaluator(DEVICE, dev, KNNAccuracyMetric(config.test_distance), test_callbacks)
 elif args.task == 'speaker':
-    train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy', metric=LogitsAccuracyMetric()),
+    train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy',
+                                                     metric=LogitsAccuracyMetric(),
+                                                     file_path=join(log_path, 'train-accuracy.log')),
                             RegularModelSaver(args.task, args.loss, log_path, interval=5, experience_name=args.exp_id)])
     test_callbacks.append(SpeakerDistanceVisualizer(log_path))
     evaluator = SpeakerVerificationEvaluator(args.batch_size, config.test_distance,
