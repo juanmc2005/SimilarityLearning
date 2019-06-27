@@ -54,8 +54,8 @@ class VoxCeleb1(SimDataset):
         self.config = VoxCeleb1.config(self.segment_size_s)
         self.protocol = get_protocol(self.config.protocol_name, preprocessors=self.config.preprocessors)
         self.train_gen, self.dev_gen, self.test_gen = None, None, None
-        print(f"Segment Size = {self.segment_size_s}s")
-        print(f"Embedding Size = {self.nfeat}")
+        print(f"[Segment Size: {self.segment_size_s}s]")
+        print(f"[Embedding Size: {self.nfeat}]")
 
     def training_partition(self) -> VoxCelebPartition:
         if self.train_gen is None:

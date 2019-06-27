@@ -82,27 +82,15 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
     plt.pause(0.001)
 
 
-def visualize_train_loss(exp_path: str, title: str, filename: str):
-    with open(join(exp_path, 'loss.log'), 'r') as loss_file:
-        losses = [float(line.strip()) for line in loss_file.readlines()]
+def visualize_logs(exp_path: str, log_file_name: str, metric_name: str, color: str, title: str, plot_file_name: str):
+    with open(join(exp_path, log_file_name), 'r') as log_file:
+        data = [float(line.strip()) for line in log_file.readlines()]
         plt.ion()
         plt.clf()
-        plt.plot(losses, c='red')
+        plt.plot(range(1, len(data) + 1), data, c=color)
         plt.xlabel('Epoch')
+        plt.ylabel(metric_name)
         plt.title(title)
-        plt.savefig(join(exp_path, f"{filename}.jpg"))
-        plt.draw()
-        plt.pause(0.001)
-
-
-def visualize_train_metric(exp_path: str, title: str, filename: str):
-    with open(join(exp_path, 'metric.log'), 'r') as metric_file:
-        metrics = [float(line.strip()) for line in metric_file.readlines()]
-        plt.ion()
-        plt.clf()
-        plt.plot(metrics, c='green')
-        plt.xlabel('Epoch')
-        plt.title(title)
-        plt.savefig(join(exp_path, f"{filename}.jpg"))
+        plt.savefig(join(exp_path, f"{plot_file_name}.jpg"))
         plt.draw()
         plt.pause(0.001)

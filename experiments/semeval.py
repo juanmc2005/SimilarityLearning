@@ -1,3 +1,4 @@
+from scipy.stats import spearmanr
 from models import SemanticNet
 from distances import Distance
 from core.plugins.storage import ModelLoader
@@ -99,3 +100,37 @@ class SemEvalBaselineModelEvaluationExperiment(SemEvalEvaluationExperiment):
 
     def _get_loss_module(self):
         return STSBaselineClassifier(self.nfeat)
+
+
+class SemEvalPredictionsSpearmanExperiment:
+
+    def __init__(self, baseline_model: str, other_model: str, nfeat: int, distance: Distance, log_interval: int,
+                 batch_size: int, sem_eval_path: str, vocab_path: str, word2vec_path: str):
+        baseline_model_loader = ModelLoader(baseline_model)
+        other_model_loader = ModelLoader(other_model)
+        self.exp_baseline = SemEvalBaselineModelEvaluationExperiment(model_loader=baseline_model_loader,
+                                                                     nfeat=nfeat,
+                                                                     data_path=sem_eval_path,
+                                                                     word2vec_path=word2vec_path,
+                                                                     vocab_path=vocab_path,
+                                                                     distance=distance,
+                                                                     log_interval=log_interval,
+                                                                     batch_size=batch_size,
+                                                                     base_dir='tmp')
+        self.exp_other = SemEvalEmbeddingEvaluationExperiment(model_loader=other_model_loader,
+                                                              nfeat=nfeat,
+                                                              data_path=sem_eval_path,
+                                                              word2vec_path=word2vec_path,
+                                                              vocab_path=vocab_path,
+                                                              distance=distance,
+                                                              log_interval=log_interval,
+                                                              batch_size=batch_size,
+                                                              base_dir='tmp')
+
+    def compare_dev(self):
+        baseline_evaluator = self.exp_baseline.get_dev_evaluator()
+        other_evaluator = self.exp_other.get_dev_evaluator()
+        _, feat_baseline, _ = baseline_evaluator.eval(self.exp_baseline.model)
+        _, feat_other, _ = other_evaluator.eval(self.exp_other.model)
+        return spearmanr(baseline_evaluator.metric.predictions, other_evaluator.metric.similarity)[0]
+

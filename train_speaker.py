@@ -35,7 +35,7 @@ dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
 train = dataset.training_partition()
 config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin)
 model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
-print(f"Train Classes: {train.nclass}")
+print(f"[Train Classes: {train.nclass}]")
 print(f"[Batches per Epoch: {train.batches_per_epoch}]")
 print('[Dataset Loaded]')
 
