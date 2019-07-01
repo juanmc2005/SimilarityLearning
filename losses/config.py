@@ -100,11 +100,19 @@ class CenterConfig(LossConfig):
         super(CenterConfig, self).__init__('Center Loss', f"λ={lweight} - {distance}", loss_module, self.loss, distance)
 
     def optimizer(self, model, task, lr):
-        # TODO change optimizer according to task
-        # Was using lr0=0.001 and lr1=0.5
-        optimizers = [optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005),
-                      optim.SGD(self.loss.center_parameters(), lr=lr)]
-        schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
+        if task == 'mnist':
+            # Was using lr0=0.001 and lr1=0.5
+            optimizers = [optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005),
+                          optim.SGD(self.loss.center_parameters(), lr=lr)]
+            schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
+        elif task == 'speaker':
+            optimizers = sincnet_optims(model, lr)
+            optimizers.append(optim.SGD(self.loss.center_parameters(), lr=lr))
+            schedulers = []
+        elif task == 'sts':
+            optimizers, schedulers = [optim.RMSprop(model.parameters(), lr=lr)], []
+        else:
+            raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
 
 
@@ -116,12 +124,20 @@ class CocoConfig(LossConfig):
         super(CocoConfig, self).__init__('CoCo Loss', f"α={alpha}", loss_module, loss, CosineDistance())
 
     def optimizer(self, model, task, lr):
-        # TODO change optimizer according to task
-        # Was using lr0=0.001 and lr1=0.01
-        params = model.all_params()
-        optimizers = [optim.SGD(params[0], lr=lr, momentum=0.9, weight_decay=0.0005),
-                      optim.SGD(params[1], lr=lr, momentum=0.9)]
-        schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
+        if task == 'mnist':
+            # Was using lr0=0.001 and lr1=0.01
+            params = model.all_params()
+            optimizers = [optim.SGD(params[0], lr=lr, momentum=0.9, weight_decay=0.0005),
+                          optim.SGD(params[1], lr=lr, momentum=0.9)]
+            schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
+        elif task == 'speaker':
+            optimizers = sincnet_optims(model, lr)
+            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr))
+            schedulers = []
+        elif task == 'sts':
+            optimizers, schedulers = [optim.RMSprop(model.parameters(), lr=lr)], []
+        else:
+            raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
 
 
