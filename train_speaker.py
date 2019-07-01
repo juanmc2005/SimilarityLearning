@@ -17,6 +17,8 @@ task = 'speaker'
 parser = common.get_arg_parser()
 parser.add_argument('--eval-interval', type=int, default=10,
                     help='Steps (in epochs) to evaluate the speaker model. Default value: 10')
+parser.add_argument('--save-interval', type=int, default=10,
+                    help='Steps (in epochs) to save the speaker model. Default value: 10')
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
@@ -66,7 +68,9 @@ if args.plot:
 train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy',
                                                  metric=LogitsAccuracyMetric(),
                                                  file_path=join(log_path, 'train-accuracy.log')),
-                        RegularModelSaver(task, args.loss, log_path, interval=5, experience_name=args.exp_id)])
+                        RegularModelSaver(task, args.loss, log_path,
+                                          interval=args.save_interval,
+                                          experience_name=args.exp_id)])
 
 # Evaluation configuration
 evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, config.test_distance,
