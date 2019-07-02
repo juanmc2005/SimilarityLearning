@@ -33,6 +33,9 @@ args.remove_scores = [int(s) for s in args.remove_scores]
 log_path = common.create_log_dir(args.exp_id, task, args.loss)
 print(f"Logging to {log_path}")
 
+# Dumping all script arguments
+common.dump_params(join(log_path, 'config.cfg'), args)
+
 # Set custom seed before doing anything
 common.set_custom_seed(args.seed)
 
