@@ -6,6 +6,7 @@ from models import SimNet
 from datasets.base import SimDatasetPartition
 from core.optim import Optimizer
 import common
+import visual_utils as vis
 
 
 class TrainingListener:
@@ -64,22 +65,41 @@ class Trainer:
     def _restore(self):
         if self.model_loader is not None:
             checkpoint = self.model_loader.restore(self.model, self.loss_fn, self.optim, self.loss_name)
-            epoch = checkpoint['epoch']
-            return checkpoint, epoch + 1
+            return checkpoint
         else:
-            return None, 1
-        
-    def train(self, epochs):
-        checkpoint, epoch = self._restore()
+            return None
+
+    def _create_plots(self, exp_path: str, plots: list):
+        print("Creating training plots before exiting...")
+        for plot in plots:
+            vis.visualize_logs(exp_path,
+                               log_file_name=plot['log_file'],
+                               metric_name=plot['metric'],
+                               color=plot['color'],
+                               title=plot['title'],
+                               plot_file_name=plot['filename'])
+        print("Done")
+
+    def _start_training(self, epochs):
+        checkpoint = self._restore()
 
         for cb in self.callbacks:
             cb.on_before_train(checkpoint)
 
-        for i in range(epoch, epoch+epochs):
+        for i in range(1, epochs + 1):
             self.train_epoch(i)
 
         for cb in self.callbacks:
             cb.on_after_train()
+        
+    def train(self, epochs: int, exp_path: str, plots: list):
+        try:
+            self._start_training(epochs)
+            print("Training finished")
+            self._create_plots(exp_path, plots)
+        except KeyboardInterrupt:
+            print("Stopped by user")
+            self._create_plots(exp_path, plots)
         
     def train_epoch(self, epoch):
         self.model.train()

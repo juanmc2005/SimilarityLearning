@@ -5,7 +5,9 @@ from os.path import isdir
 import torch
 import numpy as np
 import random
+
 import losses.config as cf
+from losses.triplet import SemiHardNegative
 from distances import CosineDistance, EuclideanDistance
 
 
@@ -86,9 +88,10 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
         print(f"[Margin: {margin}]")
         return cf.TripletConfig(DEVICE,
                                 margin=margin,
-                                distance=EuclideanDistance(),
+                                distance=CosineDistance(),
                                 size_average=False,
-                                online=task != 'sts')
+                                online=task != 'sts',
+                                sampling=SemiHardNegative(margin, deviation=0.02))
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")
         return cf.ArcFaceConfig(DEVICE, nfeat, nclass, margin=margin)
@@ -134,3 +137,22 @@ def dump_params(filepath: str, args):
     with open(filepath, 'w') as out:
         for k, v in sorted(vars(args).items()):
             out.write(f"{k}={v}\n")
+
+
+def get_basic_plots(lr: float, batch_size: int, eval_metric: str, eval_metric_color: str) -> list:
+    return [
+        {
+            'log_file': 'loss.log',
+            'metric': 'Loss',
+            'color': 'blue',
+            'title': f'Train Loss - lr={lr} - batch_size={batch_size}',
+            'filename': 'loss-plot'
+        },
+        {
+            'log_file': 'metric.log',
+            'metric': eval_metric,
+            'color': eval_metric_color,
+            'title': f'Dev {eval_metric} - lr={lr} - batch_size={batch_size}',
+            'filename': f"dev-{eval_metric.lower().replace(' ', '-')}-plot"
+        }
+    ]

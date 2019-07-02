@@ -79,4 +79,4 @@ print(f"[Epochs: {args.epochs}]")
 print()
 
 # Start training
-trainer.train(args.epochs)
+trainer.train(args.epochs, log_path, common.get_basic_plots(args.lr, args.batch_size, 'Accuracy', 'green'))

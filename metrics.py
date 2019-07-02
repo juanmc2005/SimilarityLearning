@@ -195,10 +195,6 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
         # Returning 1-eer because the evaluator keeps track of the highest metric value
         return 1 - eer, y_pred, y_true
 
-    def on_before_train(self, checkpoint):
-        if checkpoint is not None:
-            self.best_metric = checkpoint['accuracy']
-
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
             metric_value, dists, y_true = self.eval(model.to_prediction_model(), self.partition)
@@ -258,10 +254,6 @@ class ClassAccuracyEvaluator(base.TrainingListener):
 
         feat_test, y_test = np.concatenate(feat_test), np.concatenate(y_test)
         return feat_test, y_test
-
-    def on_before_train(self, checkpoint):
-        if checkpoint is not None:
-            self.best_metric = checkpoint['accuracy']
 
     def on_before_epoch(self, epoch):
         self.feat_train, self.y_train = [], []
@@ -339,10 +331,6 @@ class STSEmbeddingEvaluator(base.TrainingListener):
         y_test = np.concatenate(y_test)
         return phrases, feat_test, y_test
 
-    def on_before_train(self, checkpoint):
-        if checkpoint is not None:
-            self.best_metric = checkpoint['accuracy']
-
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         _, feat_test, y_test = self.eval(model.to_prediction_model())
         metric_value = self.metric.get()
@@ -408,10 +396,6 @@ class STSBaselineEvaluator(base.TrainingListener):
 
         feat_test, y_test = np.concatenate(feat_test), np.concatenate(y_test)
         return phrases, feat_test, y_test
-
-    def on_before_train(self, checkpoint):
-        if checkpoint is not None:
-            self.best_metric = checkpoint['accuracy']
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         phrases, feat_test, y_test = self.eval(model)

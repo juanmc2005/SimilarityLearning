@@ -92,5 +92,14 @@ print(f"[Batch Size: {args.batch_size}]")
 print(f"[Epochs: {args.epochs}]")
 print()
 
+plots = common.get_basic_plots(args.lr, args.batch_size, 'EER', 'red')
+plots.append({
+    'log_file': 'train-accuracy.log',
+    'metric': 'Accuracy',
+    'color': 'green',
+    'title': f'Train Accuracy - lr={args.lr} - batch_size={args.batch_size}',
+    'filename': 'train-accuracy-plot'
+})
+
 # Start training
-trainer.train(args.epochs)
+trainer.train(args.epochs, log_path, plots)

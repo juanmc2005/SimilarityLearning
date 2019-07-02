@@ -3,6 +3,8 @@ import math
 from sts import utils
 from tqdm import tqdm
 
+from distances import Distance
+
 
 def pad_sent_pair(s1: list, s2: list) -> tuple:
     if len(s1) == len(s2):
@@ -186,28 +188,41 @@ class PairAugmentation(SemEvalAugmentationStrategy):
         return train_sents
 
 
-class TripletAugmentation(SemEvalAugmentationStrategy):
+class OfflineTripletSampling:
+
+    def sample(self, triplets: list):
+        raise NotImplementedError
+
+
+class SemiHardOfflineTripletSampling(OfflineTripletSampling):
+
+    def __init__(self, model, distance: Distance, m: float, deviation: float):
+        self.model = model
+        self.distance = distance
+        self.m = m
+        self.deviation = deviation
+
+    def sample(self, triplets: list):
+        result = []
+        for a, p, n in triplets:
+            emb_a, emb_n = self.model(a), self.model(n)
+            dist = self.distance.dist(emb_a, emb_n)
+            if self.m >= dist[0] or self.deviation >= dist[0] - self.m:
+                result.append((a, p, n))
+        return result
+
+
+class KeepAllOfflineTripletSampling(OfflineTripletSampling):
+
+    def sample(self, triplets: list):
+        return triplets
+
+
+class BaseTripletAugmentationStrategy(SemEvalAugmentationStrategy):
 
     def __init__(self, threshold: float, remove_scores: list = None):
         self.threshold = threshold
         self.remove_scores = remove_scores if remove_scores is not None else []
-
-    def _triplets(self, sents_a, sents_b, scores):
-        segment_a = utils.SemEvalSegment(sents_a)
-        segment_b = utils.SemEvalSegment(sents_b)
-        unique_sents = set(sents_a + sents_b)
-        pos, neg = utils.pairs(segment_a, segment_b, scores, self.threshold)
-        anchors, positives, negatives = utils.triplets(unique_sents, pos, neg)
-        return list(pos), list(neg), anchors, positives, negatives
-
-    def _anchor_related(self, anchor, train_data, is_score_valid):
-        pos = []
-        for sent1, sent2, score in train_data:
-            is_sent1 = sent1 == anchor
-            is_sent2 = sent2 == anchor
-            if (is_sent1 or is_sent2) and is_score_valid(score):
-                pos.append(sent1 if is_sent2 else sent2)
-        return pos
 
     def _pad(self, anchors, positives, negatives):
         a, p, n = [], [], []
@@ -218,7 +233,47 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
             n.append(s3pad)
         return zip(a, p, n)
 
-    def _normal_triplets(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+
+class TripletPairAugmentation(BaseTripletAugmentationStrategy):
+
+    def _triplets(self, sents_a, sents_b, scores):
+        segment_a = utils.SemEvalSegment(sents_a)
+        segment_b = utils.SemEvalSegment(sents_b)
+        unique_sents = set(sents_a + sents_b)
+        pos, neg = utils.pairs(segment_a, segment_b, scores, self.threshold)
+        anchors, positives, negatives = utils.triplets(unique_sents, pos, neg)
+        return list(pos), list(neg), anchors, positives, negatives
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+        atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
+                                                           train_scores, self.remove_scores)
+        pos, neg, anchors, positives, negatives = self._triplets(atrain, btrain, simtrain)
+        dups = []
+        for i in range(len(pos)):
+            for j in range(len(neg)):
+                if pos[i] == neg[j]:
+                    dups.append(pos[i])
+        unique_pairs = list(set(pos + neg))
+        print(f"Pairs which are positive and negative at the same time: {len(dups)}")
+        print(f"Unique Train Pairs: {len(unique_pairs)}")
+        print(f"Triplets: {len(anchors)}")
+        triplets = self._pad(anchors, positives, negatives)
+        unused_y = np.zeros(len(anchors))
+        return np.array(list(zip(triplets, unused_y)))
+
+
+class TripletNoAugmentation(BaseTripletAugmentationStrategy):
+
+    def _anchor_related(self, anchor, train_data, is_score_valid):
+        pos = []
+        for sent1, sent2, score in train_data:
+            is_sent1 = sent1 == anchor
+            is_sent2 = sent2 == anchor
+            if (is_sent1 or is_sent2) and is_score_valid(score):
+                pos.append(sent1 if is_sent2 else sent2)
+        return pos
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
         atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
                                                            train_scores, self.remove_scores)
         unique_train_data = list(set(zip(atrain, btrain, simtrain)))
@@ -239,40 +294,30 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
         print(f"Triplets: {len(anchors)}")
         return np.array(list(zip(triplets, unused_y)))
 
-    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
-        atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
-                                                           train_scores, self.remove_scores)
-        pos, neg, anchors, positives, negatives = self._triplets(atrain, btrain, simtrain)
-        dups = []
-        for i in range(len(pos)):
-            for j in range(len(neg)):
-                if pos[i] == neg[j]:
-                    dups.append(pos[i])
-        unique_pairs = list(set(pos + neg))
-        print(f"Pairs which are positive and negative at the same time: {len(dups)}")
-        print(f"Unique Train Pairs: {len(unique_pairs)}")
-        print(f"Triplets: {len(anchors)}")
-        triplets = self._pad(anchors, positives, negatives)
-        unused_y = np.zeros(len(anchors))
-        return np.array(list(zip(triplets, unused_y)))
-
 
 class SemEvalAugmentationStrategyFactory:
 
-    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: list = None):
+    def __init__(self, loss: str, threshold=3, allow_redundancy: bool = False,
+                 augment: bool = False, remove_scores: list = None):
         self.loss = loss
         self.threshold = threshold
         self.allow_redundancy = allow_redundancy
+        self.augment = augment
         self.remove_scores = remove_scores if remove_scores is not None else []
 
     def new(self):
         if self.loss == 'kldiv':
             return NoAugmentation(self.allow_redundancy, self.remove_scores, ProbabilitiesScoreFormatter())
         elif self.loss == 'contrastive':
-            # return PairAugmentation(self.threshold)
-            return NoAugmentation(self.allow_redundancy, self.remove_scores, BinaryScoreFormatter(self.threshold))
+            if self.augment:
+                return PairAugmentation(self.threshold)
+            else:
+                return NoAugmentation(self.allow_redundancy, self.remove_scores, BinaryScoreFormatter(self.threshold))
         elif self.loss == 'triplet':
-            return TripletAugmentation(self.threshold, self.remove_scores)
+            if self.augment:
+                return TripletPairAugmentation(self.threshold, self.remove_scores)
+            else:
+                return TripletNoAugmentation(self.threshold, self.remove_scores)
         else:
             # Softmax based loss
             return ClusterAugmentation(self.threshold)

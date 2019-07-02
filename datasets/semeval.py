@@ -7,6 +7,7 @@ import numpy as np
 import torch
 
 from datasets.base import SimDataset, SimDatasetPartition
+from models import SimNet
 from sts.augmentation import SemEvalAugmentationStrategy, pad_sent_pair
 from sts import utils as sts
 

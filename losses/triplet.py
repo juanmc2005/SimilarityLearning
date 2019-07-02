@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import numpy as np
@@ -18,6 +19,9 @@ class TripletSamplingStrategy:
         :return: a tuple (anchors, positives, negatives) corresponding to the triplets built
         """
         raise NotImplementedError("a TripletSamplingStrategy should implement 'triplets'")
+
+    def filter(self, dist_pos, dist_neg):
+        return dist_pos, dist_neg
 
 
 class BatchAll(TripletSamplingStrategy):
@@ -39,6 +43,20 @@ class BatchAll(TripletSamplingStrategy):
                     positives.append(positive)
                     negatives.append(negative)
         return anchors, positives, negatives
+
+
+class SemiHardNegative(TripletSamplingStrategy):
+
+    def __init__(self, m: float, deviation: float):
+        self.m = m
+        self.deviation = deviation
+
+    def filter(self, dist_pos, dist_neg):
+        keep_inds = []
+        for i in range(dist_neg.size(0)):
+            keep_inds.append(self.m >= dist_neg[i] or self.deviation >= dist_neg[i] - self.m)
+        keep_inds = torch.Tensor(keep_inds).float()
+        return keep_inds
 
 
 class HardestNegative(TripletSamplingStrategy):
@@ -100,7 +118,7 @@ class TripletLoss(nn.Module):
     :param device: a device in which to run the computation
     :param margin: a margin value to separe classes
     :param distance: a distance object to measure between the samples
-    :param strategy: a TripletSamplingStrategy
+    :param sampling: a TripletSamplingStrategy
     """
 
     def __init__(self, device: str, margin: float, distance: Distance,
@@ -153,7 +171,10 @@ class TripletLoss(nn.Module):
             # Calculate the distances to positives and negatives for each anchor
             dpos = self.distance.dist(anchors, positives)
             dneg = self.distance.dist(anchors, negatives)
+            # keep_mask = self.sampling.filter(dpos, dneg).to(self.device)
+            # dpos = keep_mask * dpos
+            # dneg = keep_mask * dneg
 
         # Calculate the loss using the margin
-        loss = F.relu(dpos - dneg + self.margin)
+        loss = F.relu(torch.pow(dpos, 2) - torch.pow(dneg, 2) + self.margin)
         return loss.mean() if self.size_average else loss.sum()

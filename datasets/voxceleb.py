@@ -44,7 +44,7 @@ class VoxCelebDataset(SimDataset):
         self.batch_size = batch_size
         self.segment_size_s = segment_size_millis / 1000
         self.nfeat = self.sample_rate * segment_size_millis // 1000
-        self.config = VoxCeleb1.config(self.segment_size_s)
+        self.config = self._create_config(self.segment_size_s)
         self.protocol = get_protocol(self.config.protocol_name, preprocessors=self.config.preprocessors)
         self.train_gen, self.dev_gen, self.test_gen = None, None, None
         print(f"[Segment Size: {self.segment_size_s}s]")
@@ -84,7 +84,7 @@ class VoxCeleb1(VoxCelebDataset):
                                                duration=segment_size_sec)
 
 
-class VoxCeleb2(VoxCelebDataset)
+class VoxCeleb2(VoxCelebDataset):
 
     def _create_config(self, segment_size_sec: float):
         return metrics.SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb2',

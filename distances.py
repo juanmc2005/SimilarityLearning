@@ -92,7 +92,7 @@ class EuclideanDistance(Distance):
         return 'euclidean'
 
     def dist(self, x, y):
-        return torch.dist(x, y, p=2)
+        return torch.sum(torch.pow((x - y), 2), dim=1)
     
     def sqdist_sum(self, x, y):
         return (x - y).pow(2).sum()

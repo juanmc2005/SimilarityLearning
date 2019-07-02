@@ -6,7 +6,7 @@ from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
 from core.plugins.storage import BestModelSaver, ModelLoader
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from sts.modes import STSForwardModeFactory
-from sts.augmentation import SemEvalAugmentationStrategyFactory
+from sts.augmentation import SemEvalAugmentationStrategyFactory, SemiHardOfflineTripletSampling
 from models import SemanticNet
 from metrics import LogitsSpearmanMetric, DistanceSpearmanMetric, STSBaselineEvaluator, STSEmbeddingEvaluator
 
@@ -26,6 +26,10 @@ parser.add_argument('--redundancy', dest='redundancy', action='store_true', help
 parser.add_argument('--no-redundancy', dest='redundancy', action='store_false',
                     help='Do NOT allow redundancy in the training set')
 parser.set_defaults(redundancy=False)
+parser.add_argument('--augment', dest='augment', action='store_true', help='Augment the training set')
+parser.add_argument('--no-augment', dest='augment', action='store_false',
+                    help='Do NOT augment the training set')
+parser.set_defaults(augment=False)
 args = parser.parse_args()
 args.remove_scores = [int(s) for s in args.remove_scores]
 
@@ -48,6 +52,7 @@ nfeat = 500
 mode = STSForwardModeFactory().new(args.loss)
 augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=args.threshold,
                                                   allow_redundancy=args.redundancy,
+                                                  augment=args.augment,
                                                   remove_scores=args.remove_scores)
 partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
 dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), partition_factory)
@@ -95,4 +100,4 @@ print(f"[Epochs: {args.epochs}]")
 print()
 
 # Start training
-trainer.train(args.epochs)
+trainer.train(args.epochs, log_path, common.get_basic_plots(args.lr, args.batch_size, 'Spearman', 'green'))
