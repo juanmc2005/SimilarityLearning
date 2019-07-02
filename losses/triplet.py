@@ -171,9 +171,6 @@ class TripletLoss(nn.Module):
             # Calculate the distances to positives and negatives for each anchor
             dpos = self.distance.dist(anchors, positives)
             dneg = self.distance.dist(anchors, negatives)
-            # keep_mask = self.sampling.filter(dpos, dneg).to(self.device)
-            # dpos = keep_mask * dpos
-            # dneg = keep_mask * dneg
 
         # Calculate the loss using the margin
         loss = F.relu(torch.pow(dpos, 2) - torch.pow(dneg, 2) + self.margin)

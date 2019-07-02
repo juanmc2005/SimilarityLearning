@@ -98,7 +98,7 @@ class Trainer:
             print("Training finished")
             self._create_plots(exp_path, plots)
         except KeyboardInterrupt:
-            print("Stopped by user")
+            print("\nStopped by user")
             self._create_plots(exp_path, plots)
         
     def train_epoch(self, epoch):

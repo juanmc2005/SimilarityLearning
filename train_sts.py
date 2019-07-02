@@ -48,6 +48,7 @@ print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 print(f"[Threshold: {args.threshold}]")
+print(f"[Augmentation: {common.enabled_str(args.augment)}]")
 nfeat = 500
 mode = STSForwardModeFactory().new(args.loss)
 augmentation = SemEvalAugmentationStrategyFactory(args.loss, threshold=args.threshold,
