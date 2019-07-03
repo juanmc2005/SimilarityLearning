@@ -47,5 +47,5 @@ class SpeakerDistanceVisualizer(TestListener):
     def on_after_test(self, epoch, feat_test, y_test, metric_value):
         title = f'Distance distribution for dev speakers (Epoch {epoch}) - EER {metric_value:.3f}'
         filename = f'speaker-dists-epoch={epoch}'
-        print(f"Saving speaker distances plot to {filename}")
+        print(f"Saving speaker distances plot as {filename}")
         visual_utils.plot_pred_hists(feat_test, y_test, title, self.base_dir, filename)

@@ -77,11 +77,15 @@ class VoxCelebDataset(SimDataset):
 
 class VoxCeleb1(VoxCelebDataset):
 
-    def _create_config(self, segment_size_sec: float):
+    @staticmethod
+    def config(sample_rate: int, segment_size_sec: float):
         return metrics.SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
-                                               feature_extraction=RawAudio(sample_rate=self.sample_rate),
+                                               feature_extraction=RawAudio(sample_rate=sample_rate),
                                                preprocessors={'audio': FileFinder()},
                                                duration=segment_size_sec)
+
+    def _create_config(self, segment_size_sec: float):
+        return self.config(self.sample_rate, segment_size_sec)
 
 
 class VoxCeleb2(VoxCelebDataset):
