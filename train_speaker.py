@@ -19,6 +19,12 @@ parser.add_argument('--eval-interval', type=int, default=10,
                     help='Steps (in epochs) to evaluate the speaker model. Default value: 10')
 parser.add_argument('--save-interval', type=int, default=10,
                     help='Steps (in epochs) to save the speaker model. Default value: 10')
+parser.add_argument('--triplet-strategy', type=str, default='all',
+                    help=F'Triplet sampling strategy. Possible values: {common.TRIPLET_SAMPLING_OPTIONS_STR}')
+parser.add_argument('--semihard-negatives', type=int, default=10,
+                    help='The number of negatives to keep when using a semi-hard negative triplet sampling strategy')
+parser.add_argument('--segments-per-speaker', type=int, default=1,
+                    help='The number of audio segments per speaker in each training batch')
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
@@ -36,9 +42,10 @@ print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 nfeat = 256
-dataset = VoxCeleb1(args.batch_size, segment_size_millis=200)
+dataset = VoxCeleb1(args.batch_size, segment_size_millis=200, segments_per_speaker=args.segments_per_speaker)
 train = dataset.training_partition()
-config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin)
+config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin,
+                           args.triplet_strategy, args.semihard_negatives)
 model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
 print(f"[Train Classes: {train.nclass}]")
 print(f"[Batches per Epoch: {train.batches_per_epoch}]")
@@ -68,12 +75,13 @@ if args.plot:
     test_callbacks.append(SpeakerDistanceVisualizer(log_path))
 
 # Other useful plugins
-train_callbacks.extend([TrainingMetricCalculator(name='Training Accuracy',
-                                                 metric=LogitsAccuracyMetric(),
-                                                 file_path=join(log_path, 'train-accuracy.log')),
-                        RegularModelSaver(task, args.loss, log_path,
-                                          interval=args.save_interval,
-                                          experience_name=args.exp_id)])
+if args.loss not in ['triplet', 'contrastive']:
+    train_callbacks.append(TrainingMetricCalculator(name='Training Accuracy',
+                                                    metric=LogitsAccuracyMetric(),
+                                                    file_path=join(log_path, 'train-accuracy.log')))
+train_callbacks.append(RegularModelSaver(task, args.loss, log_path,
+                                         interval=args.save_interval,
+                                         experience_name=args.exp_id))
 
 # Evaluation configuration
 evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, config.test_distance,

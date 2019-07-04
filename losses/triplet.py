@@ -20,9 +20,6 @@ class TripletSamplingStrategy:
         """
         raise NotImplementedError("a TripletSamplingStrategy should implement 'triplets'")
 
-    def filter(self, dist_pos, dist_neg):
-        return dist_pos, dist_neg
-
 
 class BatchAll(TripletSamplingStrategy):
     """
@@ -46,17 +43,31 @@ class BatchAll(TripletSamplingStrategy):
 
 
 class SemiHardNegative(TripletSamplingStrategy):
+    """
+    Semi-hard negative strategy.
+    Create every possible triplet with the `n` hardest triplets
+    """
 
-    def __init__(self, m: float, deviation: float):
-        self.m = m
-        self.deviation = deviation
+    def __init__(self, n: int):
+        self.n = n
 
-    def filter(self, dist_pos, dist_neg):
-        keep_inds = []
-        for i in range(dist_neg.size(0)):
-            keep_inds.append(self.m >= dist_neg[i] or self.deviation >= dist_neg[i] - self.m)
-        keep_inds = torch.Tensor(keep_inds).float()
-        return keep_inds
+    def triplets(self, y, distances):
+        anchors, positives, negatives = [], [], []
+        distances = squareform(distances.detach().cpu().numpy())
+        y = y.cpu().numpy()
+        for anchor, y_anchor in enumerate(y):
+            # hardest negative
+            d = distances[anchor]
+            neg = np.where(y != y_anchor)[0]
+            semihard_negatives = d[neg].argsort()[:self.n]
+            for negative in semihard_negatives:
+                for positive in np.where(y == y_anchor)[0]:
+                    if positive == anchor:
+                        continue
+                    anchors.append(anchor)
+                    positives.append(positive)
+                    negatives.append(negative)
+        return anchors, positives, negatives
 
 
 class HardestNegative(TripletSamplingStrategy):

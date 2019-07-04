@@ -7,14 +7,15 @@ import numpy as np
 import random
 
 import losses.config as cf
-from losses.triplet import SemiHardNegative
-from distances import CosineDistance, EuclideanDistance
+from losses.triplet import SemiHardNegative, BatchAll, HardestNegative, HardestPositiveNegative, TripletSamplingStrategy
+from distances import CosineDistance
 
 
 """
 A string to explain all possible loss names
 """
 LOSS_OPTIONS_STR = 'softmax / contrastive / triplet / arcface / center / coco'
+TRIPLET_SAMPLING_OPTIONS_STR = 'all / semihard-neg / hardest-neg / hardest-pos-neg'
 
 """
 Common seed for every script
@@ -65,7 +66,8 @@ def create_log_dir(exp_id: str, task: str, loss: str):
     return log_path
 
 
-def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> cf.LossConfig:
+def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float,
+               triplet_strategy: str, semihard_n: int = 10) -> cf.LossConfig:
     """
     Create a loss configuration object based on parameteres given by the user
     :param loss: the loss function name
@@ -73,6 +75,8 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
     :param nclass: the number of classes
     :param task: the task for which the loss will be used
     :param margin: a margin to use in contrastive, triplet and arcface losses
+    :param triplet_strategy: The name of the triplet sampling strategy as received via script arguments
+    :param semihard_n: the number of negatives to keep when using a semi-hard negative triplet sampling strategy
     :return: a loss configuration object
     """
     if loss == 'softmax':
@@ -89,9 +93,9 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
         return cf.TripletConfig(DEVICE,
                                 margin=margin,
                                 distance=CosineDistance(),
-                                size_average=False,
+                                size_average=task != 'sts',
                                 online=task != 'sts',
-                                sampling=SemiHardNegative(margin, deviation=0.02))
+                                sampling=get_triplet_strategy(triplet_strategy, semihard_n))
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")
         return cf.ArcFaceConfig(DEVICE, nfeat, nclass, margin=margin)
@@ -103,6 +107,25 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float) -> 
         return cf.KLDivergenceConfig(DEVICE, nfeat)
     else:
         raise ValueError(f"Loss function should be one of: {LOSS_OPTIONS_STR}")
+
+
+def get_triplet_strategy(strategy: str, semihard_n: int) -> TripletSamplingStrategy:
+    """
+    Create a triplet sampling strategy object based on a script argument
+    :param strategy: the name of the strategy received as a script argument
+    :param semihard_n: the number of negatives to keep when using a semi-hard negative strategy
+    :return: a TripletSamplingStrategy object
+    """
+    if strategy == 'all':
+        return BatchAll()
+    elif strategy == 'semihard-neg':
+        return SemiHardNegative(semihard_n)
+    elif strategy == 'hardest-neg':
+        return HardestNegative()
+    elif strategy == 'hardest-pos-neg':
+        return HardestPositiveNegative()
+    else:
+        raise ValueError(f"Triplet strategy should be one of: {TRIPLET_SAMPLING_OPTIONS_STR}")
 
 
 def get_arg_parser():

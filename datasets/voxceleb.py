@@ -39,9 +39,10 @@ class VoxCelebPartition(SimDatasetPartition):
 
 class VoxCelebDataset(SimDataset):
 
-    def __init__(self, batch_size: int, segment_size_millis: int):
+    def __init__(self, batch_size: int, segment_size_millis: int, segments_per_speaker: int = 1):
         self.sample_rate = 16000
         self.batch_size = batch_size
+        self.segments_per_speaker = segments_per_speaker
         self.segment_size_s = segment_size_millis / 1000
         self.nfeat = self.sample_rate * segment_size_millis // 1000
         self.config = self._create_config(self.segment_size_s)
@@ -56,7 +57,8 @@ class VoxCelebDataset(SimDataset):
     def training_partition(self) -> VoxCelebPartition:
         if self.train_gen is None:
             self.train_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
-                                                    subset='train', per_label=1, per_fold=self.batch_size,
+                                                    subset='train', per_label=self.segments_per_speaker,
+                                                    per_fold=self.batch_size // self.segments_per_speaker,
                                                     duration=self.segment_size_s, parallel=3, per_epoch=2)
         return VoxCelebPartition(self.train_gen, self.nfeat)
 
@@ -78,14 +80,14 @@ class VoxCelebDataset(SimDataset):
 class VoxCeleb1(VoxCelebDataset):
 
     @staticmethod
-    def config(sample_rate: int, segment_size_sec: float):
+    def _config(sample_rate: int, segment_size_sec: float):
         return metrics.SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
                                                feature_extraction=RawAudio(sample_rate=sample_rate),
                                                preprocessors={'audio': FileFinder()},
                                                duration=segment_size_sec)
 
     def _create_config(self, segment_size_sec: float):
-        return self.config(self.sample_rate, segment_size_sec)
+        return self._config(self.sample_rate, segment_size_sec)
 
 
 class VoxCeleb2(VoxCelebDataset):
