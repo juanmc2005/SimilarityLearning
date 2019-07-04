@@ -6,6 +6,7 @@ from os.path import join
 import matplotlib.pyplot as plt
 from sklearn.manifold import TSNE
 from sklearn.neighbors import NearestNeighbors
+from scipy.spatial.distance import pdist
 
 cmap = plt.get_cmap('tab10')
 COLORS = [cmap(i) for i in range(10)]
@@ -79,11 +80,16 @@ def visualize_tsne_speaker(feat, y, unique_labels, distance, title, dir_path, fi
     print(f"t-SNE done! Time elapsed: {time.time() - time_start} seconds")
     plt.ion()
     plt.clf()
-    x1 = tsne_results[:, 0]
-    x2 = tsne_results[:, 1]
+    plt.figure(figsize=(14, 10))
+    legends = []
     for label, color in zip(unique_labels, COLORS):
-        plt.plot(x1[y == label], x2[y == label], '.', c=color)
-    plt.legend(unique_labels, loc='best')
+        # Calculate distances between original embeddings
+        dists = pdist(feat[y == label, :], metric=distance.to_sklearn_metric())
+        legends.append(f"{label}: μ={np.mean(dists):.2f} σ={np.std(dists):.2f}")
+        # Plot t-SNE embeddings
+        curfeat_tsne = tsne_results[y == label, :]
+        plt.plot(curfeat_tsne[:, 0], curfeat_tsne[:, 1], '.', c=color)
+    plt.legend(legends, loc='best', fontsize='medium')
     plt.axhline(y=0, color='grey', ls=':')
     plt.axvline(x=0, color='grey', ls=':')
     plt.title(title)
