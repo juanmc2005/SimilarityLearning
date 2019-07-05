@@ -49,7 +49,7 @@ class VoxCelebDataset(SimDataset):
         self.protocol = get_protocol(self.config.protocol_name, preprocessors=self.config.preprocessors)
         self.train_gen, self.dev_gen, self.test_gen = None, None, None
         print(f"[Segment Size: {self.segment_size_s}s]")
-        print(f"[Embedding Size: {self.nfeat}]")
+        print(f"[Network Input Size: {self.nfeat}]")
 
     def _create_config(self, segment_size_sec: float):
         raise NotImplementedError

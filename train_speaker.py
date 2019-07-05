@@ -25,6 +25,8 @@ parser.add_argument('--semihard-negatives', type=int, default=10,
                     help='The number of negatives to keep when using a semi-hard negative triplet sampling strategy')
 parser.add_argument('--segments-per-speaker', type=int, default=1,
                     help='The number of audio segments per speaker in each training batch')
+parser.add_argument('--segment-length', type=int, default=200,
+                    help='The length of each audio segment in milliseconds. Default: 200ms')
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
@@ -42,11 +44,13 @@ print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 nfeat = 256
-dataset = VoxCeleb1(args.batch_size, segment_size_millis=200, segments_per_speaker=args.segments_per_speaker)
+dataset = VoxCeleb1(args.batch_size,
+                    segment_size_millis=args.segment_length,
+                    segments_per_speaker=args.segments_per_speaker)
 train = dataset.training_partition()
 config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin,
                            args.triplet_strategy, args.semihard_negatives)
-model = SpeakerNet(nfeat, sample_rate=16000, window=200, loss_module=config.loss_module)
+model = SpeakerNet(nfeat, sample_rate=16000, window=args.segment_length, loss_module=config.loss_module)
 print(f"[Train Classes: {train.nclass}]")
 print(f"[Batches per Epoch: {train.batches_per_epoch}]")
 print('[Dataset Loaded]')
@@ -73,12 +77,24 @@ if args.save:
 print(f"[Plotting: {common.enabled_str(args.plot)}]")
 if args.plot:
     test_callbacks.append(SpeakerDistanceVisualizer(log_path))
+    plots = common.get_basic_plots(args.lr, args.batch_size, 'EER', 'red')
+    if args.loss not in ['triplet', 'contrastive']:
+        plots.append({
+            'log_file': 'train-accuracy.log',
+            'metric': 'Accuracy',
+            'color': 'green',
+            'title': f'Train Accuracy - lr={args.lr} - batch_size={args.batch_size}',
+            'filename': 'train-accuracy-plot'
+        })
+else:
+    plots = []
 
 # Other useful plugins
 if args.loss not in ['triplet', 'contrastive']:
     train_callbacks.append(TrainingMetricCalculator(name='Training Accuracy',
                                                     metric=LogitsAccuracyMetric(),
                                                     file_path=join(log_path, 'train-accuracy.log')))
+
 train_callbacks.append(RegularModelSaver(task, args.loss, log_path,
                                          interval=args.save_interval,
                                          experience_name=args.exp_id))
@@ -99,15 +115,6 @@ print(f"[LR: {args.lr}]")
 print(f"[Batch Size: {args.batch_size}]")
 print(f"[Epochs: {args.epochs}]")
 print()
-
-plots = common.get_basic_plots(args.lr, args.batch_size, 'EER', 'red')
-plots.append({
-    'log_file': 'train-accuracy.log',
-    'metric': 'Accuracy',
-    'color': 'green',
-    'title': f'Train Accuracy - lr={args.lr} - batch_size={args.batch_size}',
-    'filename': 'train-accuracy-plot'
-})
 
 # Start training
 trainer.train(args.epochs, log_path, plots)
