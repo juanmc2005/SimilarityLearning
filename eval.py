@@ -1,9 +1,12 @@
 import argparse
+import time
 from common import set_custom_seed
-from losses.base import ModelLoader
+from core.plugins.storage import ModelLoader
 from distances import EuclideanDistance, CosineDistance
 from experiments.semeval import SemEvalEmbeddingEvaluationExperiment, SemEvalBaselineModelEvaluationExperiment
 from experiments.voxceleb import VoxCeleb1ModelEvaluationExperiment
+
+launch_datetime = time.strftime('%c')
 
 # Script arguments
 parser = argparse.ArgumentParser()
@@ -18,6 +21,8 @@ parser.add_argument('--word2vec', type=str, default=None, help='Path to word emb
 parser.add_argument('--log-interval', type=int, default=10,
                     help='Steps (in percentage) to show evaluation progress, only for STS. Default: 10')
 parser.add_argument('--seed', type=int, default=None, help='Random seed')
+parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
+                    help='An identifier for the experience')
 args = parser.parse_args()
 
 # Set custom seed
@@ -53,7 +58,8 @@ elif args.task == 'sts':
                                  vocab_path=args.vocab,
                                  distance=distance,
                                  log_interval=args.log_interval,
-                                 batch_size=args.batch_size)
+                                 batch_size=args.batch_size,
+                                 base_dir='tmp')
     metric_name = 'Spearman'
 else:
     raise ValueError("Task can only be 'speaker' or 'sts'")

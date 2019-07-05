@@ -42,6 +42,34 @@ class BatchAll(TripletSamplingStrategy):
         return anchors, positives, negatives
 
 
+class SemiHardNegative(TripletSamplingStrategy):
+    """
+    Semi-hard negative strategy.
+    Create every possible triplet with the `n` hardest triplets
+    """
+
+    def __init__(self, n: int):
+        self.n = n
+
+    def triplets(self, y, distances):
+        anchors, positives, negatives = [], [], []
+        distances = squareform(distances.detach().cpu().numpy())
+        y = y.cpu().numpy()
+        for anchor, y_anchor in enumerate(y):
+            # hardest negative
+            d = distances[anchor]
+            neg = np.where(y != y_anchor)[0]
+            semihard_negatives = d[neg].argsort()[:self.n]
+            for negative in semihard_negatives:
+                for positive in np.where(y == y_anchor)[0]:
+                    if positive == anchor:
+                        continue
+                    anchors.append(anchor)
+                    positives.append(positive)
+                    negatives.append(negative)
+        return anchors, positives, negatives
+
+
 class HardestNegative(TripletSamplingStrategy):
     """
     Hardest negative strategy.
@@ -101,7 +129,7 @@ class TripletLoss(nn.Module):
     :param device: a device in which to run the computation
     :param margin: a margin value to separe classes
     :param distance: a distance object to measure between the samples
-    :param strategy: a TripletSamplingStrategy
+    :param sampling: a TripletSamplingStrategy
     """
 
     def __init__(self, device: str, margin: float, distance: Distance,
@@ -156,5 +184,5 @@ class TripletLoss(nn.Module):
             dneg = self.distance.dist(anchors, negatives)
 
         # Calculate the loss using the margin
-        loss = F.relu(dpos - dneg + self.margin)
+        loss = F.relu(torch.pow(dpos, 2) - torch.pow(dneg, 2) + self.margin)
         return loss.mean() if self.size_average else loss.sum()

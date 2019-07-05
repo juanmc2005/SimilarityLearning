@@ -3,8 +3,10 @@ import math
 from sts import utils
 from tqdm import tqdm
 
+from distances import Distance
 
-def pad_sent(s1: list, s2: list) -> tuple:
+
+def pad_sent_pair(s1: list, s2: list) -> tuple:
     if len(s1) == len(s2):
         return s1, s2
     elif len(s1) > len(s2):
@@ -18,7 +20,23 @@ def pad_sent(s1: list, s2: list) -> tuple:
     return s1, s2
 
 
+def pad_sent_triplet(s1: list, s2: list, s3: list) -> tuple:
+    len1, len2, len3 = len(s1), len(s2), len(s3)
+    maxlen = max(len1, len2, len3)
+    if maxlen == len1:
+        _, s2 = pad_sent_pair(s1, s2)
+        _, s3 = pad_sent_pair(s1, s3)
+    elif maxlen == len2:
+        _, s1 = pad_sent_pair(s2, s1)
+        _, s3 = pad_sent_pair(s2, s3)
+    else:
+        _, s1 = pad_sent_pair(s3, s1)
+        _, s2 = pad_sent_pair(s3, s2)
+    return s1, s2, s3
+
+
 def remove_pairs_with_score(a: list, b: list, sim: list, targets: list):
+    print(f"[Removing Scores: {targets}]")
     anew, bnew, simnew = [], [], []
     for i in range(len(a)):
         if math.floor(sim[i]) not in targets:
@@ -69,6 +87,15 @@ class BinaryScoreFormatter(ScoreFormatter):
         return [0 if s >= self.threshold else 1 for s in scores]
 
 
+class PairBinaryScoreFormatter(ScoreFormatter):
+
+    def __init__(self, threshold: float):
+        self.threshold = threshold
+
+    def format(self, scores):
+        return [(0, s) if s >= self.threshold else (1, s) for s in scores]
+
+
 class NoAugmentation(SemEvalAugmentationStrategy):
 
     def __init__(self, allow_redundancy: bool = False, remove_scores: list = None, formatter: ScoreFormatter = None):
@@ -90,7 +117,7 @@ class NoAugmentation(SemEvalAugmentationStrategy):
 
         a, b = [], []
         for s1, s2, _ in train_data:
-            s1pad, s2pad = pad_sent(s1.split(' '), s2.split(' '))
+            s1pad, s2pad = pad_sent_pair(s1.split(' '), s2.split(' '))
             a.append(s1pad)
             b.append(s2pad)
         pairs = zip(a, b)
@@ -161,11 +188,53 @@ class PairAugmentation(SemEvalAugmentationStrategy):
         return train_sents
 
 
-class TripletAugmentation(SemEvalAugmentationStrategy):
+class OfflineTripletSampling:
 
-    def __init__(self, threshold: float, remove_scores: tuple = ()):
+    def sample(self, triplets: list):
+        raise NotImplementedError
+
+
+class SemiHardOfflineTripletSampling(OfflineTripletSampling):
+
+    def __init__(self, model, distance: Distance, m: float, deviation: float):
+        self.model = model
+        self.distance = distance
+        self.m = m
+        self.deviation = deviation
+
+    def sample(self, triplets: list):
+        result = []
+        for a, p, n in triplets:
+            emb_a, emb_n = self.model(a), self.model(n)
+            dist = self.distance.dist(emb_a, emb_n)
+            if self.m >= dist[0] or self.deviation >= dist[0] - self.m:
+                result.append((a, p, n))
+        return result
+
+
+class KeepAllOfflineTripletSampling(OfflineTripletSampling):
+
+    def sample(self, triplets: list):
+        return triplets
+
+
+class BaseTripletAugmentationStrategy(SemEvalAugmentationStrategy):
+
+    def __init__(self, threshold: float, remove_scores: list = None):
         self.threshold = threshold
-        self.remove_scores = remove_scores
+        self.remove_scores = remove_scores if remove_scores is not None else []
+
+    def _pad(self, anchors, positives, negatives):
+        a, p, n = [], [], []
+        for s1, s2, s3 in zip(anchors, positives, negatives):
+            s1pad, s2pad, s3pad = pad_sent_triplet(s1.split(' '), s2.split(' '), s3.split(' '))
+            a.append(s1pad)
+            p.append(s2pad)
+            n.append(s3pad)
+        return zip(a, p, n)
+
+
+class TripletPairAugmentation(BaseTripletAugmentationStrategy):
 
     def _triplets(self, sents_a, sents_b, scores):
         segment_a = utils.SemEvalSegment(sents_a)
@@ -173,8 +242,27 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
         unique_sents = set(sents_a + sents_b)
         pos, neg = utils.pairs(segment_a, segment_b, scores, self.threshold)
         anchors, positives, negatives = utils.triplets(unique_sents, pos, neg)
-        return np.array([(a.split(' '), p.split(' '), n.split(' '))
-                         for a, p, n in zip(anchors, positives, negatives)])
+        return list(pos), list(neg), anchors, positives, negatives
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+        atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
+                                                           train_scores, self.remove_scores)
+        pos, neg, anchors, positives, negatives = self._triplets(atrain, btrain, simtrain)
+        dups = []
+        for i in range(len(pos)):
+            for j in range(len(neg)):
+                if pos[i] == neg[j]:
+                    dups.append(pos[i])
+        unique_pairs = list(set(pos + neg))
+        print(f"Pairs which are positive and negative at the same time: {len(dups)}")
+        print(f"Unique Train Pairs: {len(unique_pairs)}")
+        print(f"Triplets: {len(anchors)}")
+        triplets = self._pad(anchors, positives, negatives)
+        unused_y = np.zeros(len(anchors))
+        return np.array(list(zip(triplets, unused_y)))
+
+
+class TripletNoAugmentation(BaseTripletAugmentationStrategy):
 
     def _anchor_related(self, anchor, train_data, is_score_valid):
         pos = []
@@ -185,7 +273,7 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
                 pos.append(sent1 if is_sent2 else sent2)
         return pos
 
-    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list):
+    def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
         atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
                                                            train_scores, self.remove_scores)
         unique_train_data = list(set(zip(atrain, btrain, simtrain)))
@@ -198,7 +286,8 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
                     anchors.append(anchor)
                     positives.append(positive)
                     negatives.append(negative)
-        triplets = list(zip(anchors, positives, negatives))
+
+        triplets = self._pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
         print(f"Unique Train Pairs: {len(unique_train_data)}")
         print(f"Unique Train Sentences: {len(unique_sents)}")
@@ -208,20 +297,27 @@ class TripletAugmentation(SemEvalAugmentationStrategy):
 
 class SemEvalAugmentationStrategyFactory:
 
-    def __init__(self, loss: str, threshold=2.5, allow_redundancy: bool = False, remove_scores: list = None):
+    def __init__(self, loss: str, threshold=3, allow_redundancy: bool = False,
+                 augment: bool = False, remove_scores: list = None):
         self.loss = loss
         self.threshold = threshold
         self.allow_redundancy = allow_redundancy
+        self.augment = augment
         self.remove_scores = remove_scores if remove_scores is not None else []
 
     def new(self):
         if self.loss == 'kldiv':
             return NoAugmentation(self.allow_redundancy, self.remove_scores, ProbabilitiesScoreFormatter())
         elif self.loss == 'contrastive':
-            # return PairAugmentation(self.threshold)
-            return NoAugmentation(self.allow_redundancy, self.remove_scores, BinaryScoreFormatter(self.threshold))
+            if self.augment:
+                return PairAugmentation(self.threshold)
+            else:
+                return NoAugmentation(self.allow_redundancy, self.remove_scores, BinaryScoreFormatter(self.threshold))
         elif self.loss == 'triplet':
-            return TripletAugmentation(self.threshold)
+            if self.augment:
+                return TripletPairAugmentation(self.threshold, self.remove_scores)
+            else:
+                return TripletNoAugmentation(self.threshold, self.remove_scores)
         else:
             # Softmax based loss
             return ClusterAugmentation(self.threshold)

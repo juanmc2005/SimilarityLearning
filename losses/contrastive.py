@@ -21,7 +21,6 @@ class ContrastiveLoss(nn.Module):
         self.distance = distance
         self.size_average = size_average
         self.online = online
-        # self.batches = 0
     
     def forward(self, feat, logits, y):
         """
@@ -47,9 +46,6 @@ class ContrastiveLoss(nn.Module):
             feat1, feat2 = feat
             dist = self.distance.dist(feat1, feat2)
             gt = y
-            # if torch.isnan(feat1).sum().item() == 0:
-            #     visual.plot_dists(dist.detach().cpu().numpy(), 'Contrastive Pair Distances', f'dists-{self.batches}')
-            #     self.batches += 1
         # Calculate the losses as described in the paper
         loss = (1 - gt) * torch.pow(dist, 2) + gt * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
         loss = torch.sum(loss) / 2
