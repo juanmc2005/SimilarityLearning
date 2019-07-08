@@ -33,7 +33,7 @@ class ContrastiveLoss(nn.Module):
         :return: the contrastive loss
         """
         if self.online:
-            # First calculate the (euclidean) distances between every sample in the batch
+            # First calculate the distances between every sample in the batch
             nbatch = feat.size(0)
             dist = self.distance.pdist(feat).to(self.device)
             # Calculate the ground truth Y corresponding to the pairs

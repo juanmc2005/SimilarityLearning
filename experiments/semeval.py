@@ -132,5 +132,6 @@ class SemEvalPredictionsSpearmanExperiment:
         other_evaluator = self.exp_other.get_dev_evaluator()
         _, feat_baseline, _ = baseline_evaluator.eval(self.exp_baseline.model)
         _, feat_other, _ = other_evaluator.eval(self.exp_other.model)
-        return spearmanr(baseline_evaluator.metric.predictions, other_evaluator.metric.similarity)[0]
+        score, pvalue = spearmanr(baseline_evaluator.metric.predictions, other_evaluator.metric.similarity)
+        return score, pvalue
 
