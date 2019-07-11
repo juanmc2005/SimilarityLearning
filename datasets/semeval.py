@@ -91,6 +91,8 @@ class SemEval(SimDataset):
         self.train_sents = self.augmentation.augment(atrain, btrain, simtrain)
         self.dev_sents = np.array(list(zip(self._split_and_pad(adev, bdev), simdev)))
         self.test_sents = np.array(list(zip(self._split_and_pad(atest, btest), simtest)))
+        print(f"Unique Dev Sentences: {len(set(adev + bdev))}")
+        print(f"Unique Test Sentences: {len(set(atest + btest))}")
 
     def _split_and_pad(self, asents, bsents):
         result = []

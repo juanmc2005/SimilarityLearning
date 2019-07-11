@@ -19,10 +19,6 @@ parser.add_argument('--eval-interval', type=int, default=10,
                     help='Steps (in epochs) to evaluate the speaker model. Default value: 10')
 parser.add_argument('--save-interval', type=int, default=10,
                     help='Steps (in epochs) to save the speaker model. Default value: 10')
-parser.add_argument('--triplet-strategy', type=str, default='all',
-                    help=F'Triplet sampling strategy. Possible values: {common.TRIPLET_SAMPLING_OPTIONS_STR}')
-parser.add_argument('--semihard-negatives', type=int, default=10,
-                    help='The number of negatives to keep when using a semi-hard negative triplet sampling strategy')
 parser.add_argument('--segments-per-speaker', type=int, default=1,
                     help='The number of audio segments per speaker in each training batch')
 parser.add_argument('--segment-length', type=int, default=200,

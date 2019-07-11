@@ -32,7 +32,7 @@ print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 nfeat, nclass = 2, 10
-config = common.get_config(args.loss, nfeat, nclass, task, args.margin)
+config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.triplet_strategy, args.semihard_negatives)
 model = MNISTNet(nfeat, loss_module=config.loss_module)
 dataset = MNIST(args.path, args.batch_size)
 

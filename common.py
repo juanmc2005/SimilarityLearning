@@ -153,6 +153,10 @@ def get_arg_parser():
                         help='An identifier for the experience')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--seed', type=int, default=SEED, help='Random seed')
+    parser.add_argument('--triplet-strategy', type=str, default='all',
+                        help=F'Triplet sampling strategy. Possible values: {TRIPLET_SAMPLING_OPTIONS_STR}')
+    parser.add_argument('--semihard-negatives', type=int, default=10,
+                        help='The number of negatives to keep when using semi-hard negative triplet sampling strategy')
     return parser
 
 

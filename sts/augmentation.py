@@ -115,6 +115,8 @@ class NoAugmentation(SemEvalAugmentationStrategy):
             sim = [y for _, _, y in train_data]
             print(f"Unique Train Pairs: {len(train_data)}")
 
+        print(f"Unique Train Sentences: {len(set(atrain + btrain))}")
+
         a, b = [], []
         for s1, s2, _ in train_data:
             s1pad, s2pad = pad_sent_pair(s1.split(' '), s2.split(' '))

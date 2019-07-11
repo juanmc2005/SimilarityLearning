@@ -71,7 +71,8 @@ class TrainingExperiment:
         # Load dataset
         train, nclass = self._load_dataset(args.loss, args.batch_size)
         # Create model
-        config = common.get_config(args.loss, self.nfeat, nclass, self.task, args.margin)
+        config = common.get_config(args.loss, self.nfeat, nclass, self.task,
+                                   args.margin, args.triplet_strategy, args.semihard_negatives)
         model = self._create_model(config)
         # Train and evaluation plugins
         test_plugins = []
