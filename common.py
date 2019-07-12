@@ -157,6 +157,11 @@ def get_arg_parser():
                         help=F'Triplet sampling strategy. Possible values: {TRIPLET_SAMPLING_OPTIONS_STR}')
     parser.add_argument('--semihard-negatives', type=int, default=10,
                         help='The number of negatives to keep when using semi-hard negative triplet sampling strategy')
+    parser.add_argument('--recover-optim', dest='recover_optim', action='store_true',
+                        help='Recover optimizer state from model checkpoint')
+    parser.add_argument('--no-recover-optim', dest='recover_optim', action='store_false',
+                        help='Do NOT recover optimizer state from model checkpoint')
+    parser.set_defaults(recover_optim=True)
     return parser
 
 

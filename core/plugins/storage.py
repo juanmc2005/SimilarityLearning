@@ -27,8 +27,9 @@ class ModelSaver:
 
 class ModelLoader:
 
-    def __init__(self, path: str):
+    def __init__(self, path: str, restore_optimizer: bool = True):
         self.path = path
+        self.restore_optimizer = restore_optimizer
 
     def get_trained_loss(self):
         return torch.load(self.path, map_location=common.DEVICE)['trained_loss']
@@ -40,8 +41,9 @@ class ModelLoader:
             loss_fn.load_state_dict(checkpoint['loss_state_dict'])
             if model.loss_module is not None:
                 model.loss_module.load_state_dict(checkpoint['loss_module_state_dict'])
-            optimizer.load_state_dict(checkpoint['optim_state_dict'])
-        print(f"Recovered Model. Epoch {checkpoint['epoch']}. Test Metric {checkpoint['accuracy']}")
+            if self.restore_optimizer:
+                optimizer.load_state_dict(checkpoint['optim_state_dict'])
+        print(f"Recovered Model. Epoch {checkpoint['epoch']}. Dev Metric {checkpoint['accuracy']}")
         return checkpoint
 
     def load(self, model: SimNet, current_loss: str):

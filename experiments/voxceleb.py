@@ -1,4 +1,3 @@
-import random
 import numpy as np
 from experiments.base import ModelEvaluationExperiment
 from datasets.voxceleb import VoxCeleb1
@@ -14,11 +13,11 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
 
     def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int):
         self.model = SpeakerNet(nfeat, sample_rate=16000, window=200)
-        model_loader = ModelLoader(model_path)
+        model_loader = ModelLoader(model_path, restore_optimizer=False)
         loss_name = model_loader.get_trained_loss()
         model_loader.load(self.model, loss_name)
         self.model = self.model.to_prediction_model().to(common.DEVICE)
-        config = VoxCeleb1.config(sample_rate=16000, segment_size_sec=0.2)
+        config = VoxCeleb1._config(sample_rate=16000, segment_size_sec=0.2)
         # The partition parameter doesn't matter here because we're passing it at each 'eval' call
         self.evaluator = SpeakerVerificationEvaluator('', batch_size, distance, eval_interval=0, config=config)
 
@@ -36,7 +35,7 @@ class VoxCeleb1TSNEVisualizationExperiment:
     def __init__(self, model_path: str, nfeat: int, distance: Distance):
         self.distance = distance
         self.model = SpeakerNet(nfeat, sample_rate=16000, window=200)
-        model_loader = ModelLoader(model_path)
+        model_loader = ModelLoader(model_path, restore_optimizer=False)
         self.loss_name = model_loader.get_trained_loss()
         model_loader.load(self.model, self.loss_name)
         self.model = self.model.to_prediction_model().to(common.DEVICE)

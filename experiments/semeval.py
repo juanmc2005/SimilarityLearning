@@ -106,8 +106,8 @@ class SemEvalPredictionsSpearmanExperiment:
 
     def __init__(self, baseline_model: str, other_model: str, nfeat: int, distance: Distance, log_interval: int,
                  batch_size: int, sem_eval_path: str, vocab_path: str, word2vec_path: str):
-        baseline_model_loader = ModelLoader(baseline_model)
-        other_model_loader = ModelLoader(other_model)
+        baseline_model_loader = ModelLoader(baseline_model, restore_optimizer=False)
+        other_model_loader = ModelLoader(other_model, restore_optimizer=False)
         self.exp_baseline = SemEvalBaselineModelEvaluationExperiment(model_loader=baseline_model_loader,
                                                                      nfeat=nfeat,
                                                                      data_path=sem_eval_path,

@@ -105,11 +105,13 @@ train_callbacks.extend(evaluators)
 
 # Training configuration
 trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, args.lr),
-                  model_loader=ModelLoader(args.recover) if args.recover is not None else None,
+                  model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
                   callbacks=train_callbacks)
 print(f"[LR: {args.lr}]")
 print(f"[Batch Size: {args.batch_size}]")
 print(f"[Epochs: {args.epochs}]")
+if args.recover is not None:
+    print(f"[Recover Optimizer: {common.enabled_str(args.recover_optim)}]")
 print()
 
 # Start training

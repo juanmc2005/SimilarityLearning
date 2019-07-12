@@ -89,7 +89,7 @@ class TrainingExperiment:
         train_plugins.append(self._create_evaluator(args.loss, args.batch_size, config, test_plugins))
         # Training configuration
         trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, self.task, args.lr),
-                          model_loader=ModelLoader(args.recover) if args.recover is not None else None,
+                          model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
                           callbacks=train_plugins)
         print(f"[LR: {args.lr}]")
         print(f"[Batch Size: {args.batch_size}]")

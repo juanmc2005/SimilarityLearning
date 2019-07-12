@@ -45,7 +45,7 @@ if args.task == 'speaker':
                                                     batch_size=args.batch_size)
     metric_name = 'EER'
 elif args.task == 'sts':
-    model_loader = ModelLoader(args.model)
+    model_loader = ModelLoader(args.model, restore_optimizer=False)
     loss_name = model_loader.get_trained_loss()
     if loss_name == 'kldiv':
         experiment_type = SemEvalBaselineModelEvaluationExperiment
