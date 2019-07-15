@@ -1,63 +1,18 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-import math
 from os.path import join
-
 import numpy as np
-import torch
-
-from datasets.base import SimDataset, SimDatasetPartition
-from models import SimNet
+import datasets.base as base
 from sts.augmentation import SemEvalAugmentationStrategy, pad_sent_pair
 from sts import utils as sts
 
 
-class SemEvalPartition(SimDatasetPartition):
-
-    def __init__(self, data, batch_size: int, train: bool):
-        self.data = data
-        self.batch_size = batch_size
-        self.train = train
-        self.generator = self._generate()
-
-    def _transform_batch(self, x, y):
-        raise NotImplementedError("The class should implement 'transform_batch'")
-
-    def _generate(self):
-        while True:
-            if self.train:
-                np.random.shuffle(self.data)
-            for i in range(0, len(self.data), self.batch_size):
-                j = min(i + self.batch_size, len(self.data))
-                yield self.data[i:j]
-
-    def nbatches(self):
-        return math.ceil(len(self.data) / self.batch_size)
-
-    def __next__(self):
-        batch = next(self.generator)
-        x, y = [x for x, _ in batch], torch.Tensor([y for _, y in batch])
-        return self._transform_batch(x, y)
-
-
-class SemEvalBaselinePartition(SemEvalPartition):
+class SemEvalBaselinePartition(base.TextPartition):
 
     def _transform_batch(self, x, y):
         y = y.float()
         y = y.view(-1, 6) if self.train else y
         return x, y
-
-
-class SemEvalLongLabelPartition(SemEvalPartition):
-
-    def _transform_batch(self, x, y):
-        return x, y.long()
-
-
-class SemEvalFloatLabelPartition(SemEvalPartition):
-
-    def _transform_batch(self, x, y):
-        return x, y.float()
 
 
 class SemEvalPartitionFactory:
@@ -70,13 +25,13 @@ class SemEvalPartitionFactory:
         if self.loss == 'kldiv':
             return SemEvalBaselinePartition(data, self.batch_size, train)
         elif self.loss == 'contrastive' or self.loss == 'triplet':
-            return SemEvalFloatLabelPartition(data, self.batch_size, train)
+            return base.TextFloatLabelPartition(data, self.batch_size, train)
         else:
             # Softmax based loss, classes are simulated with clusters
-            return SemEvalLongLabelPartition(data, self.batch_size, train)
+            return base.TextLongLabelPartition(data, self.batch_size, train)
 
 
-class SemEval(SimDataset):
+class SemEval(base.SimDataset):
 
     def __init__(self, path: str, vector_path: str, vocab_path: str,
                  augmentation: SemEvalAugmentationStrategy, partition_factory: SemEvalPartitionFactory):
@@ -114,12 +69,13 @@ class SemEval(SimDataset):
     def nclass(self):
         return self.augmentation.nclass()
 
-    def training_partition(self) -> SimDatasetPartition:
+    def training_partition(self) -> base.SimDatasetPartition:
         np.random.shuffle(self.train_sents)
+        print(self.train_sents)
         return self.partition_factory.new(self.train_sents, train=True)
 
-    def dev_partition(self) -> SimDatasetPartition:
+    def dev_partition(self) -> base.SimDatasetPartition:
         return self.partition_factory.new(self.dev_sents, train=False)
 
-    def test_partition(self) -> SimDatasetPartition:
+    def test_partition(self) -> base.SimDatasetPartition:
         return self.partition_factory.new(self.test_sents, train=False)

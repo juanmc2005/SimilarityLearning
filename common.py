@@ -102,7 +102,7 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float,
     elif loss == 'center':
         return cf.CenterConfig(DEVICE, nfeat, nclass, distance=CosineDistance())
     elif loss == 'coco':
-        return cf.CocoConfig(DEVICE, nfeat, nclass)
+        return cf.CocoConfig(DEVICE, nfeat, nclass, alpha=1.)
     elif loss == 'kldiv':
         return cf.KLDivergenceConfig(DEVICE, nfeat)
     else:
@@ -134,8 +134,8 @@ def get_arg_parser():
     """
     launch_datetime = time.strftime('%c')
     parser = argparse.ArgumentParser()
-    parser.add_argument('--loss', type=str, help=LOSS_OPTIONS_STR)
-    parser.add_argument('--epochs', type=int, help='The number of epochs to run the model')
+    parser.add_argument('--loss', type=str, required=True, help=LOSS_OPTIONS_STR)
+    parser.add_argument('--epochs', type=int, required=True, help='The number of epochs to run the model')
     parser.add_argument('--log-interval', type=int, default=10,
                         help='Steps (in percentage) to show epoch progress. Default value: 10')
     parser.add_argument('--batch-size', type=int, default=100, help='Batch size for training and testing')
