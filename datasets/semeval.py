@@ -71,7 +71,6 @@ class SemEval(base.SimDataset):
 
     def training_partition(self) -> base.SimDatasetPartition:
         np.random.shuffle(self.train_sents)
-        print(self.train_sents)
         return self.partition_factory.new(self.train_sents, train=True)
 
     def dev_partition(self) -> base.SimDatasetPartition:

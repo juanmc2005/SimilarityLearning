@@ -62,7 +62,6 @@ class TextPartition(SimDatasetPartition):
         while True:
             if self.train:
                 np.random.shuffle(self.data)
-                print(self.data)
             for i in range(0, len(self.data), self.batch_size):
                 j = min(i + self.batch_size, len(self.data))
                 yield self.data[i:j]
