@@ -8,7 +8,7 @@ import random
 
 import losses.config as cf
 from losses.triplet import SemiHardNegative, BatchAll, HardestNegative, HardestPositiveNegative, TripletSamplingStrategy
-from distances import CosineDistance
+from distances import CosineDistance, EuclideanDistance, Distance
 
 
 """
@@ -50,6 +50,19 @@ def enabled_str(value: bool) -> str:
     return 'ENABLED' if value else 'DISABLED'
 
 
+def to_distance_object(distance: str) -> Distance:
+    """
+    :param distance: a distance name (euclidean or cosine)
+    :return: a Distance corresponding to the distance string
+    """
+    if distance == 'euclidean':
+        return EuclideanDistance()
+    elif distance == 'cosine':
+        return CosineDistance()
+    else:
+        raise ValueError('Only cosine and euclidean distances are allowed')
+
+
 def create_log_dir(exp_id: str, task: str, loss: str):
     """
     Create the directory where logs, models, plots and other experiment related files will be stored
@@ -66,8 +79,8 @@ def create_log_dir(exp_id: str, task: str, loss: str):
     return log_path
 
 
-def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float,
-               triplet_strategy: str, semihard_n: int = 10) -> cf.LossConfig:
+def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float, distance: str,
+               size_average: bool, loss_scale: float, triplet_strategy: str, semihard_n: int = 10) -> cf.LossConfig:
     """
     Create a loss configuration object based on parameteres given by the user
     :param loss: the loss function name
@@ -85,24 +98,24 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float,
         print(f"[Margin: {margin}]")
         return cf.ContrastiveConfig(DEVICE,
                                     margin=margin,
-                                    distance=CosineDistance(),
-                                    size_average=False,
+                                    distance=to_distance_object(distance),
+                                    size_average=size_average,
                                     online=task != 'sts')
     elif loss == 'triplet':
         print(f"[Margin: {margin}]")
         return cf.TripletConfig(DEVICE,
                                 margin=margin,
-                                distance=CosineDistance(),
-                                size_average=task != 'sts',
+                                distance=to_distance_object(distance),
+                                size_average=size_average,
                                 online=task != 'sts',
                                 sampling=get_triplet_strategy(triplet_strategy, semihard_n))
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")
-        return cf.ArcFaceConfig(DEVICE, nfeat, nclass, margin=margin)
+        return cf.ArcFaceConfig(DEVICE, nfeat, nclass, margin=margin, s=loss_scale)
     elif loss == 'center':
-        return cf.CenterConfig(DEVICE, nfeat, nclass, distance=CosineDistance())
+        return cf.CenterConfig(DEVICE, nfeat, nclass, lweight=loss_scale, distance=to_distance_object(distance))
     elif loss == 'coco':
-        return cf.CocoConfig(DEVICE, nfeat, nclass, alpha=1.)
+        return cf.CocoConfig(DEVICE, nfeat, nclass, alpha=loss_scale)
     elif loss == 'kldiv':
         return cf.KLDivergenceConfig(DEVICE, nfeat)
     else:
@@ -135,6 +148,8 @@ def get_arg_parser():
     launch_datetime = time.strftime('%c')
     parser = argparse.ArgumentParser()
     parser.add_argument('--loss', type=str, required=True, help=LOSS_OPTIONS_STR)
+    parser.add_argument('--distance', type=str, default='cosine',
+                        help='Base distance for loss when available: euclidean / cosine')
     parser.add_argument('--epochs', type=int, required=True, help='The number of epochs to run the model')
     parser.add_argument('--log-interval', type=int, default=10,
                         help='Steps (in percentage) to show epoch progress. Default value: 10')
@@ -148,7 +163,9 @@ def get_arg_parser():
     parser.add_argument('--no-save', dest='save', action='store_false', help='Do NOT save best accuracy models')
     parser.set_defaults(save=True)
     parser.add_argument('--recover', type=str, default=None, help='The path to the saved model to recover for training')
-    parser.add_argument('-m', '--margin', type=float, default=2., help='The margin to use for the losses that need it')
+    parser.add_argument('-m', '--margin', type=float, default=2., help='The loss margin when available')
+    parser.add_argument('-s', '--loss-scale', type=float, default=7.,
+                        help='Loss scaling factor when available (s for ArcFace, lambda for Center and alpha for CoCo)')
     parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
                         help='An identifier for the experience')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
@@ -162,6 +179,9 @@ def get_arg_parser():
     parser.add_argument('--no-recover-optim', dest='recover_optim', action='store_false',
                         help='Do NOT recover optimizer state from model checkpoint')
     parser.set_defaults(recover_optim=True)
+    parser.add_argument('--size-average', dest='size_average', action='store_true', help='Use mean batch loss')
+    parser.add_argument('--no-size-average', dest='size_average', action='store_false', help='Use sum batch loss')
+    parser.set_defaults(size_average=True)
     return parser
 
 
@@ -176,6 +196,7 @@ def get_basic_plots(lr: float, batch_size: int, eval_metric: str, eval_metric_co
         {
             'log_file': 'loss.log',
             'metric': 'Loss',
+            'bottom': None, 'top': None,
             'color': 'blue',
             'title': f'Train Loss - lr={lr} - batch_size={batch_size}',
             'filename': 'loss-plot'
@@ -183,6 +204,8 @@ def get_basic_plots(lr: float, batch_size: int, eval_metric: str, eval_metric_co
         {
             'log_file': 'metric.log',
             'metric': eval_metric,
+            'bottom': 0.1 if eval_metric == 'EER' else 0.,
+            'top': 0.35 if eval_metric == 'EER' else 1.,
             'color': eval_metric_color,
             'title': f'Dev {eval_metric} - lr={lr} - batch_size={batch_size}',
             'filename': f"dev-{eval_metric.lower().replace(' ', '-')}-plot"

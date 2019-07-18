@@ -44,8 +44,8 @@ dataset = VoxCeleb1(args.batch_size,
                     segment_size_millis=args.segment_length,
                     segments_per_speaker=args.segments_per_speaker)
 train = dataset.training_partition()
-config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin,
-                           args.triplet_strategy, args.semihard_negatives)
+config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin, args.distance,
+                           args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
 model = SpeakerNet(nfeat, sample_rate=16000, window=args.segment_length, loss_module=config.loss_module)
 print(f"[Train Classes: {train.nclass}]")
 print(f"[Batches per Epoch: {train.batches_per_epoch}]")
@@ -78,6 +78,7 @@ if args.plot:
         plots.append({
             'log_file': 'train-accuracy.log',
             'metric': 'Accuracy',
+            'bottom': 0., 'top': 1.,
             'color': 'green',
             'title': f'Train Accuracy - lr={args.lr} - batch_size={args.batch_size}',
             'filename': 'train-accuracy-plot'

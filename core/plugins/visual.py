@@ -14,7 +14,7 @@ class Visualizer(TestListener):
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         plot_name = f"embeddings-epoch-{epoch}"
-        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.1f} Accuracy"
+        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy * 100:.2f} Accuracy"
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
         print(f"Saving plot as {plot_name}")

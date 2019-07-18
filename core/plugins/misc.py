@@ -1,5 +1,8 @@
-from core.base import TrainingListener
+import numpy as np
+from core.base import TrainingListener, TestListener
 from metrics import Metric
+from distances import Distance
+from scipy.spatial.distance import pdist
 
 
 class TrainingMetricCalculator(TrainingListener):
@@ -20,3 +23,19 @@ class TrainingMetricCalculator(TrainingListener):
         if self.file_path is not None:
             with open(self.file_path, 'a') as file:
                 file.write(f"{metric}\n")
+
+
+class IntraClassDistanceStatLogger(TestListener):
+
+    def __init__(self, distance: Distance, file_path: str):
+        self.distance = distance
+        self.file_path = file_path
+        open(file_path, 'w').close()
+
+    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
+        with open(self.file_path, 'a') as out:
+            out.write(f"Epoch {epoch}:\n")
+            for i in np.unique(y):
+                class_dists = pdist(feat[y == i, :], self.distance.to_sklearn_metric())
+                out.write(f"Mean distance for class {i}: {np.mean(class_dists)}")
+                out.write('\n')

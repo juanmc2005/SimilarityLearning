@@ -5,6 +5,7 @@ from core.base import Trainer
 from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
 from core.plugins.storage import BestModelSaver, ModelLoader
 from core.plugins.visual import Visualizer
+from core.plugins.misc import IntraClassDistanceStatLogger
 from datasets.mnist import MNIST
 from models import MNISTNet
 from metrics import KNNAccuracyMetric, ClassAccuracyEvaluator
@@ -32,7 +33,8 @@ print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 nfeat, nclass = 2, 10
-config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.triplet_strategy, args.semihard_negatives)
+config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.distance, args.size_average,
+                           args.loss_scale, args.triplet_strategy, args.semihard_negatives)
 model = MNISTNet(nfeat, loss_module=config.loss_module)
 dataset = MNIST(args.path, args.batch_size)
 
@@ -58,7 +60,8 @@ else:
 # Plotting configuration
 print(f"[Plots: {common.enabled_str(args.plot)}]")
 if args.plot:
-    test_callbacks.append(Visualizer(config.name, config.param_desc))
+    test_callbacks.append(Visualizer(log_path, config.name, config.param_desc))
+    test_callbacks.append(IntraClassDistanceStatLogger(config.test_distance, join(log_path, 'mean-dists.log')))
 
 # Model saving configuration
 print(f"[Model Saving: {common.enabled_str(args.save)}]")

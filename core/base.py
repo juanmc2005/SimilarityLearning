@@ -75,6 +75,8 @@ class Trainer:
             vis.visualize_logs(exp_path,
                                log_file_name=plot['log_file'],
                                metric_name=plot['metric'],
+                               bottom=plot['bottom'],
+                               top=plot['top'],
                                color=plot['color'],
                                title=plot['title'],
                                plot_file_name=plot['filename'])

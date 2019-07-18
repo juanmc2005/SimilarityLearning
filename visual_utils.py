@@ -111,12 +111,15 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
     plt.pause(0.001)
 
 
-def visualize_logs(exp_path: str, log_file_name: str, metric_name: str, color: str, title: str, plot_file_name: str):
+def visualize_logs(exp_path: str, log_file_name: str, metric_name: str, bottom: float,
+                   top: float, color: str, title: str, plot_file_name: str):
     with open(join(exp_path, log_file_name), 'r') as log_file:
         data = [float(line.strip()) for line in log_file.readlines()]
         plt.ion()
         plt.clf()
         plt.plot(range(1, len(data) + 1), data, c=color)
+        if bottom is not None and top is not None:
+            plt.ylim(bottom, top)
         plt.xlabel('Epoch')
         plt.ylabel(metric_name)
         plt.title(title)
