@@ -73,7 +73,7 @@ metric = KNNAccuracyMetric(config.test_distance)
 train_callbacks.append(ClassAccuracyEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks))
 
 # Training configuration
-trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, args.lr),
+trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),
                   model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
                   callbacks=train_callbacks)
 print(f"[LR: {args.lr}]")

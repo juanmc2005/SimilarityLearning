@@ -169,6 +169,8 @@ def get_arg_parser():
     parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
                         help='An identifier for the experience')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
+    parser.add_argument('--loss-mod-lr', type=float, default=0.01,
+                        help='Learning rate for the loss module if available')
     parser.add_argument('--seed', type=int, default=SEED, help='Random seed')
     parser.add_argument('--triplet-strategy', type=str, default='all',
                         help=F'Triplet sampling strategy. Possible values: {TRIPLET_SAMPLING_OPTIONS_STR}')

@@ -10,6 +10,7 @@ from losses.coco import CocoLinear
 from losses.contrastive import ContrastiveLoss
 from losses.triplet import TripletLoss, BatchAll
 import core.base as base
+from models import SimNet
 
 
 def sincnet_optims(model, lr):
@@ -25,7 +26,7 @@ class LossConfig:
         self.loss = loss
         self.test_distance = test_distance
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model: SimNet, task: str, lr: tuple):
         # TODO remove 'task' parameter. Implement some sort of double dispatching or something
         # The problem is that optimizer configuration depends both on the loss and the model
         raise NotImplementedError
@@ -38,8 +39,8 @@ class KLDivergenceConfig(LossConfig):
         loss = LossWrapper(nn.KLDivLoss().to(device))
         super(KLDivergenceConfig, self).__init__('KL-Divergence', None, loss_module, loss, CosineDistance())
 
-    def optimizer(self, model, task, lr=0.0001):
-        return base.Optimizer([optim.RMSprop(model.parameters(), lr=lr)], [])
+    def optimizer(self, model: SimNet, task: str, lr: tuple):
+        return base.Optimizer([optim.RMSprop(model.parameters(), lr=lr[0])], [])
 
 
 class SoftmaxConfig(LossConfig):
@@ -49,17 +50,17 @@ class SoftmaxConfig(LossConfig):
         loss = LossWrapper(nn.NLLLoss().to(device))
         super(SoftmaxConfig, self).__init__('Cross Entropy', None, self.loss_module, loss, CosineDistance())
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model: SimNet, task: str, lr: tuple):
         if task == 'mnist':
             # Was using lr=0.01
-            optimizers = [optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)]
+            optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
         elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr)
-            optimizers.append(optim.RMSprop(self.loss_module.parameters(), lr=lr, alpha=0.95))
+            optimizers = sincnet_optims(model, lr[0])
+            optimizers.append(optim.RMSprop(self.loss_module.parameters(), lr=lr[0], alpha=0.95))
             schedulers = []
         elif task == 'sts' or task == 'ami':
-            optimizers = [optim.RMSprop(model.parameters(), lr=lr)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=lr[0])]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
@@ -73,20 +74,23 @@ class ArcFaceConfig(LossConfig):
         loss = LossWrapper(nn.CrossEntropyLoss().to(device))
         super(ArcFaceConfig, self).__init__('ArcFace Loss', f"m={margin} s={s}", self.loss_module, loss, CosineDistance())
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model: SimNet, task: str, lr: tuple):
         if task == 'mnist':
             # Was using lr0=0.005 and lr1=0.01
             params = model.all_params()
-            optimizers = [optim.SGD(params[0], lr=lr, momentum=0.9, weight_decay=0.0005),
-                          optim.SGD(params[1], lr=lr)]
+            optimizers = [optim.SGD(params[0], lr=lr[0], momentum=0.9, weight_decay=0.0005),
+                          optim.SGD(params[1], lr=lr[1])]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
                           lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
         elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr)
-            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr))
+            optimizers = sincnet_optims(model, lr[0])
+            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr[1]))
             schedulers = [lr_scheduler.StepLR(optimizers[-1], 8, gamma=0.8)]
         elif task == 'sts' or task == 'ami':
-            optimizers, schedulers = [optim.RMSprop(model.parameters(), lr=lr)], []
+            params = model.all_params()
+            optimizers = [optim.RMSprop(params[0], lr=lr[0]),
+                          optim.RMSprop(params[1], lr=lr[1])]
+            schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -99,18 +103,21 @@ class CenterConfig(LossConfig):
         self.loss = SoftmaxCenterLoss(device, nfeat, nclass, lweight, distance)
         super(CenterConfig, self).__init__('Center Loss', f"λ={lweight} - {distance}", loss_module, self.loss, distance)
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model, task, lr: tuple):
         if task == 'mnist':
             # Was using lr0=0.001 and lr1=0.5
-            optimizers = [optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005),
-                          optim.SGD(self.loss.center_parameters(), lr=lr)]
+            optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005),
+                          optim.SGD(self.loss.center_parameters(), lr=lr[1])]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
         elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr)
-            optimizers.append(optim.SGD(self.loss.center_parameters(), lr=lr))
+            optimizers = sincnet_optims(model, lr[0])
+            optimizers.append(optim.SGD(self.loss.center_parameters(), lr=lr[1]))
             schedulers = []
         elif task == 'sts' or task == 'ami':
-            optimizers, schedulers = [optim.RMSprop(model.parameters(), lr=lr)], []
+            params = model.all_params()
+            optimizers = [optim.RMSprop(params[0], lr=lr[0]),
+                          optim.RMSprop(params[1], lr=lr[1])]
+            schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -123,19 +130,22 @@ class CocoConfig(LossConfig):
         loss = LossWrapper(nn.CrossEntropyLoss().to(device))
         super(CocoConfig, self).__init__('CoCo Loss', f"α={alpha}", loss_module, loss, CosineDistance())
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model, task, lr: tuple):
         if task == 'mnist':
             # Was using lr0=0.001 and lr1=0.01
             params = model.all_params()
-            optimizers = [optim.SGD(params[0], lr=lr, momentum=0.9, weight_decay=0.0005),
-                          optim.SGD(params[1], lr=lr, momentum=0.9)]
+            optimizers = [optim.SGD(params[0], lr=lr[0], momentum=0.9, weight_decay=0.0005),
+                          optim.SGD(params[1], lr=lr[1], momentum=0.9)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
         elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr)
-            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr))
+            optimizers = sincnet_optims(model, lr[0])
+            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr[1]))
             schedulers = []
         elif task == 'sts' or task == 'ami':
-            optimizers, schedulers = [optim.RMSprop(model.parameters(), lr=lr)], []
+            params = model.all_params()
+            optimizers = [optim.RMSprop(params[0], lr=lr[0]),
+                          optim.RMSprop(params[1], lr=lr[1])]
+            schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -147,16 +157,16 @@ class ContrastiveConfig(LossConfig):
         loss = ContrastiveLoss(device, margin, distance, size_average, online)
         super(ContrastiveConfig, self).__init__('Contrastive Loss', f"m={margin} - {distance}", None, loss, distance)
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model, task, lr: tuple):
         if task == 'mnist':
             # Was using lr=0.001
-            optimizers = [optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)]
+            optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
         elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr)
+            optimizers = sincnet_optims(model, lr[0])
             schedulers = []
         elif task == 'sts' or task == 'ami':
-            optimizers = [optim.RMSprop(model.parameters(), lr=lr, momentum=0.9)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
@@ -170,16 +180,16 @@ class TripletConfig(LossConfig):
         loss = TripletLoss(device, margin, distance, size_average, online, sampling)
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 
-    def optimizer(self, model, task, lr):
+    def optimizer(self, model, task, lr: tuple):
         if task == 'mnist':
             # Was using lr=0.0001
-            optimizers = [optim.SGD(model.parameters(), lr=lr, momentum=0.9, weight_decay=0.0005)]
+            optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)]
         elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr)
+            optimizers = sincnet_optims(model, lr[0])
             schedulers = []
         elif task == 'sts' or task == 'ami':
-            optimizers = [optim.RMSprop(model.parameters(), lr=lr, momentum=0.9)]
+            optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = []
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')

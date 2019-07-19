@@ -6,7 +6,7 @@ from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
 from core.plugins.storage import BestModelSaver, ModelLoader
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from sts.modes import STSForwardModeFactory
-from sts.augmentation import SemEvalAugmentationStrategyFactory, SemiHardOfflineTripletSampling
+from sts.augmentation import SemEvalAugmentationStrategyFactory
 from models import SemanticNet
 from metrics import LogitsSpearmanMetric, DistanceSpearmanMetric, STSBaselineEvaluator, STSEmbeddingEvaluator
 
@@ -93,7 +93,7 @@ else:
 train_callbacks.append(evaluator)
 
 # Training configuration
-trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, args.lr),
+trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),
                   model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
                   callbacks=train_callbacks)
 print(f"[LR: {args.lr}]")

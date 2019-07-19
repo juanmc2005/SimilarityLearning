@@ -71,7 +71,7 @@ test_evaluator = ClassAccuracyEvaluator(common.DEVICE, test, metric, 'test',
 train_callbacks.extend([dev_evaluator, test_evaluator])
 
 # Training configuration
-trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, args.lr),
+trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),
                   model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
                   callbacks=train_callbacks)
 print(f"[LR: {args.lr}]")
