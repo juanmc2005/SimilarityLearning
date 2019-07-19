@@ -1,6 +1,7 @@
 from os.path import join
 import numpy as np
 from datasets.base import SimDataset, SimDatasetPartition, TextLongLabelPartition
+import sts.utils as sts
 
 
 label2id = {'derailing': 0, 'discredit': 1, 'dominance': 2, 'sexual_harassment': 3, 'stereotype': 4}
@@ -15,8 +16,10 @@ def _read_ami_data(path: str):
 
 class AMI(SimDataset):
 
-    def __init__(self, path: str, batch_size: int, lang: str = 'en'):
+    def __init__(self, path: str, batch_size: int, vocab_path: str, vector_path: str, lang: str = 'en'):
         self.batch_size = batch_size
+        self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
+        print(f"Created vocabulary with {n_inv} INV and {n_oov} OOV ({int(100 * n_inv / (n_inv + n_oov))}% coverage)")
         self.train_data = _read_ami_data(join(path, lang, 'train'))
         self.dev_data = _read_ami_data(join(path, lang, 'dev'))
         self.test_data = _read_ami_data(join(path, lang, 'test'))

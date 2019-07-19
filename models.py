@@ -3,6 +3,7 @@
 from torch import nn
 from sincnet import SincNet, MLP
 from sts.baseline import STSBaselineNet, STSForwardMode
+from aminet import AMINet
 
 
 class Flatten(nn.Module):
@@ -144,3 +145,19 @@ class SemanticNet(SimNet):
 
     def load_common_state_dict(self, checkpoint):
         self.base_model.load_state_dict(checkpoint)
+
+
+class HateNet(SimNet):
+
+    def __init__(self, device: str, nfeat: int, vector_vocab: dict, loss_module: nn.Module):
+        super(HateNet, self).__init__(loss_module)
+        self.base = AMINet(device, nfeat_word=300, nfeat_sent=nfeat, vec_vocab=vector_vocab)
+
+    def layers(self):
+        return [self.base]
+
+    def common_state_dict(self):
+        return self.base.state_dict()
+
+    def load_common_state_dict(self, checkpoint):
+        self.base.load_state_dict(checkpoint)

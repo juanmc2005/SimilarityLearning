@@ -68,7 +68,6 @@ def load_word_vectors(path):
         # get rid of Unicode non-breaking spaces in the vectors.
         entries = line.rstrip().split(" ")
         word, entries = entries[0], entries[1:]
-        # print(word)
         if dim is None and len(entries) > 1:
             dim = len(entries)
         elif len(entries) == 1:

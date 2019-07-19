@@ -1,6 +1,7 @@
 import torch
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
+from sklearn.metrics import f1_score
 from scipy.stats import spearmanr
 from pyannote.audio.embedding.extraction import SequenceEmbedding
 from pyannote.database import get_protocol, get_unique_identifier
@@ -13,6 +14,9 @@ import common
 
 
 class Metric:
+
+    def __str__(self):
+        raise NotImplementedError("A metric must implement the method '__str__'")
 
     def fit(self, embeddings, y):
         raise NotImplementedError("A metric must implement the method 'fit'")
@@ -40,6 +44,9 @@ class KNNAccuracyMetric(Metric):
         self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
         self.correct, self.total = 0, 0
 
+    def __str__(self):
+        return 'KNN Accuracy'
+
     def fit(self, embeddings, y):
         self.knn.fit(embeddings, y)
 
@@ -54,10 +61,36 @@ class KNNAccuracyMetric(Metric):
         return metric
 
 
+class KNNF1ScoreMetric(Metric):
+
+    def __init__(self, distance):
+        self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
+        self.preds, self.y = [], []
+
+    def __str__(self):
+        return 'Macro F1-Score'
+
+    def fit(self, embeddings, y):
+        self.knn.fit(embeddings, y)
+
+    def calculate_batch(self, embeddings, logits, y):
+        predicted = self.knn.predict(embeddings)
+        self.preds.extend(predicted)
+        self.y.extend(y)
+
+    def get(self):
+        metric = f1_score(self.y, self.preds, average='macro')
+        self.preds, self.y = [], []
+        return metric
+
+
 class LogitsAccuracyMetric(Metric):
 
     def __init__(self):
         self.correct, self.total = 0, 0
+
+    def __str__(self):
+        return 'Softmax Accuracy'
 
     def fit(self, embeddings, y):
         pass
@@ -77,6 +110,9 @@ class LogitsSpearmanMetric(Metric):
 
     def __init__(self):
         self.predictions, self.targets = [], []
+
+    def __str__(self):
+        return 'Logit Spearman'
 
     def fit(self, embeddings, y):
         pass
@@ -105,6 +141,9 @@ class DistanceSpearmanMetric(Metric):
     def __init__(self, distance: Distance):
         self.distance = distance
         self.similarity, self.targets = [], []
+
+    def __str__(self):
+        return 'Distance Spearman'
 
     def fit(self, embeddings, y):
         pass
@@ -214,11 +253,12 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
 
 class ClassAccuracyEvaluator(base.TrainingListener):
 
-    def __init__(self, device, loader, metric, callbacks=None):
+    def __init__(self, device, loader, metric, partition_name, callbacks=None):
         super(ClassAccuracyEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
+        self.partition_name = partition_name
         self.callbacks = callbacks if callbacks is not None else []
         self.feat_train, self.y_train = None, None
         self.best_metric, self.best_epoch = 0, -1
@@ -272,15 +312,13 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         metric_value = self.metric.get()
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, metric_value)
-        print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Dev Accuracy: {metric_value:.6f}")
+        print(f"{self.partition_name.capitalize()} {self.metric}: {metric_value:.6f}")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
-        print("------------------------------------------------")
         if metric_value > self.best_metric:
             self.best_metric = metric_value
             self.best_epoch = epoch
-            print('New Best Dev Accuracy!')
+            print(f'New Best {self.partition_name.capitalize()} {self.metric}!')
             for cb in self.callbacks:
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
 
