@@ -61,6 +61,8 @@ class SemiHardNegative(TripletSamplingStrategy):
             neg = np.where(y != y_anchor)[0]
             semihard_negatives = d[neg].argsort()[:self.n]
             for negative in semihard_negatives:
+                if negative == anchor:
+                    continue
                 for positive in np.where(y == y_anchor)[0]:
                     if positive == anchor:
                         continue
