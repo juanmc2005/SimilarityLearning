@@ -5,6 +5,7 @@ import sts.utils as sts
 
 
 label2id = {'derailing': 0, 'discredit': 1, 'dominance': 2, 'sexual_harassment': 3, 'stereotype': 4}
+id2label = {0: 'derailing', 1: 'discredit', 2: 'dominance', 3: 'sexual_harassment', 4: 'stereotype'}
 
 
 def _read_ami_data(path: str):

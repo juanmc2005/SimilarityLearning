@@ -15,12 +15,12 @@ COLORS = [cmap(i) for i in range(10)]
 #           '#ff00ff', '#990000', '#999900', '#009900', '#009999']
 
 
-def visualize(feat, labels, title, dir_path, filename):
+def visualize(feat, labels, title, legend, dir_path, filename):
     plt.ion()
     plt.clf()
-    for i in range(10):
+    for i in range(len(np.unique(labels))):
         plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=COLORS[i])
-    plt.legend(['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'], loc='upper right')
+    plt.legend(legend, loc='best')
     plt.title(title)
     plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()

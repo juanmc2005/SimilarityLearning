@@ -71,7 +71,7 @@ def create_log_dir(exp_id: str, task: str, loss: str):
     :param loss: the name of the loss function that will be optimized
     :return: the name of the created directory, or exit the program if the directory exists
     """
-    log_path = f"tmp/{exp_id}-{task}-{loss}"
+    log_path = f"tmp/{task}/{loss}-{exp_id}"
     if isdir(log_path):
         print(f"The experience directory '{log_path}' already exists")
         exit(1)

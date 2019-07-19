@@ -4,7 +4,7 @@ import common
 from core.base import Trainer
 from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
 from core.plugins.storage import BestModelSaver, ModelLoader
-from core.plugins.visual import Visualizer
+from core.plugins.visual import MNISTVisualizer
 from core.plugins.misc import IntraClassDistanceStatLogger
 from datasets.mnist import MNIST
 from models import MNISTNet
@@ -54,14 +54,14 @@ if args.log_interval in range(1, 101):
     test_callbacks.append(MetricFileLogger(log_path=join(log_path, f"metric.log")))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
                                        loss_log_path=join(log_path, f"loss.log")))
+    test_callbacks.append(IntraClassDistanceStatLogger(config.test_distance, join(log_path, 'mean-dists.log')))
 else:
     print(f"[Logging: {common.enabled_str(False)}]")
 
 # Plotting configuration
 print(f"[Plots: {common.enabled_str(args.plot)}]")
 if args.plot:
-    test_callbacks.append(Visualizer(log_path, config.name, config.param_desc))
-    test_callbacks.append(IntraClassDistanceStatLogger(config.test_distance, join(log_path, 'mean-dists.log')))
+    test_callbacks.append(MNISTVisualizer(log_path, config.name, config.param_desc))
 
 # Model saving configuration
 print(f"[Model Saving: {common.enabled_str(args.save)}]")
@@ -70,7 +70,7 @@ if args.save:
 
 # Evaluation configuration
 metric = KNNAccuracyMetric(config.test_distance)
-train_callbacks.append(ClassAccuracyEvaluator(common.DEVICE, dev, metric, test_callbacks))
+train_callbacks.append(ClassAccuracyEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks))
 
 # Training configuration
 trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, args.lr),

@@ -4,6 +4,7 @@ import common
 from core.base import Trainer
 from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger, HeaderPrinter
 from core.plugins.storage import BestModelSaver, ModelLoader
+from core.plugins.misc import IntraClassDistanceStatLogger
 from datasets.ami import AMI
 from models import HateNet
 from metrics import KNNF1ScoreMetric, ClassAccuracyEvaluator
@@ -53,6 +54,7 @@ if args.log_interval in range(1, 101):
     test_callbacks.append(MetricFileLogger(log_path=join(log_path, f"metric.log")))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
                                        loss_log_path=join(log_path, f"loss.log")))
+    test_callbacks.append(IntraClassDistanceStatLogger(config.test_distance, join(log_path, 'mean-dists.log')))
 else:
     print(f"[Logging: {common.enabled_str(False)}]")
 
@@ -78,4 +80,4 @@ print(f"[Epochs: {args.epochs}]")
 print()
 
 # Start training
-trainer.train(args.epochs, log_path, common.get_basic_plots(args.lr, args.batch_size, 'Accuracy', 'green'))
+trainer.train(args.epochs, log_path, common.get_basic_plots(args.lr, args.batch_size, 'Macro F1', 'green'))

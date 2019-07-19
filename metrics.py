@@ -312,7 +312,7 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         metric_value = self.metric.get()
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, metric_value)
-        print(f"{self.partition_name.capitalize()} {self.metric}: {metric_value:.6f}")
+        print(f"[{self.partition_name.capitalize()} {self.metric}: {metric_value:.6f}]")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         if metric_value > self.best_metric:

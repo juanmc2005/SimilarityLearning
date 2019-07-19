@@ -1,13 +1,14 @@
 import numpy as np
 from core.base import TestListener
 from distances import Distance
+import datasets.ami as ami
 import visual_utils
 
 
-class Visualizer(TestListener):
+class MNISTVisualizer(TestListener):
 
     def __init__(self, base_dir, loss_name, param_desc=None):
-        super(Visualizer, self).__init__()
+        super(MNISTVisualizer, self).__init__()
         self.base_dir = base_dir
         self.loss_name = loss_name
         self.param_desc = param_desc
@@ -18,7 +19,30 @@ class Visualizer(TestListener):
         if self.param_desc is not None:
             plot_title += f" - {self.param_desc}"
         print(f"Saving plot as {plot_name}")
-        visual_utils.visualize(feat, y, plot_title, self.base_dir, plot_name)
+        visual_utils.visualize(feat, y, plot_title,
+                               legend=['0', '1', '2', '3', '4', '5', '6', '7', '8', '9'],
+                               dir_path=self.base_dir,
+                               filename=plot_name)
+
+
+class AMIVisualizer(TestListener):
+
+    def __init__(self, base_dir, loss_name, param_desc=None):
+        super(AMIVisualizer, self).__init__()
+        self.base_dir = base_dir
+        self.loss_name = loss_name
+        self.param_desc = param_desc
+
+    def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
+        plot_name = f"embeddings-epoch-{epoch}"
+        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.2f} Macro F1"
+        if self.param_desc is not None:
+            plot_title += f" - {self.param_desc}"
+        print(f"Saving plot as {plot_name}")
+        visual_utils.visualize(feat, y, plot_title,
+                               legend=[ami.id2label[i] for i in range(5)],
+                               dir_path=self.base_dir,
+                               filename=plot_name)
 
 
 class TSNEVisualizer(TestListener):
