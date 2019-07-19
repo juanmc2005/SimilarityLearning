@@ -240,12 +240,14 @@ class ClassAccuracyEvaluator(base.TrainingListener):
                 # Feed Forward
                 feat, logits = model(x, y)
                 feat = feat.detach().cpu().numpy()
-                logits = logits.detach().cpu().numpy()
+                if logits is not None:
+                    logits = logits.detach().cpu().numpy()
                 y = y.detach().cpu().numpy()
 
                 # Track accuracy
                 feat_test.append(feat)
-                logits_test.append(logits)
+                if logits is not None:
+                    logits_test.append(logits)
                 y_test.append(y)
                 self.metric.calculate_batch(feat, logits, y)
 
