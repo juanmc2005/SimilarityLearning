@@ -2,7 +2,7 @@ from os.path import join
 
 import common
 from core.base import Trainer
-from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
+from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger, HeaderPrinter
 from core.plugins.storage import BestModelSaver, ModelLoader
 from core.plugins.visual import MNISTVisualizer
 from core.plugins.misc import IntraClassDistanceStatLogger
@@ -45,7 +45,7 @@ print('[Dataset Loaded]')
 
 # Train and evaluation plugins
 test_callbacks = []
-train_callbacks = []
+train_callbacks: list = [HeaderPrinter()]
 
 # Logging configuration
 if args.log_interval in range(1, 101):

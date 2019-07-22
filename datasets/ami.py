@@ -2,6 +2,7 @@ from os.path import join
 import numpy as np
 from datasets.base import SimDataset, SimDatasetPartition, TextLongLabelPartition
 import sts.utils as sts
+from collections import Counter
 
 
 label2id = {'derailing': 0, 'discredit': 1, 'dominance': 2, 'sexual_harassment': 3, 'stereotype': 4}
@@ -12,7 +13,7 @@ def _read_ami_data(path: str):
     with open(join(path, 'text.toks'), 'r') as text_file, open(join(path, 'class.txt'), 'r') as label_file:
         sents = [line.strip().split(' ') for line in text_file.readlines()]
         labels = [label2id[line.strip()] for line in label_file.readlines()]
-    return np.array(list(zip(sents, labels)))
+    return sents, labels
 
 
 class AMI(SimDataset):
@@ -21,9 +22,21 @@ class AMI(SimDataset):
         self.batch_size = batch_size
         self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
         print(f"Created vocabulary with {n_inv} INV and {n_oov} OOV ({int(100 * n_inv / (n_inv + n_oov))}% coverage)")
-        self.train_data = _read_ami_data(join(path, lang, 'train'))
-        self.dev_data = _read_ami_data(join(path, lang, 'dev'))
-        self.test_data = _read_ami_data(join(path, lang, 'test'))
+        x_train, y_train = _read_ami_data(join(path, lang, 'train'))
+        x_dev, y_dev = _read_ami_data(join(path, lang, 'dev'))
+        x_test, y_test = _read_ami_data(join(path, lang, 'test'))
+        train_counter = Counter(y_train)
+        dev_counter = Counter(y_dev)
+        test_counter = Counter(y_test)
+        print(f"Train Sentences: {len(x_train)}")
+        print(f"Train class distribution: {train_counter}")
+        print(f"Dev Sentences: {len(x_dev)}")
+        print(f"Dev class distribution: {dev_counter}")
+        print(f"Test Sentences: {len(x_test)}")
+        print(f"Test class distribution: {test_counter}")
+        self.train_data = np.array(list(zip(x_train, y_train)))
+        self.dev_data = np.array(list(zip(x_dev, y_dev)))
+        self.test_data = np.array(list(zip(x_test, y_test)))
 
     def training_partition(self) -> SimDatasetPartition:
         return TextLongLabelPartition(self.train_data, self.batch_size, train=True)

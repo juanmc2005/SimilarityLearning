@@ -126,3 +126,25 @@ def visualize_logs(exp_path: str, log_file_name: str, metric_name: str, bottom: 
         plt.savefig(join(exp_path, f"{plot_file_name}.jpg"))
         plt.draw()
         plt.pause(0.001)
+
+
+def visualize_logs_against(files: list, chain: list, metric_name: str, colors: list,
+                           legends: list, title: str, plot_file_path: str):
+    data = []
+    for file_path in files:
+        with open(file_path, 'r') as file:
+            data.append([float(line.strip()) for line in file.readlines()])
+    start_points = [1]
+    for i in range(0, len(files) - 1):
+        start_points.append(len(data[i]) if chain[i] else 1)
+    plt.ion()
+    plt.clf()
+    for start, line, c in zip(start_points, data, colors):
+        plt.plot(range(start, start + len(line)), line, c=c)
+    plt.xlabel('Epoch')
+    plt.ylabel(metric_name)
+    plt.legend(legends, loc='best')
+    plt.title(title)
+    plt.savefig(plot_file_path)
+    plt.draw()
+    plt.pause(0.001)
