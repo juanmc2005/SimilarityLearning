@@ -103,8 +103,7 @@ evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, confi
                                            dataset.config, test_callbacks, verification_callbacks),
               SpeakerVerificationEvaluator('test', args.batch_size, config.test_distance,
                                            args.eval_interval, dataset.config,
-                                           callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))],
-                                           verification_callbacks=verification_callbacks)]
+                                           callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])]
 train_callbacks.extend(evaluators)
 
 # Training configuration

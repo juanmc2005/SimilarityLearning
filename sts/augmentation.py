@@ -231,7 +231,7 @@ class BaseTripletAugmentationStrategy(SemEvalAugmentationStrategy):
         self.threshold = threshold
         self.remove_scores = remove_scores if remove_scores is not None else []
 
-    def _pad(self, anchors, positives, negatives):
+    def _split_and_pad(self, anchors, positives, negatives):
         a, p, n = [], [], []
         for s1, s2, s3 in zip(anchors, positives, negatives):
             s1pad, s2pad, s3pad = pad_sent_triplet(s1.split(' '), s2.split(' '), s3.split(' '))
@@ -264,7 +264,7 @@ class TripletPairAugmentation(BaseTripletAugmentationStrategy):
         print(f"Pairs which are positive and negative at the same time: {len(dups)}")
         print(f"Unique Train Pairs: {len(unique_pairs)}")
         print(f"Triplets: {len(anchors)}")
-        triplets = self._pad(anchors, positives, negatives)
+        triplets = self._split_and_pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
         return np.array(list(zip(triplets, unused_y)))
 
@@ -294,11 +294,13 @@ class TripletNoAugmentation(BaseTripletAugmentationStrategy):
                     positives.append(positive)
                     negatives.append(negative)
 
-        triplets = self._pad(anchors, positives, negatives)
+        sentences_kept = len(list(set(anchors + negatives + positives)))
+        triplets = self._split_and_pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
         print(f"Unique Train Pairs: {len(unique_train_data)}")
         print(f"Unique Train Sentences: {len(unique_sents)}")
         print(f"Triplets: {len(anchors)}")
+        print(f"Unique Train Sentences kept: {sentences_kept}")
         return np.array(list(zip(triplets, unused_y)))
 
 
