@@ -4,6 +4,7 @@ import time
 import numpy as np
 from os.path import join
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 from sklearn.manifold import TSNE
 from sklearn.neighbors import NearestNeighbors
 from scipy.spatial.distance import pdist
@@ -102,9 +103,32 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
     bins = np.arange(0, 1, step=0.005)
     plt.ion()
     plt.clf()
-    plt.hist([dist for dist, y in zip(dists, y_true) if y == 1], bins, alpha=0.5, label='Same', color='green')
-    plt.hist([dist for dist, y in zip(dists, y_true) if y == 0], bins, alpha=0.5, label='Different', color='red')
+    plt.hist([dist for dist, y in zip(dists, y_true) if y == 1], bins,
+             alpha=0.5, density=True, label='Same', color='green', histtype='stepfilled')
+    plt.hist([dist for dist, y in zip(dists, y_true) if y == 0], bins,
+             alpha=0.5, density=True, label='Different', color='red', histtype='stepfilled')
     plt.legend(loc='upper right')
+    plt.title(title)
+    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.draw()
+    plt.pause(0.001)
+
+
+def plot_det_curve(fpr, fnr, title, dir_path, filename):
+    plt.ion()
+    plt.clf()
+    fig, ax = plt.subplots()
+    plt.plot(fpr, fnr)
+    plt.yscale('log')
+    plt.xscale('log')
+    ticks_to_use = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50]
+    ax.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+    ax.get_yaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+    ax.set_xticks(ticks_to_use)
+    ax.set_yticks(ticks_to_use)
+    plt.axis([0.001, 50, 0.001, 50])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('False Negative Rate')
     plt.title(title)
     plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()

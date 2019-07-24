@@ -169,6 +169,12 @@ class SpeakerValidationConfig:
         self.duration = duration
 
 
+class VerificationTestCallback:
+
+    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr):
+        raise NotImplementedError
+
+
 # TODO These evaluator classes need to be refactored, they share a lot of code
 
 class SpeakerVerificationEvaluator(base.TrainingListener):
@@ -184,7 +190,7 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
         return hash((uri, segments))
 
     def __init__(self, partition: str, batch_size: int, distance: Distance, eval_interval: int,
-                 config: SpeakerValidationConfig, callbacks=None):
+                 config: SpeakerValidationConfig, callbacks=None, verification_callbacks=None):
         super(SpeakerVerificationEvaluator, self).__init__()
         self.partition = partition
         self.batch_size = batch_size
@@ -192,6 +198,7 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
         self.eval_interval = eval_interval
         self.config = config
         self.callbacks = callbacks if callbacks is not None else []
+        self.verification_callbacks = verification_callbacks if verification_callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
 
     def _file_embedding(self, file_dict: dict, sequence_embedding: SequenceEmbedding, cache: dict):
@@ -229,17 +236,17 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
             y_pred.append(dist)
             y_true.append(trial['reference'])
 
-        _, _, _, eer = det_curve(np.array(y_true), np.array(y_pred), distances=True)
+        fpr, fnr, _, eer = det_curve(np.array(y_true), np.array(y_pred), distances=True)
 
         # Returning 1-eer because the evaluator keeps track of the highest metric value
-        return 1 - eer, y_pred, y_true
+        return 1 - eer, y_pred, y_true, fpr, fnr
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
-            metric_value, dists, y_true = self.eval(model.to_prediction_model(), self.partition)
+            metric_value, dists, y_true, fpr, fnr = self.eval(model.to_prediction_model(), self.partition)
             eer = 1 - metric_value
-            for cb in self.callbacks:
-                cb.on_after_test(epoch, dists, y_true, eer)
+            for cb in self.verification_callbacks:
+                cb.on_evaluation_finished(epoch, eer, dists, y_true, fpr, fnr)
             print(f"[{self.partition.capitalize()} EER: {eer:.6f}]")
             if self.best_epoch != -1:
                 print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")

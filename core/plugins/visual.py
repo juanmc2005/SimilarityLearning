@@ -3,6 +3,7 @@ from core.base import TestListener
 from distances import Distance
 import datasets.ami as ami
 import visual_utils
+from metrics import VerificationTestCallback
 
 
 class MNISTVisualizer(TestListener):
@@ -63,13 +64,25 @@ class TSNEVisualizer(TestListener):
         visual_utils.visualize_tsne_neighbors(unique_feat, None, self.distance, plot_title, self.base_dir, plot_name)
 
 
-class SpeakerDistanceVisualizer(TestListener):
+class SpeakerDistanceVisualizer(VerificationTestCallback):
 
     def __init__(self, base_dir):
         self.base_dir = base_dir
 
-    def on_after_test(self, epoch, feat_test, y_test, metric_value):
-        title = f'Distance distribution for dev speakers (Epoch {epoch}) - EER {metric_value:.3f}'
+    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr):
+        title = f'Distance distribution for dev speakers (Epoch {epoch}) - EER {eer:.3f}'
         filename = f'speaker-dists-epoch={epoch}'
         print(f"Saving speaker distances plot as {filename}")
-        visual_utils.plot_pred_hists(feat_test, y_test, title, self.base_dir, filename)
+        visual_utils.plot_pred_hists(distances, y_true, title, self.base_dir, filename)
+
+
+class DetCurveVisualizer(VerificationTestCallback):
+
+    def __init__(self, base_dir: str):
+        self.base_dir = base_dir
+
+    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr):
+        title = f'Dev DET Curve (Epoch {epoch}) - EER {eer:.3f}'
+        filename = f'det-curve-epoch={epoch}'
+        print(f"Saving DET curve plot as {filename}")
+        visual_utils.plot_det_curve(fpr, fnr, title, self.base_dir, filename)

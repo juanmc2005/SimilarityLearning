@@ -84,7 +84,12 @@ class BinaryScoreFormatter(ScoreFormatter):
         self.threshold = threshold
 
     def format(self, scores):
-        return [0 if s >= self.threshold else 1 for s in scores]
+        binary = [0 if s >= self.threshold else 1 for s in scores]
+        neg = sum(binary)
+        pos = len(binary) - neg
+        print(f"Positive Train Pairs: {pos}")
+        print(f"Negative Train Pairs: {neg}")
+        return binary
 
 
 class PairBinaryScoreFormatter(ScoreFormatter):

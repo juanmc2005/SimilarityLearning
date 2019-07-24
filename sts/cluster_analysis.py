@@ -4,7 +4,7 @@ from os.path import join
 import matplotlib.pyplot as plt
 import numpy as np
 
-from sts import utils as sts
+from utils import SemEvalSegment, unique_pairs
 
 
 def load_partition(path, partition):
@@ -18,8 +18,8 @@ def load_partition(path, partition):
 
 
 def clusterize(sents_a, sents_b, scores, threshold):
-    segment_a = sts.SemEvalSegment(sents_a)
-    segment_b = sts.SemEvalSegment(sents_b)
+    segment_a = SemEvalSegment(sents_a)
+    segment_b = SemEvalSegment(sents_b)
     clusters = segment_a.clusters(segment_b, scores, threshold)
     return clusters, len(clusters)
 
@@ -34,7 +34,7 @@ atest, btest, simtest = load_partition(args.path, 'test')
 sents_a = atrain + adev + atest
 sents_b = btrain + bdev + btest
 scores = simtrain + simdev + simtest
-sents_a, sents_b, scores = sts.unique_pairs(sents_a, sents_b, scores)
+sents_a, sents_b, scores = unique_pairs(sents_a, sents_b, scores)
 
 total_sents = len(set(sents_a + sents_b))
 
@@ -50,19 +50,19 @@ for i in range(5, 55, 5):
     ts.append(threshold)
 
 plt.figure(figsize=(15,5))
-plt.title('SemEval Cluster Analysis')
+plt.title('SemEval clusters per threshold')
 plt.plot(ts, kept_sents, color='LightBlue')
 plt.plot(ts, nclusters, color='DarkGreen')
 plt.axhline(y=total_sents, color='red', linestyle='--')
-plt.legend(['Sentences', 'Clusters', 'Total'], loc='upper right')
-plt.xlabel('Thresholds')
+plt.legend(['Sentences kept', 'Clusters', 'Total sentences'], loc='best')
+plt.xlabel('t')
 plt.savefig('images/t-cluster-coverage.png')
 
 plt.figure(figsize=(15,5))
-plt.title('SemEval Cluster Analysis')
+plt.title('SemEval cluster size')
 plt.plot(ts, means, color='orange')
 plt.plot(ts, maxs, color='red')
-plt.legend(['Mean Cluster Size', 'Max Cluster Size'], loc='upper right')
-plt.xlabel('Thresholds')
-plt.ylabel('N Sentences')
+plt.legend(['Mean size', 'Max size'], loc='best')
+plt.xlabel('t')
+plt.ylabel('# sentences')
 plt.savefig('images/t-cluster-size.png')

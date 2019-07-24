@@ -4,7 +4,7 @@ import common
 from core.base import Trainer
 from core.plugins.logging import TrainLogger, MetricFileLogger, HeaderPrinter
 from core.plugins.storage import BestModelSaver, RegularModelSaver, ModelLoader
-from core.plugins.visual import SpeakerDistanceVisualizer
+from core.plugins.visual import SpeakerDistanceVisualizer, DetCurveVisualizer
 from core.plugins.misc import TrainingMetricCalculator
 from datasets.voxceleb import VoxCeleb1
 from models import SpeakerNet
@@ -54,6 +54,7 @@ print('[Dataset Loaded]')
 # Train and evaluation plugins
 test_callbacks: list = []
 train_callbacks: list = [HeaderPrinter()]
+verification_callbacks: list = []
 
 # Logging configuration
 if args.log_interval in range(1, 101):
@@ -72,7 +73,8 @@ if args.save:
 # Plotting configuration
 print(f"[Plotting: {common.enabled_str(args.plot)}]")
 if args.plot:
-    test_callbacks.append(SpeakerDistanceVisualizer(log_path))
+    verification_callbacks.append(SpeakerDistanceVisualizer(log_path))
+    verification_callbacks.append(DetCurveVisualizer(log_path))
     plots = common.get_basic_plots(args.lr, args.batch_size, 'EER', 'red')
     if args.loss not in ['triplet', 'contrastive']:
         plots.append({
@@ -97,11 +99,12 @@ train_callbacks.append(RegularModelSaver(task, args.loss, log_path,
                                          experience_name=args.exp_id))
 
 # Evaluation configuration
-evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, config.test_distance,
-                                           args.eval_interval, dataset.config, test_callbacks),
+evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, config.test_distance, args.eval_interval,
+                                           dataset.config, test_callbacks, verification_callbacks),
               SpeakerVerificationEvaluator('test', args.batch_size, config.test_distance,
                                            args.eval_interval, dataset.config,
-                                           callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])]
+                                           callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))],
+                                           verification_callbacks=verification_callbacks)]
 train_callbacks.extend(evaluators)
 
 # Training configuration
