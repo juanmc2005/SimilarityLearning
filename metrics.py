@@ -245,6 +245,8 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
         if epoch % self.eval_interval == 0:
             metric_value, dists, y_true, fpr, fnr = self.eval(model.to_prediction_model(), self.partition)
             eer = 1 - metric_value
+            for cb in self.callbacks:
+                cb.on_after_test(epoch, None, None, metric_value)
             for cb in self.verification_callbacks:
                 cb.on_evaluation_finished(epoch, eer, dists, y_true, fpr, fnr, self.partition)
             print(f"[{self.partition.capitalize()} EER: {eer:.6f}]")
