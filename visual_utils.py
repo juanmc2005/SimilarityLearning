@@ -115,10 +115,8 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
 
 
 def plot_det_curve(fpr, fnr, title, dir_path, filename):
-    min_tick, max_tick = 0.001, 1
     plt.ion()
     plt.clf()
-    fig, ax = plt.subplots()
     plt.plot(fpr, fnr)
     plt.yscale('logit')
     plt.xscale('logit')
@@ -126,8 +124,25 @@ def plot_det_curve(fpr, fnr, title, dir_path, filename):
     plt.ylabel('False Negative Rate')
     plt.gca().xaxis.set_minor_formatter(mpl.ticker.NullFormatter())
     plt.gca().yaxis.set_minor_formatter(mpl.ticker.NullFormatter())
-    ax.spines['left']._adjust_location()
     plt.title(title)
+    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.draw()
+    plt.pause(0.001)
+
+
+def plot_multiple_det_curves(fprs, fnrs, title: str, legends: list, dir_path: str, filename: str):
+    plt.ion()
+    plt.clf()
+    plt.gca().xaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+    plt.gca().yaxis.set_minor_formatter(mpl.ticker.NullFormatter())
+    plt.title(title)
+    plt.yscale('logit')
+    plt.xscale('logit')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('False Negative Rate')
+    for i in range(len(fprs)):
+        plt.plot(fprs[i, :], fnrs[i, :], c=COLORS[i % 10])
+    plt.legend(legends, loc='best')
     plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()
     plt.pause(0.001)
