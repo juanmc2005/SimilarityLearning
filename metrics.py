@@ -171,7 +171,7 @@ class SpeakerValidationConfig:
 
 class VerificationTestCallback:
 
-    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr):
+    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr, partition: str):
         raise NotImplementedError
 
 
@@ -246,7 +246,7 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
             metric_value, dists, y_true, fpr, fnr = self.eval(model.to_prediction_model(), self.partition)
             eer = 1 - metric_value
             for cb in self.verification_callbacks:
-                cb.on_evaluation_finished(epoch, eer, dists, y_true, fpr, fnr)
+                cb.on_evaluation_finished(epoch, eer, dists, y_true, fpr, fnr, self.partition)
             print(f"[{self.partition.capitalize()} EER: {eer:.6f}]")
             if self.best_epoch != -1:
                 print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")

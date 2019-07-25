@@ -115,20 +115,22 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
 
 
 def plot_det_curve(fpr, fnr, title, dir_path, filename):
+    fpr, fnr = 100 * fpr, 100 * fnr
+    min_tick, max_tick = 0.1, 40
     plt.ion()
     plt.clf()
     fig, ax = plt.subplots()
     plt.plot(fpr, fnr)
     plt.yscale('log')
     plt.xscale('log')
-    ticks_to_use = [0.001, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, 1, 2, 5, 10, 20, 50]
+    ticks_to_use = [min_tick, 0.2, 0.5, 1, 2, 5, 10, 20, max_tick]
     ax.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
     ax.get_yaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
     ax.set_xticks(ticks_to_use)
     ax.set_yticks(ticks_to_use)
-    plt.axis([0.001, 50, 0.001, 50])
-    plt.xlabel('False Positive Rate')
-    plt.ylabel('False Negative Rate')
+    plt.axis([min_tick, max_tick, min_tick, max_tick])
+    plt.xlabel('False Positive Rate (in %)')
+    plt.ylabel('False Negative Rate (in %)')
     plt.title(title)
     plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()

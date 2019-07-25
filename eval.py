@@ -1,8 +1,8 @@
 import argparse
 import time
-from common import set_custom_seed
+from common import set_custom_seed, create_log_dir, to_distance_object
 from core.plugins.storage import ModelLoader
-from distances import EuclideanDistance, CosineDistance
+from core.plugins.visual import DetCurveVisualizer, SpeakerDistanceVisualizer
 from experiments.semeval import SemEvalEmbeddingEvaluationExperiment, SemEvalBaselineModelEvaluationExperiment
 from experiments.voxceleb import VoxCeleb1ModelEvaluationExperiment
 
@@ -25,15 +25,13 @@ parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace
                     help='An identifier for the experience')
 args = parser.parse_args()
 
+# Create the directory for logs
+log_dir = create_log_dir(args.exp_id, args.task, 'eval')
+
 # Set custom seed
 set_custom_seed(args.seed)
 
-if args.distance == 'cosine':
-    distance = CosineDistance()
-elif args.distance == 'euclidean':
-    distance = EuclideanDistance()
-else:
-    raise ValueError("Distance can only be: cosine / euclidean")
+distance = to_distance_object(args.distance)
 
 print(f"[Task: {args.task.upper()}]")
 
@@ -42,7 +40,9 @@ if args.task == 'speaker':
     experiment = VoxCeleb1ModelEvaluationExperiment(model_path=args.model,
                                                     nfeat=256,
                                                     distance=distance,
-                                                    batch_size=args.batch_size)
+                                                    batch_size=args.batch_size,
+                                                    verification_callbacks=[SpeakerDistanceVisualizer(log_dir),
+                                                                            DetCurveVisualizer(log_dir)])
     metric_name = 'EER'
 elif args.task == 'sts':
     model_loader = ModelLoader(args.model, restore_optimizer=False)

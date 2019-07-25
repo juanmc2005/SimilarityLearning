@@ -11,7 +11,8 @@ import visual_utils as vis
 
 class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
 
-    def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int):
+    def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int, verification_callbacks: list = None):
+        self.verification_callbacks = verification_callbacks if verification_callbacks is not None else []
         self.model = SpeakerNet(nfeat, sample_rate=16000, window=200)
         model_loader = ModelLoader(model_path, restore_optimizer=False)
         loss_name = model_loader.get_trained_loss()
@@ -21,13 +22,19 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
         # The partition parameter doesn't matter here because we're passing it at each 'eval' call
         self.evaluator = SpeakerVerificationEvaluator('', batch_size, distance, eval_interval=0, config=config)
 
+    def _evaluate(self, plot: bool, partition: str):
+        inverse_eer, dists, y_true, fpr, fnr = self.evaluator.eval(self.model, partition)
+        eer = 1 - inverse_eer
+        if plot:
+            for cb in self.verification_callbacks:
+                cb.on_evaluation_finished(None, eer, dists, y_true, fpr, fnr, partition)
+        return eer
+
     def evaluate_on_dev(self, plot: bool) -> float:
-        inverse_eer, _, _ = self.evaluator.eval(self.model, partition='development')
-        return 1 - inverse_eer
+        return self._evaluate(plot, 'development')
 
     def evaluate_on_test(self) -> float:
-        inverse_eer, _, _ = self.evaluator.eval(self.model, partition='test')
-        return 1 - inverse_eer
+        return self._evaluate(False, 'test')
 
 
 class VoxCeleb1TSNEVisualizationExperiment:
