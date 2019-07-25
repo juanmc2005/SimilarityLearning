@@ -115,21 +115,21 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
 
 
 def plot_det_curve(fpr, fnr, title, dir_path, filename):
-    # min_tick, max_tick = 0.1, 40
+    min_tick, max_tick = 0.001, 1
     plt.ion()
     plt.clf()
-    # fig, ax = plt.subplots()
+    fig, ax = plt.subplots()
     plt.plot(fpr, fnr)
     plt.yscale('logit')
     plt.xscale('logit')
-    # ticks_to_use = [min_tick, 0.2, 0.5, 1, 2, 5, 10, 20, max_tick]
-    # ax.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
-    # ax.get_yaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
-    # ax.set_xticks(ticks_to_use)
-    # ax.set_yticks(ticks_to_use)
-    # plt.axis([min_tick, max_tick, min_tick, max_tick])
-    plt.xlabel('False Positive Rate (in %)')
-    plt.ylabel('False Negative Rate (in %)')
+    ticks_to_use = [min_tick, 0.002, 0.005, 0.01, 0.02, 0.05, 0.1, 0.2, 0.5, max_tick]
+    ax.get_xaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+    ax.get_yaxis().set_major_formatter(mpl.ticker.ScalarFormatter())
+    ax.set_xticks(ticks_to_use)
+    ax.set_yticks(ticks_to_use)
+    plt.axis([min_tick, max_tick, min_tick, max_tick])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('False Negative Rate')
     plt.title(title)
     plt.savefig(join(dir_path, f"{filename}.jpg"))
     plt.draw()
