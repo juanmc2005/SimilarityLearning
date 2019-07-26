@@ -1,3 +1,4 @@
+from os.path import join
 import numpy as np
 from experiments.base import ModelEvaluationExperiment
 from datasets.voxceleb import VoxCeleb1
@@ -11,7 +12,8 @@ import visual_utils as vis
 
 class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
 
-    def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int, verification_callbacks: list = None):
+    def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int,
+                 verification_callbacks: list = None):
         self.verification_callbacks = verification_callbacks if verification_callbacks is not None else []
         self.model = SpeakerNet(nfeat, sample_rate=16000, window=200)
         model_loader = ModelLoader(model_path, restore_optimizer=False)
@@ -35,6 +37,44 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
 
     def evaluate_on_test(self) -> float:
         return self._evaluate(False, 'test')
+
+
+class VoxCeleb1DETCurveDumpExperiment(VoxCeleb1ModelEvaluationExperiment):
+
+    def __init__(self, model_path: str, nfeat: int, distance: Distance, batch_size: int,
+                 log_dir: str, verification_callbacks: list = None):
+        super(VoxCeleb1DETCurveDumpExperiment, self).__init__(model_path, nfeat, distance,
+                                                              batch_size, verification_callbacks)
+        self.log_dir = log_dir
+
+    def dump_dev_det_curve(self):
+        _, _, _, fpr, fnr = self.evaluator.eval(self.model, 'development')
+        with open(join(self.log_dir, 'development-fpr.log'), 'w') as fpr_file,\
+                open(join(self.log_dir, 'development-fnr.log'), 'w') as fnr_file:
+            for fp, fn in zip(fpr, fnr):
+                fpr_file.write(f"{fp}\n")
+                fnr_file.write(f"{fn}\n")
+
+
+class VoxCeleb1DETCurveComparisonExperiment:
+
+    def __init__(self, det_dirs: list, legends: list, log_dir: str, filename: str):
+        self.log_dir = log_dir
+        self.det_dirs = det_dirs
+        self.legends = legends
+        self.filename = filename
+
+    def plot(self):
+        fprs, fnrs = [], []
+        for folder in self.det_dirs:
+            with open(join(folder, 'development-fpr.log'), 'r') as fpr_file,\
+                    open(join(folder, 'development-fnr.log'), 'r') as fnr_file:
+                fpr = [float(line.strip()) for line in fpr_file.readlines()]
+                fnr = [float(line.strip()) for line in fnr_file.readlines()]
+                fprs.append(fpr)
+                fnrs.append(fnr)
+        vis.plot_multiple_det_curves(fprs, fnrs, 'Dev DET Curves - Speaker Verification',
+                                     self.legends, self.log_dir, self.filename)
 
 
 class VoxCeleb1TSNEVisualizationExperiment:
