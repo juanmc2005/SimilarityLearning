@@ -58,10 +58,11 @@ class VoxCeleb1DETCurveDumpExperiment(VoxCeleb1ModelEvaluationExperiment):
 
 class VoxCeleb1DETCurveComparisonExperiment:
 
-    def __init__(self, det_dirs: list, legends: list, log_dir: str, filename: str):
+    def __init__(self, det_dirs: list, legends: list, fmts: list, log_dir: str, filename: str):
         self.log_dir = log_dir
         self.det_dirs = det_dirs
         self.legends = legends
+        self.fmts = fmts
         self.filename = filename
 
     def plot(self):
@@ -73,7 +74,7 @@ class VoxCeleb1DETCurveComparisonExperiment:
                 fnr = [float(line.strip()) for line in fnr_file.readlines()]
                 fprs.append(fpr)
                 fnrs.append(fnr)
-        vis.plot_multiple_det_curves(fprs, fnrs, 'Dev DET Curves - Speaker Verification',
+        vis.plot_multiple_det_curves(fprs, fnrs, self.fmts, 'Dev DET Curves - Speaker Verification',
                                      self.legends, self.log_dir, self.filename)
 
 

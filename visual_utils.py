@@ -132,11 +132,11 @@ def plot_det_curve(fpr, fnr, title, dir_path, filename):
     plt.pause(0.001)
 
 
-def plot_multiple_det_curves(fprs, fnrs, title: str, legends: list, dir_path: str, filename: str):
+def plot_multiple_det_curves(fprs, fnrs, fmts: list, title: str, legends: list, dir_path: str, filename: str):
     plt.ion()
     plt.clf()
     for i in range(len(fprs)):
-        plt.plot(fprs[i], fnrs[i], c=COLORS[i % 10])
+        plt.plot(fprs[i], fnrs[i], fmts[i])
     plt.title(title)
     plt.yscale('logit')
     plt.xscale('logit')
