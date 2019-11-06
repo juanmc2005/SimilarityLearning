@@ -3,6 +3,7 @@
 import torch
 import torch.nn.functional as F
 from pyannote.audio.features.utils import RawAudio
+from pyannote.audio.augmentation.noise import AddNoise
 from pyannote.audio.embedding.generators import SpeechSegmentGenerator
 from pyannote.database import get_protocol
 from pyannote.database import FileFinder
@@ -56,7 +57,10 @@ class VoxCelebDataset(SimDataset):
 
     def training_partition(self) -> VoxCelebPartition:
         if self.train_gen is None:
-            self.train_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
+            augmentation = AddNoise(snr_min=10, snr_max=20,
+                                    collection='MUSAN.Collection.BackgroundNoise')
+            feature_extraction = RawAudio(sample_rate=self.sample_rate, augmentation=augmentation)
+            self.train_gen = SpeechSegmentGenerator(feature_extraction, self.protocol,
                                                     subset='train', per_label=self.segments_per_speaker,
                                                     per_fold=self.batch_size // self.segments_per_speaker,
                                                     duration=self.segment_size_s, parallel=3, per_epoch=2)
@@ -64,14 +68,14 @@ class VoxCelebDataset(SimDataset):
 
     def dev_partition(self) -> VoxCelebPartition:
         if self.dev_gen is None:
-            self.dev_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
+            self.dev_gen = SpeechSegmentGenerator(RawAudio(sample_rate=self.sample_rate), self.protocol,
                                                   subset='development', per_label=1, per_fold=self.batch_size,
                                                   duration=self.segment_size_s, parallel=2, per_epoch=2)
         return VoxCelebPartition(self.dev_gen, self.nfeat)
 
     def test_partition(self) -> VoxCelebPartition:
         if self.test_gen is None:
-            self.test_gen = SpeechSegmentGenerator(self.config.feature_extraction, self.protocol,
+            self.test_gen = SpeechSegmentGenerator(RawAudio(sample_rate=self.sample_rate), self.protocol,
                                                    subset='test', per_label=1, per_fold=self.batch_size,
                                                    duration=self.segment_size_s, parallel=2)
         return VoxCelebPartition(self.test_gen, self.nfeat)
@@ -80,20 +84,18 @@ class VoxCelebDataset(SimDataset):
 class VoxCeleb1(VoxCelebDataset):
 
     @staticmethod
-    def _config(sample_rate: int, segment_size_sec: float):
+    def _config(segment_size_sec: float):
         return metrics.SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb1_X',
-                                               feature_extraction=RawAudio(sample_rate=sample_rate),
                                                preprocessors={'audio': FileFinder()},
                                                duration=segment_size_sec)
 
     def _create_config(self, segment_size_sec: float):
-        return self._config(self.sample_rate, segment_size_sec)
+        return self._config(segment_size_sec)
 
 
 class VoxCeleb2(VoxCelebDataset):
 
     def _create_config(self, segment_size_sec: float):
         return metrics.SpeakerValidationConfig(protocol_name='VoxCeleb.SpeakerVerification.VoxCeleb2',
-                                               feature_extraction=RawAudio(sample_rate=self.sample_rate),
                                                preprocessors={'audio': FileFinder()},
                                                duration=segment_size_sec)

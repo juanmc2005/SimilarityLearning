@@ -165,11 +165,11 @@ class ContrastiveConfig(LossConfig):
         elif task == 'speaker':
             optimizers = sincnet_optims(model, lr[0])
             schedulers = []
-        elif task == 'sts' or task == 'ami':
+        elif task in ['sts', 'ami', 'snli']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = []
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts')
+            raise ValueError('Task must be one of mnist/speaker/sts/ami/snli')
         return base.Optimizer(optimizers, schedulers)
 
 

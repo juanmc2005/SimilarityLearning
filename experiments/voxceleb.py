@@ -8,6 +8,7 @@ from metrics import SpeakerVerificationEvaluator
 from distances import Distance
 import common
 import visual_utils as vis
+from pyannote.audio.features.utils import RawAudio
 
 
 class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
@@ -20,9 +21,10 @@ class VoxCeleb1ModelEvaluationExperiment(ModelEvaluationExperiment):
         loss_name = model_loader.get_trained_loss()
         model_loader.load(self.model, loss_name)
         self.model = self.model.to_prediction_model().to(common.DEVICE)
-        config = VoxCeleb1._config(sample_rate=16000, segment_size_sec=0.2)
+        config = VoxCeleb1._config(segment_size_sec=0.2)
         # The partition parameter doesn't matter here because we're passing it at each 'eval' call
-        self.evaluator = SpeakerVerificationEvaluator('', batch_size, distance, eval_interval=0, config=config)
+        self.evaluator = SpeakerVerificationEvaluator('', batch_size, distance, eval_interval=0,
+                                                      config=config, feature_extraction=RawAudio(sample_rate=16000))
 
     def _evaluate(self, plot: bool, partition: str):
         inverse_eer, dists, y_true, fpr, fnr = self.evaluator.eval(self.model, partition)

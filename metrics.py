@@ -150,7 +150,7 @@ class DistanceSpearmanMetric(Metric):
 
     def calculate_batch(self, embeddings, logits, y):
         embeddings1, embeddings2 = embeddings
-        self.similarity.extend([-self.distance.dist(embeddings1[i,:].unsqueeze(0), embeddings2[i,:].unsqueeze(0))
+        self.similarity.extend([-self.distance.dist(embeddings1[i, :].unsqueeze(0), embeddings2[i, :].unsqueeze(0))
                                 for i in range(embeddings1.size(0))])
         self.targets.extend(list(y))
 
@@ -160,11 +160,51 @@ class DistanceSpearmanMetric(Metric):
         return metric
 
 
+class SNLIDistanceAutoAccuracyMetric(Metric):
+
+    def __init__(self, distance: Distance, label2id: dict):
+        self.distance = distance
+        self.label2id = label2id
+        self.distances, self.targets = np.array([]), []
+
+    def _norm_dist_to_label(self, d: float) -> str:
+        if d < 0.3:
+            return self.label2id['entailment']
+        elif d > 0.7:
+            return self.label2id['contradiction']
+        else:
+            return self.label2id['neutral']
+
+    def __str__(self):
+        return 'Distance Accuracy'
+
+    def fit(self, embeddings, y):
+        pass
+
+    def calculate_batch(self, embeddings, logits, y):
+        embeddings1, embeddings2 = embeddings
+        dists = self.distance.dist(embeddings1, embeddings2).detach().cpu().numpy()
+        self.distances = np.concatenate((self.distances, dists), axis=None)
+        self.targets.extend(list(y))
+
+    def get(self):
+        print(f"eval distances: {self.distances[:3]}")
+        print(f"targets: {self.targets[:3]}")
+        min_dist, max_dist = np.min(self.distances), np.max(self.distances)
+        preds = (self.distances - min_dist) / (max_dist - min_dist)
+        preds = np.array([self._norm_dist_to_label(d) for d in preds])
+        y = np.array(self.targets)
+        correct = (preds == y).sum()
+        total = y.shape[0]
+        metric = correct / total
+        self.distances, self.targets = np.array([]), []
+        return metric
+
+
 class SpeakerValidationConfig:
 
-    def __init__(self, protocol_name, feature_extraction, preprocessors, duration):
+    def __init__(self, protocol_name, preprocessors, duration):
         self.protocol_name = protocol_name
-        self.feature_extraction = feature_extraction
         self.preprocessors = preprocessors
         self.duration = duration
 
@@ -190,13 +230,14 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
         return hash((uri, segments))
 
     def __init__(self, partition: str, batch_size: int, distance: Distance, eval_interval: int,
-                 config: SpeakerValidationConfig, callbacks=None, verification_callbacks=None):
+                 config: SpeakerValidationConfig, feature_extraction, callbacks=None, verification_callbacks=None):
         super(SpeakerVerificationEvaluator, self).__init__()
         self.partition = partition
         self.batch_size = batch_size
         self.distance = distance
         self.eval_interval = eval_interval
         self.config = config
+        self.feature_extraction = feature_extraction
         self.callbacks = callbacks if callbacks is not None else []
         self.verification_callbacks = verification_callbacks if verification_callbacks is not None else []
         self.best_metric, self.best_epoch = 0, -1
@@ -215,7 +256,7 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
     def eval(self, model, partition: str = 'development'):
         model.eval()
         sequence_embedding = SequenceEmbedding(model=model,
-                                               feature_extraction=self.config.feature_extraction,
+                                               feature_extraction=self.feature_extraction,
                                                duration=self.config.duration,
                                                step=.5 * self.config.duration,
                                                batch_size=self.batch_size,
@@ -386,14 +427,14 @@ class STSEmbeddingEvaluator(base.TrainingListener):
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, metric_value)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Dev Spearman: {metric_value:.6f}")
+        print(f"Dev {self.metric}: {metric_value:.6f}")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         print("------------------------------------------------")
         if metric_value > self.best_metric:
             self.best_metric = metric_value
             self.best_epoch = epoch
-            print('New Best Dev Spearman!')
+            print(f'New Best Dev {self.metric}!')
             for cb in self.callbacks:
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
 

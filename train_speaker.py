@@ -9,6 +9,7 @@ from core.plugins.misc import TrainingMetricCalculator
 from datasets.voxceleb import VoxCeleb1
 from models import SpeakerNet
 from metrics import LogitsAccuracyMetric, SpeakerVerificationEvaluator
+from pyannote.audio.features.utils import RawAudio
 
 
 task = 'speaker'
@@ -46,7 +47,7 @@ dataset = VoxCeleb1(args.batch_size,
 train = dataset.training_partition()
 config = common.get_config(args.loss, nfeat, train.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = SpeakerNet(nfeat, sample_rate=16000, window=args.segment_length, loss_module=config.loss_module)
+model = SpeakerNet(nfeat, sample_rate=dataset.sample_rate, window=args.segment_length, loss_module=config.loss_module)
 print(f"[Train Classes: {train.nclass}]")
 print(f"[Batches per Epoch: {train.batches_per_epoch}]")
 print('[Dataset Loaded]')
@@ -100,9 +101,10 @@ train_callbacks.append(RegularModelSaver(task, args.loss, log_path,
 
 # Evaluation configuration
 evaluators = [SpeakerVerificationEvaluator('development', args.batch_size, config.test_distance, args.eval_interval,
-                                           dataset.config, test_callbacks, verification_callbacks),
-              SpeakerVerificationEvaluator('test', args.batch_size, config.test_distance,
-                                           args.eval_interval, dataset.config,
+                                           dataset.config, RawAudio(sample_rate=dataset.sample_rate),
+                                           test_callbacks, verification_callbacks),
+              SpeakerVerificationEvaluator('test', args.batch_size, config.test_distance, args.eval_interval,
+                                           dataset.config, RawAudio(sample_rate=dataset.sample_rate),
                                            callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])]
 train_callbacks.extend(evaluators)
 

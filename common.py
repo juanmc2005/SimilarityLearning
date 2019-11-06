@@ -100,14 +100,14 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float, dis
                                     margin=margin,
                                     distance=to_distance_object(distance),
                                     size_average=size_average,
-                                    online=task != 'sts')
+                                    online=task != 'sts' and task != 'snli')
     elif loss == 'triplet':
         print(f"[Margin: {margin}]")
         return cf.TripletConfig(DEVICE,
                                 margin=margin,
                                 distance=to_distance_object(distance),
                                 size_average=size_average,
-                                online=task != 'sts',
+                                online=task != 'sts' and task != 'snli',
                                 sampling=get_triplet_strategy(triplet_strategy, semihard_n))
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")
