@@ -6,6 +6,7 @@ from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
 from core.plugins.storage import BestModelSaver, ModelLoader
 from datasets.snli import SNLI
 from sts.modes import STSForwardModeFactory
+from sts.augmentation import SNLIAugmentationStrategyFactory
 from models import SemanticNet
 from metrics import STSEmbeddingEvaluator, SNLIDistanceAutoAccuracyMetric
 
@@ -17,6 +18,8 @@ parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to SNLI dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
 parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
+parser.add_argument('--dump-triplets', type=str, required=False, default=None,
+                    help='Path to directory to dump generated triplets')
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
@@ -34,9 +37,11 @@ print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
 nfeat = 4096
+label2int = {'entailment': 0,  'neutral': 1, 'contradiction': 2}
 mode = STSForwardModeFactory().new(args.loss)
-dataset = SNLI(args.path, args.word2vec, args.vocab, args.batch_size)
-config = common.get_config(args.loss, nfeat, 0, task, args.margin, args.distance,
+augmentation = SNLIAugmentationStrategyFactory(args.loss, label2int, args.dump_triplets).new()
+dataset = SNLI(args.path, args.word2vec, args.vocab, args.batch_size, augmentation, label2int)
+config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
 model = SemanticNet(common.DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
 dev = dataset.dev_partition()

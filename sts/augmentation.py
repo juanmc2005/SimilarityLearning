@@ -1,3 +1,4 @@
+from os.path import join
 import numpy as np
 import math
 from sts import utils
@@ -195,6 +196,31 @@ class PairAugmentation(SemEvalAugmentationStrategy):
         return train_sents
 
 
+class SNLINoNeutralAugmentation(SemEvalAugmentationStrategy):
+
+    def __init__(self, label2int: dict):
+        self.label2int = label2int
+
+    def _remove_neutrals(self, asents, bsents, labels):
+        id_neutral = self.label2int['neutral']
+        a = [sent for i, sent in enumerate(asents) if labels[i] != id_neutral]
+        b = [sent for i, sent in enumerate(bsents) if labels[i] != id_neutral]
+        sim = [1 if s == self.label2int['contradiction'] else 0 for s in labels if s != id_neutral]
+        return a, b, sim
+
+    def nclass(self):
+        return 2
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_labels: list) -> np.ndarray:
+        atrain, btrain, simtrain = self._remove_neutrals(train_sents_a, train_sents_b, train_labels)
+        a, b = [], []
+        for s1, s2 in zip(atrain, btrain):
+            s1pad, s2pad = pad_sent_pair(s1.split(' '), s2.split(' '))
+            a.append(s1pad)
+            b.append(s2pad)
+        return np.array(list(zip(zip(a, b), simtrain)))
+
+
 class OfflineTripletSampling:
 
     def sample(self, triplets: list):
@@ -225,13 +251,26 @@ class KeepAllOfflineTripletSampling(OfflineTripletSampling):
         return triplets
 
 
-class BaseTripletAugmentationStrategy(SemEvalAugmentationStrategy):
+class TripletGenerator:
 
-    def __init__(self, threshold: float, remove_scores: list = None):
-        self.threshold = threshold
-        self.remove_scores = remove_scores if remove_scores is not None else []
+    def __init__(self, desc: str, is_positive, dump_dir: str = None):
+        self.desc = desc
+        self.is_positive = is_positive
+        self.dump_dir = dump_dir
 
-    def _split_and_pad(self, anchors, positives, negatives):
+    def is_negative(self, similarity):
+        return not self.is_positive(similarity)
+
+    def anchor_related(self, anchor, train_data, is_annotation_valid):
+        pos = []
+        for sent1, sent2, annotation in train_data:
+            is_sent1 = sent1 == anchor
+            is_sent2 = sent2 == anchor
+            if (is_sent1 or is_sent2) and is_annotation_valid(annotation):
+                pos.append(sent1 if is_sent2 else sent2)
+        return pos
+
+    def split_and_pad(self, anchors, positives, negatives):
         a, p, n = [], [], []
         for s1, s2, s3 in zip(anchors, positives, negatives):
             s1pad, s2pad, s3pad = pad_sent_triplet(s1.split(' '), s2.split(' '), s3.split(' '))
@@ -240,8 +279,63 @@ class BaseTripletAugmentationStrategy(SemEvalAugmentationStrategy):
             n.append(s3pad)
         return zip(a, p, n)
 
+    def generate(self, atrain, btrain, simtrain):
+        unique_train_data = list(set(zip(atrain, btrain, simtrain)))
+        unique_sents = list(set(atrain + btrain))
+        anchors, positives, negatives = [], [], []
+        for anchor in tqdm(unique_sents, total=len(unique_sents), desc=self.desc):
+            for positive in self.anchor_related(anchor, unique_train_data, self.is_positive):
+                for negative in self.anchor_related(anchor, unique_train_data, self.is_negative):
+                    anchors.append(anchor)
+                    positives.append(positive)
+                    negatives.append(negative)
 
-class TripletPairAugmentation(BaseTripletAugmentationStrategy):
+        if self.dump_dir is not None:
+            with open(join(self.dump_dir, 'anchors'), 'w') as anchor_file, \
+                    open(join(self.dump_dir, 'positives'), 'w') as pos_file, \
+                    open(join(self.dump_dir, 'negatives'), 'w') as neg_file:
+                for anchor in anchors:
+                    anchor_file.write(anchor + '\n')
+                for pos in positives:
+                    pos_file.write(pos + '\n')
+                for neg in negatives:
+                    neg_file.write(neg + '\n')
+
+        sentences_kept = len(list(set(anchors + negatives + positives)))
+        triplets = self.split_and_pad(anchors, positives, negatives)
+        unused_y = np.zeros(len(anchors))
+        print(f"Unique Train Pairs: {len(unique_train_data)}")
+        print(f"Unique Train Sentences: {len(unique_sents)}")
+        print(f"Triplets: {len(anchors)}")
+        print(f"Unique Train Sentences kept: {sentences_kept}")
+        return np.array(list(zip(triplets, unused_y)))
+
+
+class SNLITripletNoAugmentation(SemEvalAugmentationStrategy):
+
+    def __init__(self, label2int: dict, dump_dir: str = None):
+        self.dump_dir = dump_dir
+        self.base = SNLINoNeutralAugmentation(label2int)
+        self.triplet_generator = TripletGenerator(desc='Generating SNLI triplets',
+                                                  is_positive=lambda s: s == 0,
+                                                  dump_dir=dump_dir)
+
+    def augment(self, train_sents_a: list, train_sents_b: list, train_labels: list) -> np.ndarray:
+        # Remove neutrals and get pairs formatted for contrastive loss (0 = positive, 1 = negative)
+        train_data = self.base.augment(train_sents_a, train_sents_b, train_labels)
+        atrain = [' '.join(row[0][0]) for row in train_data]
+        btrain = [' '.join(row[0][1]) for row in train_data]
+        simtrain = [row[1] for row in train_data]
+        return self.triplet_generator.generate(atrain, btrain, simtrain)
+
+
+class TripletPairAugmentation(SemEvalAugmentationStrategy):
+
+    def __init__(self, threshold: float, remove_scores: list = None):
+        self.threshold = threshold
+        self.remove_scores = remove_scores if remove_scores is not None else []
+        # Only used for splitting and padding sentences inside the triplets
+        self.triplet_generator = TripletGenerator('', None)
 
     def _triplets(self, sents_a, sents_b, scores):
         segment_a = utils.SemEvalSegment(sents_a)
@@ -264,44 +358,23 @@ class TripletPairAugmentation(BaseTripletAugmentationStrategy):
         print(f"Pairs which are positive and negative at the same time: {len(dups)}")
         print(f"Unique Train Pairs: {len(unique_pairs)}")
         print(f"Triplets: {len(anchors)}")
-        triplets = self._split_and_pad(anchors, positives, negatives)
+        triplets = self.triplet_generator.split_and_pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
         return np.array(list(zip(triplets, unused_y)))
 
 
-class TripletNoAugmentation(BaseTripletAugmentationStrategy):
+class TripletNoAugmentation(SemEvalAugmentationStrategy):
 
-    def _anchor_related(self, anchor, train_data, is_score_valid):
-        pos = []
-        for sent1, sent2, score in train_data:
-            is_sent1 = sent1 == anchor
-            is_sent2 = sent2 == anchor
-            if (is_sent1 or is_sent2) and is_score_valid(score):
-                pos.append(sent1 if is_sent2 else sent2)
-        return pos
+    def __init__(self, threshold: float, remove_scores: list = None):
+        self.threshold = threshold
+        self.remove_scores = remove_scores if remove_scores is not None else []
+        self.triplet_generator = TripletGenerator(desc=f"Generating triplets with threshold={self.threshold}",
+                                                  is_positive=lambda s: s >= self.threshold)
 
     def augment(self, train_sents_a: list, train_sents_b: list, train_scores: list) -> np.ndarray:
         atrain, btrain, simtrain = remove_pairs_with_score(train_sents_a, train_sents_b,
                                                            train_scores, self.remove_scores)
-        unique_train_data = list(set(zip(atrain, btrain, simtrain)))
-        unique_sents = list(set(atrain + btrain))
-        anchors, positives, negatives = [], [], []
-        for anchor in tqdm(unique_sents, total=len(unique_sents),
-                           desc=f"Generating triplets with threshold={self.threshold}"):
-            for positive in self._anchor_related(anchor, unique_train_data, lambda s: s >= self.threshold):
-                for negative in self._anchor_related(anchor, unique_train_data, lambda s: s < self.threshold):
-                    anchors.append(anchor)
-                    positives.append(positive)
-                    negatives.append(negative)
-
-        sentences_kept = len(list(set(anchors + negatives + positives)))
-        triplets = self._split_and_pad(anchors, positives, negatives)
-        unused_y = np.zeros(len(anchors))
-        print(f"Unique Train Pairs: {len(unique_train_data)}")
-        print(f"Unique Train Sentences: {len(unique_sents)}")
-        print(f"Triplets: {len(anchors)}")
-        print(f"Unique Train Sentences kept: {sentences_kept}")
-        return np.array(list(zip(triplets, unused_y)))
+        return self.triplet_generator.generate(atrain, btrain, simtrain)
 
 
 class SemEvalAugmentationStrategyFactory:
@@ -330,3 +403,19 @@ class SemEvalAugmentationStrategyFactory:
         else:
             # Softmax based loss
             return ClusterAugmentation(self.threshold)
+
+
+class SNLIAugmentationStrategyFactory:
+
+    def __init__(self, loss: str, label2int: dict, triplet_dump_dir: str = None):
+        self.loss = loss
+        self.label2int = label2int
+        self.triplet_dump_dir = triplet_dump_dir
+
+    def new(self):
+        if self.loss == 'contrastive':
+            return SNLINoNeutralAugmentation(self.label2int)
+        elif self.loss == 'triplet':
+            return SNLITripletNoAugmentation(self.label2int, self.triplet_dump_dir)
+        else:
+            raise ValueError('Loss must be one of: contrastive/triplet')
