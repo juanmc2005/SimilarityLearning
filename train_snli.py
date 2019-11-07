@@ -18,6 +18,7 @@ parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to SNLI dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
 parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
+parser.add_argument('--per-epoch', type=int, required=True, default=None, help='Number of batches per epoch')
 parser.add_argument('--dump-triplets', type=str, required=False, default=None,
                     help='Path to directory to dump generated triplets')
 args = parser.parse_args()
@@ -40,7 +41,7 @@ nfeat = 4096
 label2int = {'entailment': 0,  'neutral': 1, 'contradiction': 2}
 mode = STSForwardModeFactory().new(args.loss)
 augmentation = SNLIAugmentationStrategyFactory(args.loss, label2int, args.dump_triplets).new()
-dataset = SNLI(args.path, args.word2vec, args.vocab, args.batch_size, augmentation, label2int)
+dataset = SNLI(args.path, args.word2vec, args.vocab, args.batch_size, augmentation, label2int, args.per_epoch)
 config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
 model = SemanticNet(common.DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
@@ -68,7 +69,7 @@ if args.save:
     test_callbacks.append(BestModelSaver(task, args.loss, log_path, args.exp_id))
 
 # Evaluation configuration
-metric = SNLIDistanceAutoAccuracyMetric(config.test_distance, dataset.label2int)
+metric = SNLIDistanceAutoAccuracyMetric(config.test_distance, label2int)
 evaluator = STSEmbeddingEvaluator(common.DEVICE, dev, metric, test_callbacks)
 train_callbacks.append(evaluator)
 

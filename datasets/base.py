@@ -49,10 +49,11 @@ class LoaderWrapperPartition(SimDatasetPartition):
 
 class TextPartition(SimDatasetPartition):
 
-    def __init__(self, data, batch_size: int, train: bool):
+    def __init__(self, data, batch_size: int, train: bool, batches_per_epoch: int = None):
         self.data = data
         self.batch_size = batch_size
         self.train = train
+        self.batches_per_epoch = batches_per_epoch
         self.generator = self._generate()
 
     def _transform_batch(self, x, y):
@@ -67,7 +68,11 @@ class TextPartition(SimDatasetPartition):
                 yield self.data[i:j]
 
     def nbatches(self):
-        return math.ceil(len(self.data) / self.batch_size)
+        total_batches = math.ceil(len(self.data) / self.batch_size)
+        if self.batches_per_epoch is not None and self.batches_per_epoch in range(1, total_batches):
+            return self.batches_per_epoch
+        else:
+            return total_batches
 
     def __next__(self):
         batch = next(self.generator)

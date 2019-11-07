@@ -213,6 +213,10 @@ class SNLINoNeutralAugmentation(SemEvalAugmentationStrategy):
 
     def augment(self, train_sents_a: list, train_sents_b: list, train_labels: list) -> np.ndarray:
         atrain, btrain, simtrain = self._remove_neutrals(train_sents_a, train_sents_b, train_labels)
+        print(f"Train Pairs (no neutrals): {len(atrain)}")
+        print(f"Unique Train Sentences (no neutrals): {len(set(atrain + btrain))}")
+        print(f"+ Train Pairs: {sum([1 for y in simtrain if y == 0])}")
+        print(f"- Train Pairs: {sum([1 for y in simtrain if y == 1])}")
         a, b = [], []
         for s1, s2 in zip(atrain, btrain):
             s1pad, s2pad = pad_sent_pair(s1.split(' '), s2.split(' '))
@@ -304,8 +308,6 @@ class TripletGenerator:
         sentences_kept = len(list(set(anchors + negatives + positives)))
         triplets = self.split_and_pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
-        print(f"Unique Train Pairs: {len(unique_train_data)}")
-        print(f"Unique Train Sentences: {len(unique_sents)}")
         print(f"Triplets: {len(anchors)}")
         print(f"Unique Train Sentences kept: {sentences_kept}")
         return np.array(list(zip(triplets, unused_y)))
