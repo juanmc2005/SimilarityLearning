@@ -59,7 +59,7 @@ partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
 dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), partition_factory)
 config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = SemanticNet(common.DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
+model = SemanticNet(common.DEVICE, nfeat, 1, dataset.vocab, loss_module=config.loss_module, mode=mode)
 dev = dataset.dev_partition()
 train = dataset.training_partition()
 print('[Dataset Loaded]')

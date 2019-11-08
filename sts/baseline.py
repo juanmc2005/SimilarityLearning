@@ -7,7 +7,7 @@ from sts.modes import STSForwardMode
 
 class STSBaselineNet(nn.Module):
 
-    def __init__(self, device: str, nfeat_word: int, nfeat_sent: int, vec_vocab: dict, mode: STSForwardMode):
+    def __init__(self, device: str, nfeat_word: int, nfeat_sent: int, nlayers: int, vec_vocab: dict, mode: STSForwardMode):
         super(STSBaselineNet, self).__init__()
         self.device = device
         self.nfeat_word = nfeat_word
@@ -24,7 +24,7 @@ class STSBaselineNet(nn.Module):
             pretrained_weight[i] = vec_vocab[word].numpy()
         self.word_embedding.weight.data.copy_(torch.from_numpy(pretrained_weight))
         self.lstm = nn.LSTM(input_size=nfeat_word, hidden_size=nfeat_sent // 2,
-                            num_layers=1, bidirectional=True)
+                            num_layers=nlayers, bidirectional=True)
 
     def _to_word_embeddings(self, sent):
         word_ids = [self.word2id[word] if word in self.word2id else self.word2id['oov'] for word in sent]

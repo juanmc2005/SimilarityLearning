@@ -33,7 +33,7 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
         partition_factory = SemEvalPartitionFactory(loss=self.loss_name, batch_size=batch_size)
         self.dataset = SemEval(data_path, word2vec_path, vocab_path, augmentation, partition_factory)
 
-        self.model = SemanticNet(DEVICE, nfeat, self.dataset.vocab,
+        self.model = SemanticNet(DEVICE, nfeat, 1, self.dataset.vocab,
                                  mode=self._get_model_mode(),
                                  loss_module=self._get_loss_module())
         model_loader.load(self.model, self.loss_name)

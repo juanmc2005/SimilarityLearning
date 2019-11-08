@@ -18,6 +18,7 @@ parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to SNLI dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
 parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
+parser.add_argument('--layers', type=int, required=False, default=1, help='Number of stacked LSTMs')
 parser.add_argument('--per-epoch', type=int, required=False, default=None, help='Number of batches per epoch')
 parser.add_argument('--dump-triplets', type=str, required=False, default=None,
                     help='Path to directory to dump generated triplets')
@@ -44,7 +45,7 @@ augmentation = SNLIAugmentationStrategyFactory(args.loss, label2int, args.dump_t
 dataset = SNLI(args.path, args.word2vec, args.vocab, args.batch_size, augmentation, label2int, args.per_epoch)
 config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = SemanticNet(common.DEVICE, nfeat, dataset.vocab, loss_module=config.loss_module, mode=mode)
+model = SemanticNet(common.DEVICE, nfeat, args.layers, dataset.vocab, loss_module=config.loss_module, mode=mode)
 dev = dataset.dev_partition()
 train = dataset.training_partition()
 print('[Dataset Loaded]')
