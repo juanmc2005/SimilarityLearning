@@ -1,7 +1,7 @@
 import torch
 import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score, confusion_matrix
 from scipy.stats import spearmanr
 from pyannote.audio.embedding.extraction import SequenceEmbedding
 from pyannote.database import get_protocol, get_unique_identifier
@@ -168,9 +168,9 @@ class SNLIDistanceAutoAccuracyMetric(Metric):
         self.distances, self.targets = np.array([]), []
 
     def _norm_dist_to_label(self, d: float) -> str:
-        if d < 0.3:
+        if d < 0.33:
             return self.label2id['entailment']
-        elif d > 0.7:
+        elif d > 0.66:
             return self.label2id['contradiction']
         else:
             return self.label2id['neutral']
@@ -188,16 +188,18 @@ class SNLIDistanceAutoAccuracyMetric(Metric):
         self.targets.extend(list(y))
 
     def get(self):
-        print(f"eval distances: {self.distances[:3]}")
-        print(f"targets: {self.targets[:3]}")
-        min_dist, max_dist = np.min(self.distances), np.max(self.distances)
-        preds = (self.distances - min_dist) / (max_dist - min_dist)
+        # Min Max Normalization (minimum is always 0)
+        preds = self.distances / self.distance.max
+        # Use distances to make predictions
         preds = np.array([self._norm_dist_to_label(d) for d in preds])
         y = np.array(self.targets)
+        # Calculate accuracy
         correct = (preds == y).sum()
         total = y.shape[0]
         metric = correct / total
+        # Reset internal state and print confusion matrix
         self.distances, self.targets = np.array([]), []
+        print(f"Confusion Matrix:\n{confusion_matrix(y, preds)}")
         return metric
 
 

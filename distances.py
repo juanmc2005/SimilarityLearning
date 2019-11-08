@@ -9,6 +9,10 @@ class Distance:
     A distance function implementing pairwise distance
     """
 
+    @property
+    def max(self):
+        return None
+
     def dist(self, x, y):
         raise NotImplementedError("a Distance should implement 'dist'")
     
@@ -54,6 +58,10 @@ class CosineDistance(Distance):
     
     def __str__(self):
         return 'Cosine Distance'
+
+    @property
+    def max(self):
+        return 2
     
     def to_sklearn_metric(self):
         return 'cosine'

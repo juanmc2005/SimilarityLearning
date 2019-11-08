@@ -18,7 +18,7 @@ parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to SNLI dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
 parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
-parser.add_argument('--per-epoch', type=int, required=True, default=None, help='Number of batches per epoch')
+parser.add_argument('--per-epoch', type=int, required=False, default=None, help='Number of batches per epoch')
 parser.add_argument('--dump-triplets', type=str, required=False, default=None,
                     help='Path to directory to dump generated triplets')
 args = parser.parse_args()
@@ -80,6 +80,7 @@ trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, 
 print(f"[LR: {args.lr}]")
 print(f"[Batch Size: {args.batch_size}]")
 print(f"[Epochs: {args.epochs}]")
+print(f"[Model Size: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1000000:.1f}m]")
 print()
 
 # Start training

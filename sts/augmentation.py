@@ -23,6 +23,8 @@ def pad_sent_pair(s1: list, s2: list) -> tuple:
 
 def pad_sent_triplet(s1: list, s2: list, s3: list) -> tuple:
     len1, len2, len3 = len(s1), len(s2), len(s3)
+    if len1 == len2 and len2 == len3:
+        return s1, s2, s3
     maxlen = max(len1, len2, len3)
     if maxlen == len1:
         _, s2 = pad_sent_pair(s1, s2)
@@ -294,6 +296,10 @@ class TripletGenerator:
                     positives.append(positive)
                     negatives.append(negative)
 
+        sentences_kept = len(set(anchors + negatives + positives))
+        print(f"Triplets: {len(anchors)}")
+        print(f"Unique Train Sentences kept: {sentences_kept}")
+        print('Dumping triplets...')
         if self.dump_dir is not None:
             with open(join(self.dump_dir, 'anchors'), 'w') as anchor_file, \
                     open(join(self.dump_dir, 'positives'), 'w') as pos_file, \
@@ -304,30 +310,28 @@ class TripletGenerator:
                     pos_file.write(pos + '\n')
                 for neg in negatives:
                     neg_file.write(neg + '\n')
-
-        sentences_kept = len(list(set(anchors + negatives + positives)))
+        print('Done')
         triplets = self.split_and_pad(anchors, positives, negatives)
         unused_y = np.zeros(len(anchors))
-        print(f"Triplets: {len(anchors)}")
-        print(f"Unique Train Sentences kept: {sentences_kept}")
         return np.array(list(zip(triplets, unused_y)))
 
 
-class SNLITripletNoAugmentation(SemEvalAugmentationStrategy):
+class SNLITripletNoAugmentation(SNLINoNeutralAugmentation):
 
     def __init__(self, label2int: dict, dump_dir: str = None):
+        super(SNLITripletNoAugmentation, self).__init__(label2int)
         self.dump_dir = dump_dir
-        self.base = SNLINoNeutralAugmentation(label2int)
         self.triplet_generator = TripletGenerator(desc='Generating SNLI triplets',
                                                   is_positive=lambda s: s == 0,
                                                   dump_dir=dump_dir)
 
     def augment(self, train_sents_a: list, train_sents_b: list, train_labels: list) -> np.ndarray:
         # Remove neutrals and get pairs formatted for contrastive loss (0 = positive, 1 = negative)
-        train_data = self.base.augment(train_sents_a, train_sents_b, train_labels)
-        atrain = [' '.join(row[0][0]) for row in train_data]
-        btrain = [' '.join(row[0][1]) for row in train_data]
-        simtrain = [row[1] for row in train_data]
+        atrain, btrain, simtrain = self._remove_neutrals(train_sents_a, train_sents_b, train_labels)
+        print(f"Train Pairs (no neutrals): {len(atrain)}")
+        print(f"Unique Train Sentences (no neutrals): {len(set(atrain + btrain))}")
+        print(f"+ Train Pairs: {sum([1 for y in simtrain if y == 0])}")
+        print(f"- Train Pairs: {sum([1 for y in simtrain if y == 1])}")
         return self.triplet_generator.generate(atrain, btrain, simtrain)
 
 
