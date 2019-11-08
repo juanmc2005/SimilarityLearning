@@ -189,7 +189,7 @@ class SNLIDistanceAutoAccuracyMetric(Metric):
 
     def get(self):
         # Min Max Normalization (minimum is always 0)
-        preds = self.distances / self.distance.max
+        preds = self.distances / self.distance.max if self.distance.max is not None else 1
         # Use distances to make predictions
         preds = np.array([self._norm_dist_to_label(d) for d in preds])
         y = np.array(self.targets)
