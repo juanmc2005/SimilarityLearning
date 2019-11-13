@@ -160,7 +160,7 @@ class DistanceSpearmanMetric(Metric):
         return metric
 
 
-class SNLIDistanceAutoAccuracyMetric(Metric):
+class SNLIFixedThresholdAccuracyMetric(Metric):
 
     def __init__(self, distance: Distance, label2id: dict):
         self.distance = distance
@@ -200,6 +200,62 @@ class SNLIDistanceAutoAccuracyMetric(Metric):
         # Reset internal state and print confusion matrix
         self.distances, self.targets = np.array([]), []
         print(f"Confusion Matrix:\n{confusion_matrix(y, preds)}")
+        return metric
+
+
+class SNLIGridSearchAccuracyMetric(Metric):
+
+    def __init__(self, distance: Distance, label2id: dict, t_lows, t_highs):
+        self.distance = distance
+        self.label2id = label2id
+        self.t_lows = t_lows
+        self.t_highs = t_highs
+        self.distances, self.targets = np.array([]), []
+
+    def _norm_dist_to_label(self, d: float, t_low: float, t_high: float) -> str:
+        if d < t_low:
+            return self.label2id['entailment']
+        elif d > t_high:
+            return self.label2id['contradiction']
+        else:
+            return self.label2id['neutral']
+
+    def __str__(self):
+        return 'Distance Accuracy'
+
+    def fit(self, embeddings, y):
+        pass
+
+    def calculate_batch(self, embeddings, logits, y):
+        embeddings1, embeddings2 = embeddings
+        dists = self.distance.dist(embeddings1, embeddings2).detach().cpu().numpy()
+        self.distances = np.concatenate((self.distances, dists), axis=None)
+        self.targets.extend(list(y))
+
+    def get(self):
+        best = None
+        dropped = 0
+        for t_low in self.t_lows:
+            for t_high in self.t_highs:
+                # Fail safe for invalid threshold values
+                if t_high <= t_low:
+                    dropped += 1
+                    break
+                # Use distances to make predictions
+                preds = np.array([self._norm_dist_to_label(d, t_low, t_high) for d in self.distances])
+                y = np.array(self.targets)
+                # Calculate accuracy
+                correct = (preds == y).sum()
+                total = y.shape[0]
+                metric = correct / total
+                if best is None or metric > best[0]:
+                    best = (metric, t_low, t_high, y, preds)
+        # Reset internal state and print confusion matrix
+        self.distances, self.targets = np.array([]), []
+        metric, t_low, t_high, y, preds = best
+        print(f"Optimal Thresholds: low={t_low} high={t_high}")
+        print(f"Confusion Matrix:\n{confusion_matrix(y, preds)}")
+        print(f"Invalid Combinations: {dropped}")
         return metric
 
 
