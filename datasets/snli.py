@@ -5,7 +5,7 @@ import numpy as np
 import datasets.base as base
 from sts.augmentation import pad_sent_pair, SemEvalAugmentationStrategy, TripletGenerator
 from sts import utils as sts
-from datasets.base import TextFloatLabelPartition
+from datasets.base import TextFloatLabelPartition, DataSplitter
 
 
 def split_and_pad_pairs(asents, bsents):
@@ -24,6 +24,39 @@ def load_partition(path: str, label2int: dict, partition: str):
         b = [f"<s> {line.strip()} </s>" for line in bfile.readlines()]
         sim = [label2int[line.strip()] for line in simfile.readlines()]
         return a, b, sim
+
+
+class SNLIPairDataSplitter(DataSplitter):
+
+    def __init__(self, relative_size: float):
+        self.relsize = relative_size
+
+    def split(self, data):
+        """
+        Split SNLI data in 2, shuffling, balancing classes and without common sentences between the splits
+        :param data: a list of pairs in the form (sent1: str, sent2: str, label: int)
+        :return: a pair of SNLI data lists
+        """
+        # Metadata calculation and initialization
+        split2_size = int(self.relsize * len(data))
+        nlabel = split2_size // 2
+        count_by_label = (0, 0, 0)
+        split1, split2 = [], []
+
+        # Shuffle data
+        np.random.shuffle(data)
+        seen_sents = set()
+        for sent1, sent2, label in data:
+            # Add the pair if sentences are not in the target split and the quota for the label has not been met
+            if sent1 not in seen_sents and sent2 not in seen_sents and count_by_label[label] < nlabel:
+                split2.append((sent1, sent2, label))
+                seen_sents.add(sent1)
+                seen_sents.add(sent2)
+                count_by_label[label] += 1
+            else:
+                split1.append((sent1, sent2, label))
+
+        return split1, split2
 
 
 class SNLI(base.SimDataset):

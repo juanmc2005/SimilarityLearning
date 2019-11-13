@@ -29,6 +29,12 @@ class SimDataset:
         raise NotImplementedError
 
 
+class DataSplitter:
+
+    def split(self, data):
+        raise NotImplementedError
+
+
 class LoaderWrapperPartition(SimDatasetPartition):
 
     def __init__(self, loader):
