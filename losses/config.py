@@ -59,7 +59,7 @@ class SoftmaxConfig(LossConfig):
             optimizers = sincnet_optims(model, lr[0])
             optimizers.append(optim.RMSprop(self.loss_module.parameters(), lr=lr[0], alpha=0.95))
             schedulers = []
-        elif task == 'sts' or task == 'ami':
+        elif task in ['sts', 'ami', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0])]
             schedulers = []
         else:
@@ -86,7 +86,7 @@ class ArcFaceConfig(LossConfig):
             optimizers = sincnet_optims(model, lr[0])
             optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr[1]))
             schedulers = [lr_scheduler.StepLR(optimizers[-1], 8, gamma=0.8)]
-        elif task == 'sts' or task == 'ami':
+        elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
                           optim.RMSprop(params[1], lr=lr[1])]
@@ -113,7 +113,7 @@ class CenterConfig(LossConfig):
             optimizers = sincnet_optims(model, lr[0])
             optimizers.append(optim.SGD(self.loss.center_parameters(), lr=lr[1]))
             schedulers = []
-        elif task == 'sts' or task == 'ami':
+        elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
                           optim.RMSprop(params[1], lr=lr[1])]
@@ -141,7 +141,7 @@ class CocoConfig(LossConfig):
             optimizers = sincnet_optims(model, lr[0])
             optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr[1]))
             schedulers = []
-        elif task == 'sts' or task == 'ami':
+        elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
                           optim.RMSprop(params[1], lr=lr[1])]
@@ -165,7 +165,7 @@ class ContrastiveConfig(LossConfig):
         elif task == 'speaker':
             optimizers = sincnet_optims(model, lr[0])
             schedulers = []
-        elif task in ['sts', 'ami', 'snli']:
+        elif task in ['sts', 'ami', 'snli', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = []
         else:
@@ -188,7 +188,7 @@ class TripletConfig(LossConfig):
         elif task == 'speaker':
             optimizers = sincnet_optims(model, lr[0])
             schedulers = []
-        elif task in ['sts', 'ami', 'snli']:
+        elif task in ['sts', 'ami', 'snli', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = []
         else:
