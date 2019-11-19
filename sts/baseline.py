@@ -32,11 +32,11 @@ class STSBaselineNet(nn.Module):
         embedded_sent = self.word_embedding(indices)
         return embedded_sent.view(-1, 1, self.nfeat_word)
 
-    def _embed(self, sent):
+    def encode(self, sent):
         x = self._to_word_embeddings(sent)
         out, _ = self.lstm(x)
         # Max pooling to get the embedding
         return torch.max(out, 0)[0]
 
     def forward(self, sents):
-        return self.mode.forward(self._embed, sents, self.training)
+        return self.mode.forward(self.encode, sents, self.training)

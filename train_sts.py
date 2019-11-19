@@ -86,7 +86,7 @@ if args.save:
 # Evaluation configuration
 if args.loss == 'kldiv':
     metric = LogitsSpearmanMetric()
-    evaluator = STSBaselineEvaluator(common.DEVICE, dev, metric, test_callbacks)
+    evaluator = STSBaselineEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
 else:
     metric = DistanceSpearmanMetric(config.test_distance)
     evaluator = STSEmbeddingEvaluator(common.DEVICE, dev, metric, test_callbacks)

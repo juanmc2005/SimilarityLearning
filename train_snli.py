@@ -56,6 +56,7 @@ config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, 
 model = SemanticNet(common.DEVICE, nfeat, args.layers, dataset.vocab, loss_module=config.loss_module, mode=mode)
 dev = dataset.dev_partition()
 train = dataset.training_partition()
+test = dataset.test_partition()
 print('[Dataset Loaded]')
 
 # Train and evaluation plugins
@@ -79,10 +80,13 @@ if args.save:
 
 # Evaluation configuration
 metric = SNLIGridSearchAccuracyMetric(config.test_distance, label2int,
-                                      t_lows=linspace(0.02, 1.6, num=60),
-                                      t_highs=linspace(0.4, 1.98, num=60))
-evaluator = STSEmbeddingEvaluator(common.DEVICE, dev, metric, test_callbacks)
-train_callbacks.append(evaluator)
+                                      t_lows=linspace(1e-5, 1.5, num=500),
+                                      t_highs=linspace(1e-4, 1.9, num=500))
+evaluators = [STSEmbeddingEvaluator(common.DEVICE, dev, metric, test_callbacks),
+              STSEmbeddingEvaluator(common.DEVICE, test, metric,
+                                    callbacks=[TestLogger(args.log_interval, test.nbatches()),
+                                               MetricFileLogger(log_path=join(log_path, f"test-metric.log"))])]
+train_callbacks.extend(evaluators)
 
 # Training configuration
 trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),

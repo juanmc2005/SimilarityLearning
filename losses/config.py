@@ -176,8 +176,8 @@ class ContrastiveConfig(LossConfig):
 class TripletConfig(LossConfig):
 
     def __init__(self, device, margin: float = 2, distance=EuclideanDistance(),
-                 size_average: bool = True, online: bool = True, sampling=BatchAll()):
-        loss = TripletLoss(device, margin, distance, size_average, online, sampling)
+                 size_average: bool = True, online: bool = True, clamp: str = 'positive', sampling=BatchAll()):
+        loss = TripletLoss(device, margin, distance, size_average, online, clamp, sampling)
         super(TripletConfig, self).__init__('Triplet Loss', f"m={margin} - {distance}", None, loss, distance)
 
     def optimizer(self, model, task, lr: tuple):

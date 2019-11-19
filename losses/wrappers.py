@@ -22,3 +22,14 @@ class STSBaselineClassifier(nn.Module):
         output = self.mlp(x)
         output = output.view(-1, 6)
         return output
+
+
+class SNLIClassifier(nn.Module):
+
+    def __init__(self, nfeat_sent, nclass):
+        super(SNLIClassifier, self).__init__()
+        self.nclass = nclass
+        self.mlp = nn.Sequential(nn.Linear(2 * nfeat_sent, 512), nn.Linear(512, nclass), nn.LogSoftmax())
+
+    def forward(self, x, y):
+        return self.mlp(x).view(-1, self.nclass)

@@ -96,9 +96,9 @@ class LogitsAccuracyMetric(Metric):
         pass
 
     def calculate_batch(self, embeddings, logits, y):
-        pred = logits.argmax(dim=1, keepdim=True)
-        self.correct += pred.eq(y.view_as(pred)).sum().item()
-        self.total += logits.size(0)
+        pred = logits.argmax(axis=1)
+        self.correct += (pred == y).sum()
+        self.total += logits.shape[0]
 
     def get(self):
         metric = self.correct / self.total
@@ -499,8 +499,9 @@ class STSEmbeddingEvaluator(base.TrainingListener):
 
 class STSBaselineEvaluator(base.TrainingListener):
 
-    def __init__(self, device, loader, metric, callbacks=None):
+    def __init__(self, device, loader, metric, partition_name: str = 'dev', callbacks=None):
         super(STSBaselineEvaluator, self).__init__()
+        self.partition_name = partition_name
         self.device = device
         self.loader = loader
         self.metric = metric
@@ -551,13 +552,13 @@ class STSBaselineEvaluator(base.TrainingListener):
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, metric_value)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Dev Spearman: {metric_value:.6f}")
+        print(f"{self.partition_name.capitalize()} {self.metric}: {metric_value:.6f}")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         print("------------------------------------------------")
         if metric_value > self.best_metric:
             self.best_metric = metric_value
             self.best_epoch = epoch
-            print('New Best Dev Spearman!')
+            print(f'New Best {self.partition_name.capitalize()} {self.metric}!')
             for cb in self.callbacks:
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)

@@ -131,17 +131,23 @@ class TripletLoss(nn.Module):
     :param device: a device in which to run the computation
     :param margin: a margin value to separe classes
     :param distance: a distance object to measure between the samples
+    :param size_average: whether to average by batch size or not (bool)
+    :param online: whether to compute triplets online or not (bool)
+    :param clamp: clamp mode (positive/sigmoid)
     :param sampling: a TripletSamplingStrategy
     """
 
     def __init__(self, device: str, margin: float, distance: Distance,
-                 size_average: bool, online: bool = True, sampling=BatchAll()):
+                 size_average: bool, online: bool = True, clamp: str = 'positive', sampling=BatchAll()):
         super(TripletLoss, self).__init__()
         self.device = device
         self.margin = margin
         self.distance = distance
         self.size_average = size_average
         self.online = online
+        if clamp not in ['positive', 'sigmoid']:
+            raise ValueError("clamp must be one in 'positive'/'sigmoid'")
+        self.clamp = clamp
         self.sampling = sampling
     
     def _calculate_distances(self, x, y):
@@ -186,5 +192,10 @@ class TripletLoss(nn.Module):
             dneg = self.distance.dist(anchors, negatives)
 
         # Calculate the loss using the margin
-        loss = F.relu(torch.pow(dpos, 2) - torch.pow(dneg, 2) + self.margin)
+        delta = dpos - dneg
+        if self.clamp == 'sigmoid':
+            # TODO tune this '10'
+            loss = torch.sigmoid(10 * (delta + self.margin))
+        else:
+            loss = F.relu(delta + self.margin)
         return loss.mean() if self.size_average else loss.sum()

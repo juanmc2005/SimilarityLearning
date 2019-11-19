@@ -2,8 +2,10 @@
 # -*- coding: utf-8 -*-
 from torch import nn
 from sincnet import SincNet, MLP
-from sts.baseline import STSBaselineNet, STSForwardMode
+from sts.baseline import STSBaselineNet
+from sts.modes import STSForwardMode, ConcatSTSForwardMode
 from aminet import AMINet
+from losses.wrappers import SNLIClassifier
 
 
 class Flatten(nn.Module):
@@ -146,6 +148,27 @@ class SemanticNet(SimNet):
 
     def load_common_state_dict(self, checkpoint):
         self.base_model.load_state_dict(checkpoint)
+
+
+class SNLIClassifierNet(SimNet):
+
+    def __init__(self, device: str, encoder_loader, nfeat_sent: int, nclass: int, nlayers: int, vector_vocab: dict):
+        super(SNLIClassifierNet, self).__init__(SNLIClassifier(nfeat_sent, nclass))
+        model = SemanticNet(device, nfeat_sent, nlayers, vector_vocab, ConcatSTSForwardMode())
+        # Load encoder
+        encoder_loader.load(model, encoder_loader.get_trained_loss())
+        self.encoder = model.base_model
+        # Put encoder in evaluation mode so it won't be learned
+        self.encoder.eval()
+
+    def layers(self):
+        return [self.encoder]
+
+    def common_state_dict(self):
+        return self.encoder.state_dict()
+
+    def load_common_state_dict(self, checkpoint):
+        self.encoder.load_state_dict(checkpoint)
 
 
 class HateNet(SimNet):

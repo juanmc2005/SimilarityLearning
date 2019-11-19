@@ -5,7 +5,7 @@ import numpy as np
 import datasets.base as base
 from sts.augmentation import pad_sent_pair, SemEvalAugmentationStrategy, TripletGenerator
 from sts import utils as sts
-from datasets.base import TextFloatLabelPartition, DataSplitter
+from datasets.base import TextFloatLabelPartition, TextLongLabelPartition, DataSplitter
 
 
 def split_and_pad_pairs(asents, bsents):
@@ -83,18 +83,17 @@ class SNLI(base.SimDataset):
     def nclass(self):
         return self.augmentation.nclass()
 
-    # Using float labels because only contrastive and triplet loss are supported
-
     def training_partition(self) -> base.SimDatasetPartition:
+        # Using float labels because only contrastive and triplet loss are supported
         np.random.shuffle(self.train_sents)
         return TextFloatLabelPartition(self.train_sents, self.batch_size, train=True,
                                        batches_per_epoch=self.batches_per_epoch)
 
     def dev_partition(self) -> base.SimDatasetPartition:
-        return TextFloatLabelPartition(self.dev_sents, self.batch_size, train=False)
+        return TextLongLabelPartition(self.dev_sents, self.batch_size, train=False)
 
     def test_partition(self) -> base.SimDatasetPartition:
-        return TextFloatLabelPartition(self.test_sents, self.batch_size, train=False)
+        return TextLongLabelPartition(self.test_sents, self.batch_size, train=False)
 
 
 class SNLITriplets(base.SimDataset):
