@@ -33,7 +33,7 @@ common.set_custom_seed(args.seed)
 print(f"[Task: {task.upper()}]")
 print(f"[Loss: {args.loss.upper()}]")
 print('[Loading Dataset...]')
-nfeat, nclass = 500, 2
+nfeat, nclass = 4096, 2
 dataset = BinarySST(args.path, args.batch_size, args.vocab, args.word2vec)
 config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
@@ -50,7 +50,7 @@ train_callbacks: list = [HeaderPrinter()]
 # Logging configuration
 if args.log_interval in range(1, 101):
     print(f"[Logging: {common.enabled_str(True)} (every {args.log_interval}%)]")
-    test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
+    # test_callbacks.append(TestLogger(args.log_interval, dev.nbatches()))
     test_callbacks.append(MetricFileLogger(log_path=join(log_path, f"metric.log")))
     train_callbacks.append(TrainLogger(args.log_interval, train.nbatches(),
                                        loss_log_path=join(log_path, f"loss.log")))
@@ -73,10 +73,11 @@ train_callbacks.extend([dev_evaluator, test_evaluator])
 # Training configuration
 trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),
                   model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
-                  callbacks=train_callbacks)
+                  callbacks=train_callbacks, last_metric_fn=lambda: dev_evaluator.last_metric)
 print(f"[LR: {args.lr}]")
 print(f"[Batch Size: {args.batch_size}]")
 print(f"[Epochs: {args.epochs}]")
+print(f"[Model Size: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1000000:.1f}m]")
 print()
 
 # Start training

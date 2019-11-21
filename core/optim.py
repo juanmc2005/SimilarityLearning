@@ -23,9 +23,12 @@ class Optimizer:
             for i, s in enumerate(self.schedulers):
                 s.load_state_dict(checkpoint[self.SCHED_KEY][i])
 
-    def scheduler_step(self):
+    def scheduler_step(self, metric: float = None):
         for s in self.schedulers:
-            s.step()
+            if metric is None:
+                s.step()
+            else:
+                s.step(metric)
 
     def zero_grad(self):
         for o in self.optimizers:
@@ -34,3 +37,6 @@ class Optimizer:
     def step(self):
         for o in self.optimizers:
             o.step()
+
+    def lrs(self):
+        return [o.state_dict()['param_groups'][0]['lr'] for o in self.optimizers]

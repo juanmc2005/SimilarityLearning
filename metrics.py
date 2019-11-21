@@ -298,7 +298,7 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
         self.feature_extraction = feature_extraction
         self.callbacks = callbacks if callbacks is not None else []
         self.verification_callbacks = verification_callbacks if verification_callbacks is not None else []
-        self.best_metric, self.best_epoch = 0, -1
+        self.best_metric, self.best_epoch, self.last_eer = 0, -1, 0
 
     def _file_embedding(self, file_dict: dict, sequence_embedding: SequenceEmbedding, cache: dict):
         file1 = file_dict
@@ -343,12 +343,13 @@ class SpeakerVerificationEvaluator(base.TrainingListener):
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.eval_interval == 0:
             metric_value, dists, y_true, fpr, fnr = self.eval(model.to_prediction_model(), self.partition)
-            eer = 1 - metric_value
+            # Real metric value is EER
+            self.last_eer = 1 - metric_value
             for cb in self.callbacks:
                 cb.on_after_test(epoch, None, None, metric_value)
             for cb in self.verification_callbacks:
-                cb.on_evaluation_finished(epoch, eer, dists, y_true, fpr, fnr, self.partition)
-            print(f"[{self.partition.capitalize()} EER: {eer:.6f}]")
+                cb.on_evaluation_finished(epoch, self.last_eer, dists, y_true, fpr, fnr, self.partition)
+            print(f"[{self.partition.capitalize()} EER: {self.last_eer:.6f}]")
             if self.best_epoch != -1:
                 print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")
             if metric_value > self.best_metric:
@@ -369,7 +370,7 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         self.partition_name = partition_name
         self.callbacks = callbacks if callbacks is not None else []
         self.feat_train, self.y_train = None, None
-        self.best_metric, self.best_epoch = 0, -1
+        self.best_metric, self.best_epoch, self.last_metric = 0, -1, 0
 
     def _eval(self, model):
         model.eval()
@@ -417,18 +418,18 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         y_train = np.concatenate(self.y_train)
         self.metric.fit(feat_train, y_train)
         feat_test, y_test = self._eval(model)
-        metric_value = self.metric.get()
+        self.last_metric = self.metric.get()
         for cb in self.callbacks:
-            cb.on_after_test(epoch, feat_test, y_test, metric_value)
-        print(f"[{self.partition_name.capitalize()} {self.metric}: {metric_value:.6f}]")
+            cb.on_after_test(epoch, feat_test, y_test, self.last_metric)
+        print(f"[{self.partition_name.capitalize()} {self.metric}: {self.last_metric:.6f}]")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
-        if metric_value > self.best_metric:
-            self.best_metric = metric_value
+        if self.last_metric > self.best_metric:
+            self.best_metric = self.last_metric
             self.best_epoch = epoch
             print(f'New Best {self.partition_name.capitalize()} {self.metric}!')
             for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
+                cb.on_best_accuracy(epoch, model, loss_fn, optim, self.last_metric, feat_test, y_test)
 
 
 class STSEmbeddingEvaluator(base.TrainingListener):
@@ -439,7 +440,7 @@ class STSEmbeddingEvaluator(base.TrainingListener):
         self.loader = loader
         self.metric = metric
         self.callbacks = callbacks if callbacks is not None else []
-        self.best_metric, self.best_epoch = 0, -1
+        self.best_metric, self.best_epoch, self.last_metric = 0, -1, 0
 
     def eval(self, model):
         model.eval()
@@ -481,20 +482,20 @@ class STSEmbeddingEvaluator(base.TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         _, feat_test, y_test = self.eval(model.to_prediction_model())
-        metric_value = self.metric.get()
+        self.last_metric = self.metric.get()
         for cb in self.callbacks:
-            cb.on_after_test(epoch, feat_test, y_test, metric_value)
+            cb.on_after_test(epoch, feat_test, y_test, self.last_metric)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Dev {self.metric}: {metric_value:.6f}")
+        print(f"Dev {self.metric}: {self.last_metric:.6f}")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         print("------------------------------------------------")
-        if metric_value > self.best_metric:
-            self.best_metric = metric_value
+        if self.last_metric > self.best_metric:
+            self.best_metric = self.last_metric
             self.best_epoch = epoch
             print(f'New Best Dev {self.metric}!')
             for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
+                cb.on_best_accuracy(epoch, model, loss_fn, optim, self.last_metric, feat_test, y_test)
 
 
 class STSBaselineEvaluator(base.TrainingListener):
@@ -506,7 +507,7 @@ class STSBaselineEvaluator(base.TrainingListener):
         self.loader = loader
         self.metric = metric
         self.callbacks = callbacks if callbacks is not None else []
-        self.best_metric, self.best_epoch = 0, -1
+        self.best_metric, self.best_epoch, self.last_metric = 0, -1, 0
 
     def eval(self, model):
         model.eval()
@@ -548,17 +549,17 @@ class STSBaselineEvaluator(base.TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         phrases, feat_test, y_test = self.eval(model)
-        metric_value = self.metric.get()
+        self.last_metric = self.metric.get()
         for cb in self.callbacks:
-            cb.on_after_test(epoch, feat_test, y_test, metric_value)
+            cb.on_after_test(epoch, feat_test, y_test, self.last_metric)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"{self.partition_name.capitalize()} {self.metric}: {metric_value:.6f}")
+        print(f"{self.partition_name.capitalize()} {self.metric}: {self.last_metric:.6f}")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         print("------------------------------------------------")
-        if metric_value > self.best_metric:
-            self.best_metric = metric_value
+        if self.last_metric > self.best_metric:
+            self.best_metric = self.last_metric
             self.best_epoch = epoch
             print(f'New Best {self.partition_name.capitalize()} {self.metric}!')
             for cb in self.callbacks:
-                cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, feat_test, y_test)
+                cb.on_best_accuracy(epoch, model, loss_fn, optim, self.last_metric, feat_test, y_test)

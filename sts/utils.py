@@ -54,7 +54,7 @@ def vectorized_vocabulary(vocab_path, vec_path):
             vec_vocab[token] = vectors[stoi[token]]
             n_inv += 1
         else:
-            vec_vocab[token] = vectors[stoi['oov']]
+            vec_vocab[token] = torch.Tensor([0. for _ in range(dim)])
             n_oov += 1
     vec_vocab['oov'] = vectors[stoi['oov']]
     return vec_vocab, n_inv, n_oov

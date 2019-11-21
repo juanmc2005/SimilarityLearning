@@ -53,7 +53,7 @@ class TestListener:
 class Trainer:
     
     def __init__(self, loss_name: str, model: SimNet, loss_fn: nn.Module, partition: SimDatasetPartition,
-                 optim: Optimizer, model_loader=None, callbacks: list = None):
+                 optim: Optimizer, model_loader=None, callbacks: list = None, last_metric_fn=None):
         self.loss_name = loss_name
         self.model = model.to(common.DEVICE)
         self.loss_fn = loss_fn
@@ -61,6 +61,7 @@ class Trainer:
         self.optim = optim
         self.model_loader = model_loader
         self.callbacks = callbacks if callbacks is not None else []
+        self.last_metric_fn = last_metric_fn if last_metric_fn is not None else lambda: None
 
     def _restore(self):
         if self.model_loader is not None:
@@ -90,6 +91,10 @@ class Trainer:
 
         for i in range(1, epochs + 1):
             self.train_epoch(i)
+            if self.optim.lrs()[0] < 1e-6:
+                print('Stopping because LR dropped from 1e-6')
+                break
+            self.optim.scheduler_step(self.last_metric_fn())
 
         for cb in self.callbacks:
             cb.on_after_train()
@@ -108,8 +113,6 @@ class Trainer:
 
         for cb in self.callbacks:
             cb.on_before_epoch(epoch)
-
-        self.optim.scheduler_step()
 
         nbatches = self.partition.nbatches()
         for i in range(nbatches):

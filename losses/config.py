@@ -61,7 +61,8 @@ class SoftmaxConfig(LossConfig):
             schedulers = []
         elif task in ['sts', 'ami', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0])]
-            schedulers = []
+            schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
+                                                         patience=5, verbose=True)]
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -90,7 +91,10 @@ class ArcFaceConfig(LossConfig):
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
                           optim.RMSprop(params[1], lr=lr[1])]
-            schedulers = []
+            schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
+                                                         patience=5, verbose=True),
+                          lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.7,
+                                                         patience=5, verbose=True)]
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -117,7 +121,10 @@ class CenterConfig(LossConfig):
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
                           optim.RMSprop(params[1], lr=lr[1])]
-            schedulers = []
+            schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
+                                                         patience=5, verbose=True),
+                          lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.7,
+                                                         patience=5, verbose=True)]
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -145,7 +152,10 @@ class CocoConfig(LossConfig):
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
                           optim.RMSprop(params[1], lr=lr[1])]
-            schedulers = []
+            schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
+                                                         patience=5, verbose=True),
+                          lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.7,
+                                                         patience=5, verbose=True)]
         else:
             raise ValueError('Task must be one of mnist/speaker/sts')
         return base.Optimizer(optimizers, schedulers)
@@ -167,7 +177,8 @@ class ContrastiveConfig(LossConfig):
             schedulers = []
         elif task in ['sts', 'ami', 'snli', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
-            schedulers = []
+            schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
+                                                         patience=5, verbose=True)]
         else:
             raise ValueError('Task must be one of mnist/speaker/sts/ami/snli')
         return base.Optimizer(optimizers, schedulers)
@@ -190,7 +201,8 @@ class TripletConfig(LossConfig):
             schedulers = []
         elif task in ['sts', 'ami', 'snli', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
-            schedulers = []
+            schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
+                                                         patience=5, verbose=True)]
         else:
             raise ValueError('Task must be one of mnist/speaker/sts/ami/snli')
         return base.Optimizer(optimizers, schedulers)
