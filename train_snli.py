@@ -82,8 +82,8 @@ if args.save:
 metric = SNLIGridSearchAccuracyMetric(config.test_distance, label2int,
                                       t_lows=linspace(1e-5, 1.5, num=500),
                                       t_highs=linspace(1e-4, 1.9, num=500))
-evaluators = [STSEmbeddingEvaluator(common.DEVICE, dev, metric, test_callbacks),
-              STSEmbeddingEvaluator(common.DEVICE, test, metric,
+evaluators = [STSEmbeddingEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks),
+              STSEmbeddingEvaluator(common.DEVICE, test, metric, 'test',
                                     callbacks=[TestLogger(args.log_interval, test.nbatches()),
                                                MetricFileLogger(log_path=join(log_path, f"test-metric.log"))])]
 train_callbacks.extend(evaluators)

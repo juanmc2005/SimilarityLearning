@@ -55,3 +55,18 @@ class ArcLinear(nn.Module):
         # Apply the scaling
         cos_theta_j = self.s * cos_theta_j
         return cos_theta_j
+
+    def predict(self, x):
+        """
+        Apply the angular margin transformation
+        :param x: a feature vector batch
+        :return: a tensor of logits
+        """
+        # Normalize the feature vectors and W
+        xnorm = F.normalize(x)
+        Wnorm = F.normalize(self.W)
+        # Calculate cosθj (the logits)
+        cos_theta_j = torch.matmul(xnorm, torch.transpose(Wnorm, 0, 1))
+        # Apply the scaling
+        cos_theta_j = self.s * cos_theta_j
+        return cos_theta_j

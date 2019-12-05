@@ -7,7 +7,8 @@ from core.plugins.storage import BestModelSaver, ModelLoader
 from core.plugins.misc import IntraClassDistanceStatLogger
 from datasets.sst import BinarySST
 from models import HateNet
-from metrics import KNNAccuracyMetric, ClassAccuracyEvaluator
+from metrics import KNNAccuracyMetric, ClassAccuracyEvaluator, LogitsAccuracyMetric
+from gensim.models import Word2Vec
 
 
 task = 'sst2'
@@ -16,7 +17,8 @@ task = 'sst2'
 parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to SemEval dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
-parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
+parser.add_argument('--word2vec', type=str, required=False, default=None, help='Path to word embeddings')
+parser.add_argument('--word2vec-model', type=str, required=False, default=None, help='Path to GENSIM Word2Vec model')
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
@@ -37,7 +39,8 @@ nfeat, nclass = 4096, 2
 dataset = BinarySST(args.path, args.batch_size, args.vocab, args.word2vec)
 config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = HateNet(common.DEVICE, nfeat, dataset.vocab, config.loss_module)
+vocab_vec = dataset.vocab_vec if args.word2vec is not None else Word2Vec.load(args.word2vec_model).wv
+model = HateNet(common.DEVICE, nfeat, dataset.vocab, vocab_vec, config.loss_module, dropout=0.2)
 dev = dataset.dev_partition()
 test = dataset.test_partition()
 train = dataset.training_partition()
@@ -64,7 +67,7 @@ if args.save:
     test_callbacks.append(BestModelSaver(task, args.loss, log_path, args.exp_id))
 
 # Evaluation configuration
-metric = KNNAccuracyMetric(config.test_distance)
+metric = KNNAccuracyMetric(config.test_distance) if args.loss != 'softmax' else LogitsAccuracyMetric()
 dev_evaluator = ClassAccuracyEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
 test_evaluator = ClassAccuracyEvaluator(common.DEVICE, test, metric, 'test',
                                         callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])

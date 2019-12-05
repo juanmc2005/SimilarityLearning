@@ -134,11 +134,12 @@ class SpeakerNet(SimNet):
 
 class SemanticNet(SimNet):
 
-    def __init__(self, device: str, nfeat: int, nlayers: int, vector_vocab: dict,
+    def __init__(self, device: str, nfeat: int, nlayers: int, word_list: list, vector_vocab: dict,
                  mode: STSForwardMode, loss_module: nn.Module = None):
         super().__init__(loss_module)
         self.base_model = STSBaselineNet(device, nfeat_word=300, nfeat_sent=nfeat,
-                                         nlayers=nlayers, vec_vocab=vector_vocab, mode=mode)
+                                         nlayers=nlayers, word_list=word_list,
+                                         vec_vocab=vector_vocab, mode=mode)
 
     def layers(self):
         return [self.base_model]
@@ -173,9 +174,10 @@ class SNLIClassifierNet(SimNet):
 
 class HateNet(SimNet):
 
-    def __init__(self, device: str, nfeat: int, vector_vocab: dict, loss_module: nn.Module):
+    def __init__(self, device: str, nfeat: int, word_list: list, vector_vocab, loss_module: nn.Module, dropout: float = 0):
         super(HateNet, self).__init__(loss_module)
-        self.base = AMINet(device, nfeat_word=300, nfeat_sent=nfeat, vec_vocab=vector_vocab)
+        self.base = AMINet(device, nfeat_word=300, nfeat_sent=nfeat,
+                           word_list=word_list, vec_vocab=vector_vocab, dropout=dropout)
 
     def layers(self):
         return [self.base]

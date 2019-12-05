@@ -16,3 +16,6 @@ class CocoLinear(nn.Module):
         xnorm = self.alpha * F.normalize(x)
         logits = torch.matmul(xnorm, torch.transpose(cnorm, 0, 1))
         return logits
+
+    def predict(self, x):
+        return self.forward(x, None)

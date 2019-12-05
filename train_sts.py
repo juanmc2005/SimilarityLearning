@@ -2,13 +2,14 @@ from os.path import join
 
 import common
 from core.base import Trainer
-from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger
+from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger, HeaderPrinter
 from core.plugins.storage import BestModelSaver, ModelLoader
 from datasets.semeval import SemEval, SemEvalPartitionFactory
 from sts.modes import STSForwardModeFactory
 from sts.augmentation import SemEvalAugmentationStrategyFactory
 from models import SemanticNet
 from metrics import LogitsSpearmanMetric, DistanceSpearmanMetric, STSBaselineEvaluator, STSEmbeddingEvaluator
+from gensim.models import Word2Vec
 
 
 task = 'sts'
@@ -17,7 +18,8 @@ task = 'sts'
 parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to SemEval dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
-parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
+parser.add_argument('--word2vec', type=str, required=False, default=None, help='Path to word embeddings')
+parser.add_argument('--word2vec-model', type=str, required=False, default=None, help='Path to GENSIM Word2Vec model')
 parser.add_argument('-t', '--threshold', type=float, default=3.,
                     help='The threshold to consider a pair as positive or negative')
 parser.add_argument('--remove-scores', type=list, default=[],
@@ -59,14 +61,16 @@ partition_factory = SemEvalPartitionFactory(args.loss, args.batch_size)
 dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), partition_factory)
 config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = SemanticNet(common.DEVICE, nfeat, 1, dataset.vocab, loss_module=config.loss_module, mode=mode)
+vocab_vec = dataset.vocab_vec if args.word2vec is not None else Word2Vec.load(args.word2vec_model).wv
+model = SemanticNet(common.DEVICE, nfeat, 1, dataset.vocab, vocab_vec, loss_module=config.loss_module, mode=mode)
 dev = dataset.dev_partition()
+test = dataset.test_partition()
 train = dataset.training_partition()
 print('[Dataset Loaded]')
 
 # Train and evaluation plugins
 test_callbacks = []
-train_callbacks = []
+train_callbacks = [HeaderPrinter()]
 
 # Logging configuration
 if args.log_interval in range(1, 101):
@@ -86,19 +90,24 @@ if args.save:
 # Evaluation configuration
 if args.loss == 'kldiv':
     metric = LogitsSpearmanMetric()
-    evaluator = STSBaselineEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
+    dev_evaluator = STSBaselineEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
+    test_evaluator = STSBaselineEvaluator(common.DEVICE, test, metric, 'test',
+                                          callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])
 else:
     metric = DistanceSpearmanMetric(config.test_distance)
-    evaluator = STSEmbeddingEvaluator(common.DEVICE, dev, metric, test_callbacks)
-train_callbacks.append(evaluator)
+    dev_evaluator = STSEmbeddingEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
+    test_evaluator = STSEmbeddingEvaluator(common.DEVICE, test, metric, 'test',
+                                           callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])
+train_callbacks.extend([dev_evaluator, test_evaluator])
 
 # Training configuration
 trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),
                   model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
-                  callbacks=train_callbacks)
+                  callbacks=train_callbacks, last_metric_fn=lambda: dev_evaluator.last_metric)
 print(f"[LR: {args.lr}]")
 print(f"[Batch Size: {args.batch_size}]")
 print(f"[Epochs: {args.epochs}]")
+print(f"[Model Size: {sum(p.numel() for p in model.parameters() if p.requires_grad) / 1000000:.1f}m]")
 print()
 
 # Start training

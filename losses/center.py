@@ -95,3 +95,6 @@ class CenterLinear(nn.Module):
         :return: a tensor with class probabilities for this batch
         """
         return F.log_softmax(self.linear(x), dim=1)
+
+    def predict(self, x):
+        return self.forward(x, None)

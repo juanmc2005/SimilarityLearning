@@ -12,11 +12,21 @@ class LossWrapper(nn.Module):
         return self.loss(logits, y)
 
 
+class PredictLossModuleWrapper(nn.Module):
+
+    def __init__(self, module: nn.Module):
+        super().__init__()
+        self.mod = module
+
+    def forward(self, x, y):
+        return self.mod.predict(x)
+
+
 class STSBaselineClassifier(nn.Module):
 
     def __init__(self, nfeat_sent):
         super(STSBaselineClassifier, self).__init__()
-        self.mlp = nn.Sequential(nn.Linear(2*nfeat_sent, 128), nn.Tanh(), nn.Linear(128, 6), nn.LogSoftmax())
+        self.mlp = nn.Sequential(nn.Linear(4 * nfeat_sent, 128), nn.Tanh(), nn.Linear(128, 6), nn.LogSoftmax())
 
     def forward(self, x, y):
         output = self.mlp(x)

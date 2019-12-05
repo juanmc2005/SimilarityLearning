@@ -17,8 +17,13 @@ class BinarySST(SimDataset):
 
     def __init__(self, path: str, batch_size: int, vocab_path: str, vector_path: str):
         self.batch_size = batch_size
-        self.vocab, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
-        print(f"Created vocabulary with {n_inv} INV and {n_oov} OOV ({int(100 * n_inv / (n_inv + n_oov))}% coverage)")
+        if vector_path is not None:
+            self.vocab_vec, n_inv, n_oov = sts.vectorized_vocabulary(vocab_path, vector_path)
+            self.vocab = list(self.vocab_vec.keys())
+            print(f"Created vocabulary with {n_inv} INV and {n_oov} OOV ({int(100 * n_inv / (n_inv + n_oov))}% coverage)")
+        else:
+            self.vocab_vec = None
+            self.vocab = [line.strip() for line in open(vocab_path, 'r')]
         x_train, y_train = _read_sst2_data(join(path, 'train'))
         x_dev, y_dev = _read_sst2_data(join(path, 'dev'))
         x_test, y_test = _read_sst2_data(join(path, 'test'))

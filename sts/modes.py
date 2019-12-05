@@ -18,6 +18,16 @@ class ConcatSTSForwardMode(STSForwardMode):
         return self.stack(embs)
 
 
+class ConcatAbsMulSTSForwardMode(STSForwardMode):
+
+    def forward(self, embed_fn, sents: list, train: bool):
+        embs = []
+        for s1, s2 in sents:
+            emb1, emb2 = embed_fn(s1), embed_fn(s2)
+            embs.append(torch.cat((emb1, emb2, abs(emb1 - emb2), emb1 * emb2), dim=1))
+        return self.stack(embs)
+
+
 class PairSTSForwardMode(STSForwardMode):
 
     def forward(self, embed_fn, sents: list, train: bool):
@@ -62,14 +72,15 @@ class STSForwardModeFactory:
 
     def new(self, loss: str) -> STSForwardMode:
         if loss == 'kldiv':
-            # Kullback-Leibler Divergence loss, forward pairs and then concatenate embeddings
-            return ConcatSTSForwardMode()
+            # Concatenate embeddings with difference and multiplication
+            return ConcatAbsMulSTSForwardMode()
+            # return ConcatSTSForwardMode()
         elif loss == 'contrastive':
-            # Contrastive loss, forward pairs and don't concatenate
+            # Don't concatenate
             return PairSTSForwardMode()
         elif loss == 'triplet':
-            # Triplet loss, forward triplets and don't concatenate
+            # Don't concatenate
             return TripletSTSForwardMode()
         else:
-            # Softmax based, forward a single sentence at a time
+            # Single sentence at a time
             return SingleSTSForwardMode()

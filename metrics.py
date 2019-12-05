@@ -11,6 +11,7 @@ from pyannote.core import Timeline
 from distances import Distance
 import core.base as base
 import common
+from collections import Counter
 
 
 class Metric:
@@ -43,6 +44,7 @@ class KNNAccuracyMetric(Metric):
     def __init__(self, distance):
         self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
         self.correct, self.total = 0, 0
+        self.preds, self.y = [], []
 
     def __str__(self):
         return 'KNN Accuracy'
@@ -54,8 +56,11 @@ class KNNAccuracyMetric(Metric):
         predicted = self.knn.predict(embeddings)
         self.correct += (predicted == y).sum()
         self.total += y.shape[0]
+        self.preds.extend(predicted)
+        self.y.extend(y)
 
     def get(self):
+        print(f"Confusion Matrix:\n{confusion_matrix(self.y, self.preds)}")
         metric = self.correct / self.total
         self.correct, self.total = 0, 0
         return metric
@@ -63,23 +68,43 @@ class KNNAccuracyMetric(Metric):
 
 class KNNF1ScoreMetric(Metric):
 
-    def __init__(self, distance):
-        self.knn = KNeighborsClassifier(n_neighbors=1, metric=distance.to_sklearn_metric())
+    def __init__(self, distance, neighbors: int = 1):
+        self.neighbors = neighbors
+        self.knn = KNeighborsClassifier(n_neighbors=neighbors, metric=distance.to_sklearn_metric())
         self.preds, self.y = [], []
+        self.train_class_counter = None
+        self.train_y = None
 
     def __str__(self):
-        return 'Macro F1-Score'
+        return 'KNN Macro F1-Score'
 
     def fit(self, embeddings, y):
         self.knn.fit(embeddings, y)
+        self.train_y = y
+        self.train_class_counter = Counter(y)
 
     def calculate_batch(self, embeddings, logits, y):
-        predicted = self.knn.predict(embeddings)
+        if self.neighbors == 1:
+            predicted = self.knn.predict(embeddings)
+        else:
+            _, idx = self.knn.kneighbors(embeddings)
+            predicted = []
+            for neigh_labels in self.train_y[idx]:
+                counter = Counter(neigh_labels)
+                max_vote, max_label = 0, -1
+                for label in counter:
+                    vote = counter[label] / self.train_class_counter[label]
+                    if vote > max_vote:
+                        max_vote = vote
+                        max_label = label
+                predicted.append(max_label)
+            predicted = np.array(predicted)
         self.preds.extend(predicted)
         self.y.extend(y)
 
     def get(self):
         metric = f1_score(self.y, self.preds, average='macro')
+        print(f"Confusion Matrix:\n{confusion_matrix(self.y, self.preds)}")
         self.preds, self.y = [], []
         return metric
 
@@ -103,6 +128,29 @@ class LogitsAccuracyMetric(Metric):
     def get(self):
         metric = self.correct / self.total
         self.correct, self.total = 0, 0
+        return metric
+
+
+class LogitsF1ScoreMetric(Metric):
+
+    def __init__(self):
+        self.preds, self.y = [], []
+
+    def __str__(self):
+        return 'Macro F1-Score'
+
+    def fit(self, embeddings, y):
+        pass
+
+    def calculate_batch(self, embeddings, logits, y):
+        predicted = logits.argmax(axis=1)
+        self.preds.extend(predicted)
+        self.y.extend(y)
+
+    def get(self):
+        metric = f1_score(self.y, self.preds, average='macro')
+        print(f"Confusion Matrix:\n{confusion_matrix(self.y, self.preds)}")
+        self.preds, self.y = [], []
         return metric
 
 
@@ -372,7 +420,7 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         self.feat_train, self.y_train = None, None
         self.best_metric, self.best_epoch, self.last_metric = 0, -1, 0
 
-    def _eval(self, model):
+    def eval(self, model):
         model.eval()
         feat_test, logits_test, y_test = [], [], []
         for cb in self.callbacks:
@@ -417,7 +465,7 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         feat_train = np.concatenate(self.feat_train)
         y_train = np.concatenate(self.y_train)
         self.metric.fit(feat_train, y_train)
-        feat_test, y_test = self._eval(model)
+        feat_test, y_test = self.eval(model)
         self.last_metric = self.metric.get()
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, self.last_metric)
@@ -434,11 +482,12 @@ class ClassAccuracyEvaluator(base.TrainingListener):
 
 class STSEmbeddingEvaluator(base.TrainingListener):
 
-    def __init__(self, device, loader, metric, callbacks=None):
+    def __init__(self, device, loader, metric, partition_name, callbacks=None):
         super(STSEmbeddingEvaluator, self).__init__()
         self.device = device
         self.loader = loader
         self.metric = metric
+        self.partition_name = partition_name
         self.callbacks = callbacks if callbacks is not None else []
         self.best_metric, self.best_epoch, self.last_metric = 0, -1, 0
 
@@ -486,14 +535,14 @@ class STSEmbeddingEvaluator(base.TrainingListener):
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, self.last_metric)
         print(f"--------------- Epoch {epoch:02d} Results ---------------")
-        print(f"Dev {self.metric}: {self.last_metric:.6f}")
+        print(f"{self.partition_name.capitalize()} {self.metric}: {self.last_metric:.6f}")
         if self.best_epoch != -1:
             print(f"Best until now: {self.best_metric:.6f}, at epoch {self.best_epoch}")
         print("------------------------------------------------")
         if self.last_metric > self.best_metric:
             self.best_metric = self.last_metric
             self.best_epoch = epoch
-            print(f'New Best Dev {self.metric}!')
+            print(f'New Best {self.partition_name.capitalize()} {self.metric}!')
             for cb in self.callbacks:
                 cb.on_best_accuracy(epoch, model, loss_fn, optim, self.last_metric, feat_test, y_test)
 

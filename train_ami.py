@@ -5,9 +5,11 @@ from core.base import Trainer
 from core.plugins.logging import TrainLogger, TestLogger, MetricFileLogger, HeaderPrinter
 from core.plugins.storage import BestModelSaver, ModelLoader
 from core.plugins.misc import IntraClassDistanceStatLogger
+from core.plugins.visual import AMIVisualizer
 from datasets.ami import AMI
 from models import HateNet
-from metrics import KNNF1ScoreMetric, ClassAccuracyEvaluator
+from metrics import KNNF1ScoreMetric, LogitsF1ScoreMetric, ClassAccuracyEvaluator
+from gensim.models import Word2Vec
 
 
 task = 'ami'
@@ -16,7 +18,8 @@ task = 'ami'
 parser = common.get_arg_parser()
 parser.add_argument('--path', type=str, required=True, help='Path to AMI dataset')
 parser.add_argument('--vocab', type=str, required=True, help='Path to vocabulary file')
-parser.add_argument('--word2vec', type=str, required=True, help='Path to word embeddings')
+parser.add_argument('--word2vec', type=str, required=False, default=None, help='Path to word embeddings')
+parser.add_argument('--word2vec-model', type=str, required=False, default=None, help='Path to GENSIM Word2Vec model')
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
@@ -37,7 +40,8 @@ nfeat, nclass = 500, 6
 dataset = AMI(args.path, args.batch_size, args.vocab, args.word2vec)
 config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = HateNet(common.DEVICE, nfeat, dataset.vocab, config.loss_module)
+vocab_vec = dataset.vocab_vec if args.word2vec is not None else Word2Vec.load(args.word2vec_model).wv
+model = HateNet(common.DEVICE, nfeat, dataset.vocab, vocab_vec, config.loss_module, dropout=0.2)
 dev = dataset.dev_partition()
 test = dataset.test_partition()
 train = dataset.training_partition()
@@ -63,8 +67,13 @@ print(f"[Model Saving: {common.enabled_str(args.save)}]")
 if args.save:
     test_callbacks.append(BestModelSaver(task, args.loss, log_path, args.exp_id))
 
+# Plotting configuration
+print(f"[Plots: {common.enabled_str(args.plot)}]")
+if args.plot:
+    test_callbacks.append(AMIVisualizer(log_path, config.name))
+
 # Evaluation configuration
-metric = KNNF1ScoreMetric(config.test_distance)
+metric = KNNF1ScoreMetric(config.test_distance, neighbors=10) if args.loss != 'softmax' else LogitsF1ScoreMetric()
 dev_evaluator = ClassAccuracyEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
 test_evaluator = ClassAccuracyEvaluator(common.DEVICE, test, metric, 'test',
                                         callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])

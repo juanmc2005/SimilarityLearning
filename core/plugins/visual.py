@@ -28,20 +28,17 @@ class MNISTVisualizer(TestListener):
 
 class AMIVisualizer(TestListener):
 
-    def __init__(self, base_dir, loss_name, param_desc=None):
+    def __init__(self, base_dir, loss_name):
         super(AMIVisualizer, self).__init__()
         self.base_dir = base_dir
         self.loss_name = loss_name
-        self.param_desc = param_desc
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
-        plot_name = f"embeddings-epoch-{epoch}"
-        plot_title = f"{self.loss_name} (Epoch {epoch}) - {accuracy:.2f} Macro F1"
-        if self.param_desc is not None:
-            plot_title += f" - {self.param_desc}"
+        plot_name = f"embeddings-epoch-{epoch}-f1={accuracy:.2f}"
+        plot_title = self.loss_name
         print(f"Saving plot as {plot_name}")
         visual_utils.visualize(feat, y, plot_title,
-                               legend=[ami.id2label[i] for i in range(5)],
+                               legend=[ami.id2label[i] for i in range(6)],
                                dir_path=self.base_dir,
                                filename=plot_name)
 

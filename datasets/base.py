@@ -86,7 +86,40 @@ class TextPartition(SimDatasetPartition):
         return self._transform_batch(x, y)
 
 
+class ClassBalancedTextPartition(TextPartition):
+
+    def __init__(self, data, per_class: int, nclass: int, batches_per_epoch: int = None):
+        super(ClassBalancedTextPartition, self).__init__(data, per_class * nclass, True, batches_per_epoch)
+        self.per_class = per_class
+        self.nclass = nclass
+
+    def _generate(self):
+        x, y = [x for x, _ in self.data], [y for _, y in self.data]
+        while True:
+            remaining_x, remaining_y = x, y
+            while len(remaining_y) > self.batch_size:
+                counters = [self.per_class for _ in range(self.nclass)]
+                perm = np.random.permutation(len(remaining_y))
+                new_remaining_x, new_remaining_y, batch = [], [], []
+                for i in perm:
+                    if counters[remaining_y[i]] > 0:
+                        counters[remaining_y[i]] -= 1
+                        batch.append((remaining_x[i], remaining_y[i]))
+                    else:
+                        new_remaining_x.append(remaining_x[i])
+                        new_remaining_y.append(remaining_y[i])
+                remaining_x, remaining_y = new_remaining_x, new_remaining_y
+                yield batch
+            yield list(zip(remaining_x, remaining_y))
+
+
 class TextLongLabelPartition(TextPartition):
+
+    def _transform_batch(self, x, y):
+        return x, y.long()
+
+
+class ClassBalancedTextLongLabelPartition(ClassBalancedTextPartition):
 
     def _transform_batch(self, x, y):
         return x, y.long()
