@@ -4,7 +4,7 @@ from torch import nn
 from sincnet import SincNet, MLP
 from sts.baseline import STSBaselineNet
 from sts.modes import STSForwardMode, ConcatSTSForwardMode
-from aminet import AMINet
+from aminet import AMILSTM
 from losses.wrappers import SNLIClassifier
 
 
@@ -174,16 +174,15 @@ class SNLIClassifierNet(SimNet):
 
 class HateNet(SimNet):
 
-    def __init__(self, device: str, nfeat: int, word_list: list, vector_vocab, loss_module: nn.Module, dropout: float = 0):
-        super(HateNet, self).__init__(loss_module)
-        self.base = AMINet(device, nfeat_word=300, nfeat_sent=nfeat,
-                           word_list=word_list, vec_vocab=vector_vocab, dropout=dropout)
+    def __init__(self, encoder: nn.Module, clf: nn.Module):
+        super(HateNet, self).__init__(clf)
+        self.encoder = encoder
 
     def layers(self):
-        return [self.base]
+        return [self.encoder]
 
     def common_state_dict(self):
-        return self.base.state_dict()
+        return self.encoder.state_dict()
 
     def load_common_state_dict(self, checkpoint):
-        self.base.load_state_dict(checkpoint)
+        self.encoder.load_state_dict(checkpoint)

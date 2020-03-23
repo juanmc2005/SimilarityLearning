@@ -134,5 +134,6 @@ dmypy.json
 images/
 tmp/
 saved-models/
+results/
 
 # End of https://www.gitignore.io/api/python

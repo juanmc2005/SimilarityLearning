@@ -23,7 +23,7 @@ def visualize(feat, labels, title, legend, dir_path, filename):
         plt.plot(feat[labels == i, 0], feat[labels == i, 1], '.', c=COLORS[i])
     plt.legend(legend, loc='best')
     plt.title(title)
-    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.savefig(join(dir_path, f"{filename}.png"))
     plt.draw()
     plt.pause(0.001)
 
@@ -69,7 +69,7 @@ def visualize_tsne_neighbors(feat, phrases, distance, title, dir_path, filename)
     plt.axhline(y=0, color='grey', ls=':')
     plt.axvline(x=0, color='grey', ls=':')
     plt.title(title)
-    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.savefig(join(dir_path, f"{filename}.png"))
     plt.draw()
     plt.pause(0.001)
 
@@ -94,7 +94,7 @@ def visualize_tsne_speaker(feat, y, unique_labels, distance, title, dir_path, fi
     plt.axhline(y=0, color='grey', ls=':')
     plt.axvline(x=0, color='grey', ls=':')
     plt.title(title)
-    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.savefig(join(dir_path, f"{filename}.png"))
     plt.draw()
     plt.pause(0.001)
 
@@ -109,7 +109,7 @@ def plot_pred_hists(dists, y_true, title, dir_path, filename):
              alpha=0.5, density=True, label='Different', color='red', histtype='stepfilled')
     plt.legend(loc='upper right')
     plt.title(title)
-    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.savefig(join(dir_path, f"{filename}.png"))
     plt.draw()
     plt.pause(0.001)
 
@@ -127,7 +127,7 @@ def plot_det_curve(fpr, fnr, title, dir_path, filename):
     plt.gca().set_xlim([1e-4, 0.99])
     plt.gca().set_ylim([1e-4, 0.99])
     plt.title(title)
-    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.savefig(join(dir_path, f"{filename}.png"))
     plt.draw()
     plt.pause(0.001)
 
@@ -147,7 +147,7 @@ def plot_multiple_det_curves(fprs, fnrs, fmts: list, title: str, legends: list, 
     plt.gca().yaxis.set_minor_formatter(mpl.ticker.NullFormatter())
     plt.gca().set_xlim([1e-4, 0.99])
     plt.gca().set_ylim([1e-4, 0.99])
-    plt.savefig(join(dir_path, f"{filename}.jpg"))
+    plt.savefig(join(dir_path, f"{filename}.png"))
     plt.draw()
     plt.pause(0.001)
 
@@ -164,7 +164,7 @@ def visualize_logs(exp_path: str, log_file_name: str, metric_name: str, bottom: 
         plt.xlabel('Epoch')
         plt.ylabel(metric_name)
         plt.title(title)
-        plt.savefig(join(exp_path, f"{plot_file_name}.jpg"))
+        plt.savefig(join(exp_path, f"{plot_file_name}.png"))
         plt.draw()
         plt.pause(0.001)
 

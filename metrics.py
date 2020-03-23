@@ -3,11 +3,6 @@ import numpy as np
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.metrics import f1_score, confusion_matrix
 from scipy.stats import spearmanr
-from pyannote.audio.embedding.extraction import SequenceEmbedding
-from pyannote.database import get_protocol, get_unique_identifier
-from pyannote.metrics.binary_classification import det_curve
-from pyannote.core.utils.distance import cdist
-from pyannote.core import Timeline
 from distances import Distance
 import core.base as base
 import common
@@ -322,91 +317,6 @@ class VerificationTestCallback:
 
 
 # TODO These evaluator classes need to be refactored, they share a lot of code
-
-class SpeakerVerificationEvaluator(base.TrainingListener):
-
-    @staticmethod
-    def get_hash(trial_file):
-        uri = get_unique_identifier(trial_file)
-        try_with = trial_file['try_with']
-        if isinstance(try_with, Timeline):
-            segments = tuple(try_with)
-        else:
-            segments = (try_with,)
-        return hash((uri, segments))
-
-    def __init__(self, partition: str, batch_size: int, distance: Distance, eval_interval: int,
-                 config: SpeakerValidationConfig, feature_extraction, callbacks=None, verification_callbacks=None):
-        super(SpeakerVerificationEvaluator, self).__init__()
-        self.partition = partition
-        self.batch_size = batch_size
-        self.distance = distance
-        self.eval_interval = eval_interval
-        self.config = config
-        self.feature_extraction = feature_extraction
-        self.callbacks = callbacks if callbacks is not None else []
-        self.verification_callbacks = verification_callbacks if verification_callbacks is not None else []
-        self.best_metric, self.best_epoch, self.last_eer = 0, -1, 0
-
-    def _file_embedding(self, file_dict: dict, sequence_embedding: SequenceEmbedding, cache: dict):
-        file1 = file_dict
-        f_hash = self.get_hash(file1)
-        if f_hash in cache:
-            emb = cache[f_hash]
-        else:
-            emb = sequence_embedding.crop(file1, file1['try_with'])
-            emb = np.mean(np.stack(emb), axis=0, keepdims=True)
-            cache[f_hash] = emb
-        return emb
-
-    def eval(self, model, partition: str = 'development'):
-        model.eval()
-        sequence_embedding = SequenceEmbedding(model=model,
-                                               feature_extraction=self.feature_extraction,
-                                               duration=self.config.duration,
-                                               step=.5 * self.config.duration,
-                                               batch_size=self.batch_size,
-                                               device=common.DEVICE)
-        protocol = get_protocol(self.config.protocol_name, progress=False, preprocessors=self.config.preprocessors)
-
-        y_true, y_pred, cache = [], [], {}
-
-        for trial in getattr(protocol, f"{partition}_trial")():
-
-            # Compute embeddings
-            emb1 = self._file_embedding(trial['file1'], sequence_embedding, cache)
-            emb2 = self._file_embedding(trial['file2'], sequence_embedding, cache)
-
-            # Compare embeddings
-            dist = cdist(emb1, emb2, metric=self.distance.to_sklearn_metric())[0, 0]
-
-            y_pred.append(dist)
-            y_true.append(trial['reference'])
-
-        fpr, fnr, _, eer = det_curve(np.array(y_true), np.array(y_pred), distances=True)
-
-        # Returning 1-eer because the evaluator keeps track of the highest metric value
-        return 1 - eer, y_pred, y_true, fpr, fnr
-
-    def on_after_epoch(self, epoch, model, loss_fn, optim):
-        if epoch % self.eval_interval == 0:
-            metric_value, dists, y_true, fpr, fnr = self.eval(model.to_prediction_model(), self.partition)
-            # Real metric value is EER
-            self.last_eer = 1 - metric_value
-            for cb in self.callbacks:
-                cb.on_after_test(epoch, None, None, metric_value)
-            for cb in self.verification_callbacks:
-                cb.on_evaluation_finished(epoch, self.last_eer, dists, y_true, fpr, fnr, self.partition)
-            print(f"[{self.partition.capitalize()} EER: {self.last_eer:.6f}]")
-            if self.best_epoch != -1:
-                print(f"Best until now: {1 - self.best_metric:.6f}, at epoch {self.best_epoch}")
-            if metric_value > self.best_metric:
-                self.best_metric = metric_value
-                self.best_epoch = epoch
-                print(f"New Best {self.partition.capitalize()} EER!")
-                for cb in self.callbacks:
-                    cb.on_best_accuracy(epoch, model, loss_fn, optim, metric_value, None, None)
-
 
 class ClassAccuracyEvaluator(base.TrainingListener):
 
