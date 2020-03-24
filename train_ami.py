@@ -88,7 +88,7 @@ if args.save:
     test_callbacks.append(BestModelSaver(task, args.loss, log_path, args.exp_id))
 
 # Evaluation configuration
-metric = KNNF1ScoreMetric(config.test_distance, neighbors=10) if args.loss != 'softmax' else LogitsF1ScoreMetric()
+metric = KNNF1ScoreMetric(config.test_distance, neighbors=10)
 dev_evaluator = ClassAccuracyEvaluator(common.DEVICE, dev, metric, 'dev', test_callbacks)
 test_evaluator = ClassAccuracyEvaluator(common.DEVICE, test, metric, 'test',
                                         callbacks=[MetricFileLogger(log_path=join(log_path, 'test-metric.log'))])

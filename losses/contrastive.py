@@ -47,7 +47,8 @@ class ContrastiveLoss(nn.Module):
             dist = self.distance.dist(feat1, feat2)
             gt = y
         # Calculate the losses as described in the paper
-        loss = (1 - gt) * torch.pow(dist, 2) + gt * torch.pow(torch.clamp(self.margin - dist, min=1e-8), 2)
+        # Removing squares as cosine distance is in [0,2]
+        loss = (1 - gt) * dist + gt * torch.clamp(self.margin - dist, min=1e-8)
         loss = torch.sum(loss) / 2
         # Average by batch size if requested
         return loss / dist.size(0) if self.size_average else loss

@@ -109,7 +109,7 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float, dis
                                 size_average=size_average,
                                 online=task != 'sts' and task != 'snli',
                                 # TODO parameterize 'clamp'
-                                clamp='positive',
+                                clamp='sigmoid',
                                 sampling=get_triplet_strategy(triplet_strategy, semihard_n))
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")

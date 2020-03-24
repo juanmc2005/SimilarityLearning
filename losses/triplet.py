@@ -147,6 +147,8 @@ class TripletLoss(nn.Module):
         self.online = online
         if clamp not in ['positive', 'sigmoid']:
             raise ValueError("clamp must be one in 'positive'/'sigmoid'")
+        elif clamp == 'sigmoid':
+            print("Triplet loss is calculated using sigmoid. Margin won't be used")
         self.clamp = clamp
         self.sampling = sampling
     
@@ -195,7 +197,7 @@ class TripletLoss(nn.Module):
         delta = dpos - dneg
         if self.clamp == 'sigmoid':
             # TODO tune this '10'
-            loss = torch.sigmoid(10 * (delta + self.margin))
+            loss = torch.sigmoid(10 * delta)
         else:
             loss = F.relu(delta + self.margin)
         return loss.mean() if self.size_average else loss.sum()

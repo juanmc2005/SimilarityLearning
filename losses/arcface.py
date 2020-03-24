@@ -57,7 +57,7 @@ class ArcLinear(nn.Module):
         theta_yi = torch.acos(cos_theta_yi)
         # apply the margin to the angle
         cos_theta_yi_margin = torch.cos(theta_yi + self.margin)
-        # one hot encode  y
+        # one hot encode y
         one_hot = torch.zeros_like(cos_theta_j)
         one_hot.scatter_(1, target, 1.0)
         # project margin differences into cosθj
