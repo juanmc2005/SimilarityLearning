@@ -91,8 +91,8 @@ class Trainer:
 
         for i in range(1, epochs + 1):
             self.train_epoch(i)
-            if self.optim.lrs()[0] < 1e-6:
-                print('Stopping because LR dropped from 1e-6')
+            if self.optim.lrs()[0] < 1e-8:
+                print('Stopping because LR dropped from 1e-8')
                 break
             self.optim.scheduler_step(self.last_metric_fn())
 

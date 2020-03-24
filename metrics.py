@@ -328,6 +328,7 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         self.partition_name = partition_name
         self.callbacks = callbacks if callbacks is not None else []
         self.feat_train, self.y_train = None, None
+        self.results = []
         self.best_metric, self.best_epoch, self.last_metric = 0, -1, 0
 
     def eval(self, model):
@@ -377,6 +378,7 @@ class ClassAccuracyEvaluator(base.TrainingListener):
         self.metric.fit(feat_train, y_train)
         feat_test, y_test = self.eval(model)
         self.last_metric = self.metric.get()
+        self.results.append(self.last_metric)
         for cb in self.callbacks:
             cb.on_after_test(epoch, feat_test, y_test, self.last_metric)
         print(f"[{self.partition_name.capitalize()} {self.metric}: {self.last_metric:.6f}]")

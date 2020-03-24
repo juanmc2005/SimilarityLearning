@@ -62,7 +62,7 @@ elif args.model == 'bert':
 else:
     raise ValueError(f"Unknown model '{args.model}'. Only 'lstm' and 'bert' are accepted")
 
-model = HateNet(encoder, config.loss_module)
+model = HateNet(encoder=encoder, clf=config.loss_module)
 dev = loader.dev_partition()
 test = loader.test_partition()
 train = loader.training_partition()
@@ -95,7 +95,7 @@ test_evaluator = ClassAccuracyEvaluator(common.DEVICE, test, metric, 'test',
 train_callbacks.extend([dev_evaluator, test_evaluator])
 
 # Training configuration
-trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.loss_mod_lr)),
+trainer = Trainer(args.loss, model, config.loss, train, config.optimizer(model, task, lr=(args.lr, args.clf_lr)),
                   model_loader=ModelLoader(args.recover, args.recover_optim) if args.recover is not None else None,
                   callbacks=train_callbacks, last_metric_fn=lambda: dev_evaluator.last_metric)
 print(f"[LR: {args.lr}]")
@@ -106,3 +106,7 @@ print()
 
 # Start training
 trainer.train(args.epochs, log_path, common.get_basic_plots(args.lr, args.batch_size, 'Macro F1', 'green'))
+
+print(f"Best result at epoch {dev_evaluator.best_epoch}:")
+print(f"Dev: {dev_evaluator.best_metric}")
+print(f"Test: {test_evaluator.results[dev_evaluator.best_epoch-1]}")
