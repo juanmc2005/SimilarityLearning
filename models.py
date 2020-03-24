@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+import common
 from torch import nn
-from sincnet import SincNet, MLP
 from sts.baseline import STSBaselineNet
 from sts.modes import STSForwardMode, ConcatSTSForwardMode
-from aminet import AMILSTM
 from losses.wrappers import SNLIClassifier
 
 
@@ -13,176 +12,82 @@ class Flatten(nn.Module):
         return x.view(x.size(0), -1)
 
 
-class SimNet(nn.Module):
+class MetricNet(nn.Module):
 
-    def __init__(self, loss_module=None):
-        super(SimNet, self).__init__()
-        self.loss_module = loss_module
+    def __init__(self, encoder: nn.Module, classifier: nn.Module = None):
+        super(MetricNet, self).__init__()
+        self.encoder = encoder
+        self.classifier = classifier
 
-    def layers(self):
-        raise NotImplementedError
+    def encoder_state_dict(self):
+        return self.encoder.state_dict()
 
-    def common_state_dict(self):
-        raise NotImplementedError
-
-    def load_common_state_dict(self, checkpoint):
-        raise NotImplementedError
+    def load_encoder_state_dict(self, checkpoint):
+        self.encoder.load_state_dict(checkpoint)
 
     def to_prediction_model(self):
         return PredictionModel(self)
 
     def forward(self, x, y):
-        for layer in self.layers():
-            x = layer(x)
-        logits = self.loss_module(x, y) if self.loss_module is not None else None
+        x = self.encoder(x)
+        logits = self.classifier(x, y) if self.classifier is not None else None
         return x, logits
 
     def all_params(self):
-        params = [layer.parameters() for layer in self.layers()]
-        if self.loss_module is not None:
-            params.append(self.loss_module.parameters())
+        params = [self.encoder.parameters()]
+        if self.classifier is not None:
+            params.append(self.classifier.parameters())
         return params
 
 
 class PredictionModel(nn.Module):
 
-    def __init__(self, model: SimNet):
+    def __init__(self, model: MetricNet):
         super(PredictionModel, self).__init__()
         self.model = model
 
     def forward(self, x):
-        for layer in self.model.layers():
-            x = layer(x)
-        return x
+        return self.model.encoder(x)
 
 
-class MNISTNet(SimNet):
-
-    def __init__(self, nfeat, loss_module=None):
-        super(MNISTNet, self).__init__(loss_module)
-        self.net = nn.Sequential(
-            nn.Conv2d(1, 32, kernel_size=5, padding=2),
-            nn.PReLU(),
-            nn.Conv2d(32, 32, kernel_size=5, padding=2),
-            nn.PReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(32, 64, kernel_size=5, padding=2),
-            nn.PReLU(),
-            nn.Conv2d(64, 64, kernel_size=5, padding=2),
-            nn.PReLU(),
-            nn.MaxPool2d(2),
-            nn.Conv2d(64, 128, kernel_size=5, padding=2),
-            nn.PReLU(),
-            nn.Conv2d(128, 128, kernel_size=5, padding=2),
-            nn.PReLU(),
-            nn.MaxPool2d(2),
-            Flatten(),
-            nn.Linear(128 * 3 * 3, nfeat),
-            nn.PReLU()
-        )
-
-    def layers(self):
-        return [self.net]
-
-    def common_state_dict(self):
-        return self.net.state_dict()
-
-    def load_common_state_dict(self, checkpoint):
-        self.net.load_state_dict(checkpoint)
+def MNISTNet(nfeat: int, classifier: nn.Module = None) -> MetricNet:
+    encoder = nn.Sequential(
+        nn.Conv2d(1, 32, kernel_size=5, padding=2),
+        nn.PReLU(),
+        nn.Conv2d(32, 32, kernel_size=5, padding=2),
+        nn.PReLU(),
+        nn.MaxPool2d(2),
+        nn.Conv2d(32, 64, kernel_size=5, padding=2),
+        nn.PReLU(),
+        nn.Conv2d(64, 64, kernel_size=5, padding=2),
+        nn.PReLU(),
+        nn.MaxPool2d(2),
+        nn.Conv2d(64, 128, kernel_size=5, padding=2),
+        nn.PReLU(),
+        nn.Conv2d(128, 128, kernel_size=5, padding=2),
+        nn.PReLU(),
+        nn.MaxPool2d(2),
+        Flatten(),
+        nn.Linear(128 * 3 * 3, nfeat),
+        nn.PReLU())
+    return MetricNet(encoder=encoder, classifier=classifier)
 
 
-class SpeakerNet(SimNet):
-
-    def __init__(self, nfeat, sample_rate, window, loss_module=None):
-        super(SpeakerNet, self).__init__(loss_module)
-        wlen = int(sample_rate * window / 1000)
-        self.cnn = SincNet({'input_dim': wlen,
-                            'fs': sample_rate,
-                            'cnn_N_filt': [80, 60, 60],
-                            'cnn_len_filt': [251, 5, 5],
-                            'cnn_max_pool_len': [3, 3, 3],
-                            'cnn_use_laynorm_inp': True,
-                            'cnn_use_batchnorm_inp': False,
-                            'cnn_use_laynorm': [True, True, True],
-                            'cnn_use_batchnorm': [False, False, False],
-                            'cnn_act': ['leaky_relu', 'leaky_relu', 'leaky_relu'],
-                            'cnn_drop': [0., 0., 0.],
-                            })
-        self.dnn = MLP({'input_dim': self.cnn.out_dim,
-                        'fc_lay': [2048, 2048, nfeat],
-                        'fc_drop': [0., 0., 0.],
-                        'fc_use_batchnorm': [True, True, True],
-                        'fc_use_laynorm': [False, False, False],
-                        'fc_use_laynorm_inp': True,
-                        'fc_use_batchnorm_inp': False,
-                        'fc_act': ['leaky_relu', 'leaky_relu', 'leaky_relu'],
-                        })
-
-    def layers(self):
-        return [self.cnn, self.dnn]
-
-    def common_state_dict(self):
-        return {
-            'cnn': self.cnn.state_dict(),
-            'dnn': self.dnn.state_dict()
-        }
-
-    def load_common_state_dict(self, checkpoint):
-        self.cnn.load_state_dict(checkpoint['cnn'])
-        self.dnn.load_state_dict(checkpoint['dnn'])
+def SemanticNet(nfeat: int, nlayers: int, word_list: list, vector_vocab: dict,
+                mode: STSForwardMode, classifier: nn.Module = None) -> MetricNet:
+    encoder = STSBaselineNet(common.DEVICE, nfeat_word=300, nfeat_sent=nfeat,
+                             nlayers=nlayers, word_list=word_list,
+                             vec_vocab=vector_vocab, mode=mode)
+    return MetricNet(encoder=encoder, classifier=classifier)
 
 
-class SemanticNet(SimNet):
-
-    def __init__(self, device: str, nfeat: int, nlayers: int, word_list: list, vector_vocab: dict,
-                 mode: STSForwardMode, loss_module: nn.Module = None):
-        super().__init__(loss_module)
-        self.base_model = STSBaselineNet(device, nfeat_word=300, nfeat_sent=nfeat,
-                                         nlayers=nlayers, word_list=word_list,
-                                         vec_vocab=vector_vocab, mode=mode)
-
-    def layers(self):
-        return [self.base_model]
-
-    def common_state_dict(self):
-        return self.base_model.state_dict()
-
-    def load_common_state_dict(self, checkpoint):
-        self.base_model.load_state_dict(checkpoint)
-
-
-class SNLIClassifierNet(SimNet):
-
-    def __init__(self, device: str, encoder_loader, nfeat_sent: int, nclass: int, nlayers: int, vector_vocab: dict):
-        super(SNLIClassifierNet, self).__init__(SNLIClassifier(nfeat_sent, nclass))
-        model = SemanticNet(device, nfeat_sent, nlayers, vector_vocab, ConcatSTSForwardMode())
-        # Load encoder
-        encoder_loader.load(model, encoder_loader.get_trained_loss())
-        self.encoder = model.base_model
-        # Put encoder in evaluation mode so it won't be learned
-        self.encoder.eval()
-
-    def layers(self):
-        return [self.encoder]
-
-    def common_state_dict(self):
-        return self.encoder.state_dict()
-
-    def load_common_state_dict(self, checkpoint):
-        self.encoder.load_state_dict(checkpoint)
-
-
-class HateNet(SimNet):
-
-    def __init__(self, encoder: nn.Module, clf: nn.Module):
-        super(HateNet, self).__init__(clf)
-        self.encoder = encoder
-
-    def layers(self):
-        return [self.encoder]
-
-    def common_state_dict(self):
-        return self.encoder.state_dict()
-
-    def load_common_state_dict(self, checkpoint):
-        self.encoder.load_state_dict(checkpoint)
+# TODO this hasn't been updated for a while, it's not working
+def SNLIClassifierNet(encoder_loader, nfeat_sent: int,
+                      nclass: int, nlayers: int, vector_vocab: dict) -> MetricNet:
+    model = SemanticNet(nfeat_sent, nlayers, vector_vocab, ConcatSTSForwardMode())
+    # Load encoder
+    encoder_loader.load(model, encoder_loader.get_trained_loss())
+    encoder = model.base_model
+    # Put encoder in evaluation mode so it won't be learned
+    encoder.eval()
+    return MetricNet(encoder=encoder, classifier=SNLIClassifier(nfeat_sent, nclass))

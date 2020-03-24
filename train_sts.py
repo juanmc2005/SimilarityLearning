@@ -62,7 +62,7 @@ dataset = SemEval(args.path, args.word2vec, args.vocab, augmentation.new(), part
 config = common.get_config(args.loss, nfeat, dataset.nclass, task, args.margin, args.distance,
                            args.size_average, args.loss_scale, args.triplet_strategy, args.semihard_negatives)
 vocab_vec = dataset.vocab_vec if args.word2vec is not None else Word2Vec.load(args.word2vec_model).wv
-model = SemanticNet(common.DEVICE, nfeat, 1, dataset.vocab, vocab_vec, loss_module=config.loss_module, mode=mode)
+model = SemanticNet(common.DEVICE, nfeat, 1, dataset.vocab, vocab_vec, classifier=config.loss_module, mode=mode)
 dev = dataset.dev_partition()
 test = dataset.test_partition()
 train = dataset.training_partition()

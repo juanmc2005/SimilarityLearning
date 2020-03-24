@@ -1,20 +1,19 @@
 import argparse
 import time
-from common import set_custom_seed, create_log_dir, to_distance_object
+from common import set_custom_seed, create_log_dir
 from core.plugins.storage import ModelLoader
-from core.plugins.visual import DetCurveVisualizer, SpeakerDistanceVisualizer
 from experiments.semeval import SemEvalEmbeddingEvaluationExperiment, SemEvalBaselineModelEvaluationExperiment
-from experiments.voxceleb import VoxCeleb1ModelEvaluationExperiment
 from experiments.sst import BinarySSTClassicEvaluationExperiment
 from losses.arcface import ArcLinear
 from losses.center import CenterLinear
 from losses.coco import CocoLinear
+from distances import Distance
 
 launch_datetime = time.strftime('%c')
 
 # Script arguments
 parser = argparse.ArgumentParser()
-parser.add_argument('--task', type=str, required=True, help='speaker / sts / sst2')
+parser.add_argument('--task', type=str, required=True, help='sts / sst2')
 parser.add_argument('--embedding-size', type=int, required=False, default=500, help='Embedding size')
 parser.add_argument('--model', type=str, required=True, help='The path to the saved model to evaluate')
 parser.add_argument('--partition', type=str, required=True, help='dev / test')
@@ -37,21 +36,12 @@ log_dir = create_log_dir(args.exp_id, args.task, 'eval')
 # Set custom seed
 set_custom_seed(args.seed)
 
-distance = to_distance_object(args.distance)
+distance = Distance.from_name(args.distance)
 
 print(f"[Task: {args.task.upper()}]")
 
 print('[Preparing...]')
-if args.task == 'speaker':
-    experiment = VoxCeleb1ModelEvaluationExperiment(model_path=args.model,
-                                                    # FIXME hardcoded
-                                                    nfeat=256,
-                                                    distance=distance,
-                                                    batch_size=args.batch_size,
-                                                    verification_callbacks=[SpeakerDistanceVisualizer(log_dir),
-                                                                            DetCurveVisualizer(log_dir)])
-    metric_name = 'EER'
-elif args.task == 'sts':
+if args.task == 'sts':
     model_loader = ModelLoader(args.model, restore_optimizer=False)
     loss_name = model_loader.get_trained_loss()
     if loss_name == 'kldiv':

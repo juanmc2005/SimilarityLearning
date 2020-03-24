@@ -9,6 +9,19 @@ class Distance:
     A distance function implementing pairwise distance
     """
 
+    @staticmethod
+    def from_name(distance: str):
+        """
+        :param distance: a distance name (euclidean or cosine)
+        :return: a Distance corresponding to the distance string
+        """
+        if distance == 'euclidean':
+            return EuclideanDistance()
+        elif distance == 'cosine':
+            return CosineDistance()
+        else:
+            raise ValueError('Only cosine and euclidean distances are allowed')
+
     @property
     def max(self):
         return None

@@ -35,7 +35,7 @@ print('[Loading Dataset...]')
 nfeat, nclass = 2, 10
 config = common.get_config(args.loss, nfeat, nclass, task, args.margin, args.distance, args.size_average,
                            args.loss_scale, args.triplet_strategy, args.semihard_negatives)
-model = MNISTNet(nfeat, loss_module=config.loss_module)
+model = MNISTNet(nfeat, classifier=config.loss_module)
 dataset = MNIST(args.path, args.batch_size, balance=args.loss == 'contrastive' or args.loss == 'triplet')
 
 dev = dataset.dev_partition()

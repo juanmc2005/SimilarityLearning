@@ -59,29 +59,3 @@ class TSNEVisualizer(TestListener):
         print(f"Saving TSNE plot to {plot_name}")
         unique_feat = np.unique(feat_test, axis=0)
         visual_utils.visualize_tsne_neighbors(unique_feat, None, self.distance, plot_title, self.base_dir, plot_name)
-
-
-class SpeakerDistanceVisualizer(VerificationTestCallback):
-
-    def __init__(self, base_dir):
-        self.base_dir = base_dir
-
-    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr, partition: str):
-        epoch_str = f' (Epoch {epoch})' if epoch is not None else ''
-        title = f"{partition.capitalize()} speaker distances{epoch_str} - EER {eer:.3f}"
-        filename = f'{partition}-speaker-dists-epoch={epoch}'
-        print(f"Saving {partition.capitalize()} speaker distances plot as {filename}")
-        visual_utils.plot_pred_hists(distances, y_true, title, self.base_dir, filename)
-
-
-class DetCurveVisualizer(VerificationTestCallback):
-
-    def __init__(self, base_dir: str):
-        self.base_dir = base_dir
-
-    def on_evaluation_finished(self, epoch, eer, distances, y_true, fpr, fnr, partition: str):
-        epoch_str = f' (Epoch {epoch})' if epoch is not None else ''
-        title = f'{partition.capitalize()} DET Curve{epoch_str} - EER {eer:.3f}'
-        filename = f'{partition}-det-curve-epoch={epoch}'
-        print(f"Saving {partition.capitalize()} DET curve plot as {filename}")
-        visual_utils.plot_det_curve(fpr, fnr, title, self.base_dir, filename)

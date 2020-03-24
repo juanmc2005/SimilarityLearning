@@ -8,7 +8,7 @@ import random
 
 import losses.config as cf
 from losses.triplet import SemiHardNegative, BatchAll, HardestNegative, HardestPositiveNegative, TripletSamplingStrategy
-from distances import CosineDistance, EuclideanDistance, Distance
+from distances import Distance
 
 
 """
@@ -50,19 +50,6 @@ def enabled_str(value: bool) -> str:
     return 'ENABLED' if value else 'DISABLED'
 
 
-def to_distance_object(distance: str) -> Distance:
-    """
-    :param distance: a distance name (euclidean or cosine)
-    :return: a Distance corresponding to the distance string
-    """
-    if distance == 'euclidean':
-        return EuclideanDistance()
-    elif distance == 'cosine':
-        return CosineDistance()
-    else:
-        raise ValueError('Only cosine and euclidean distances are allowed')
-
-
 def create_log_dir(exp_id: str, task: str, loss: str):
     """
     Create the directory where logs, models, plots and other experiment related files will be stored
@@ -98,24 +85,23 @@ def get_config(loss: str, nfeat: int, nclass: int, task: str, margin: float, dis
         print(f"[Margin: {margin}]")
         return cf.ContrastiveConfig(DEVICE,
                                     margin=margin,
-                                    distance=to_distance_object(distance),
+                                    distance=Distance.from_name(distance),
                                     size_average=size_average,
                                     online=task != 'sts' and task != 'snli')
     elif loss == 'triplet':
         print(f"[Margin: {margin}]")
         return cf.TripletConfig(DEVICE,
                                 margin=margin,
-                                distance=to_distance_object(distance),
+                                distance=Distance.from_name(distance),
                                 size_average=size_average,
                                 online=task != 'sts' and task != 'snli',
-                                # TODO parameterize 'clamp'
                                 clamp='sigmoid',
                                 sampling=get_triplet_strategy(triplet_strategy, semihard_n))
     elif loss == 'arcface':
         print(f"[Margin: {margin}]")
         return cf.ArcFaceConfig(DEVICE, nfeat, nclass, margin=margin, s=loss_scale)
     elif loss == 'center':
-        return cf.CenterConfig(DEVICE, nfeat, nclass, lweight=loss_scale, distance=to_distance_object(distance))
+        return cf.CenterConfig(DEVICE, nfeat, nclass, lweight=loss_scale, distance=Distance.from_name(distance))
     elif loss == 'coco':
         return cf.CocoConfig(DEVICE, nfeat, nclass, alpha=loss_scale)
     elif loss == 'kldiv':
@@ -208,8 +194,8 @@ def get_basic_plots(lr: float, batch_size: int, eval_metric: str, eval_metric_co
         {
             'log_file': 'metric.log',
             'metric': eval_metric,
-            'bottom': 0.1 if eval_metric == 'EER' else 0.,
-            'top': 0.35 if eval_metric == 'EER' else 1.,
+            'bottom': 0.,
+            'top': 1.,
             'color': eval_metric_color,
             'title': f'Dev {eval_metric} - lr={lr} - batch_size={batch_size}',
             'filename': f"dev-{eval_metric.lower().replace(' ', '-')}-plot"

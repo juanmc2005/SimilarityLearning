@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 import torch
 import torch.nn as nn
-from models import SimNet
+from models import MetricNet
 from datasets.base import SimDatasetPartition
 from core.optim import Optimizer
 import common
@@ -52,7 +52,7 @@ class TestListener:
 
 class Trainer:
     
-    def __init__(self, loss_name: str, model: SimNet, loss_fn: nn.Module, partition: SimDatasetPartition,
+    def __init__(self, loss_name: str, model: MetricNet, loss_fn: nn.Module, partition: SimDatasetPartition,
                  optim: Optimizer, model_loader=None, callbacks: list = None, last_metric_fn=None):
         self.loss_name = loss_name
         self.model = model.to(common.DEVICE)

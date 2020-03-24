@@ -10,11 +10,7 @@ from losses.coco import CocoLinear
 from losses.contrastive import ContrastiveLoss
 from losses.triplet import TripletLoss, BatchAll
 import core.base as base
-from models import SimNet
-
-
-def sincnet_optims(model, lr):
-    return [optim.RMSprop(l.parameters(), lr=lr, alpha=0.95) for l in model.layers()]
+from models import MetricNet
 
 
 class LossConfig:
@@ -26,7 +22,7 @@ class LossConfig:
         self.loss = loss
         self.test_distance = test_distance
 
-    def optimizer(self, model: SimNet, task: str, lr: tuple):
+    def optimizer(self, model: MetricNet, task: str, lr: tuple):
         # TODO remove 'task' parameter. Implement some sort of double dispatching or something
         # The problem is that optimizer configuration depends both on the loss and the model
         raise NotImplementedError
@@ -39,7 +35,7 @@ class KLDivergenceConfig(LossConfig):
         loss = LossWrapper(nn.KLDivLoss().to(device))
         super(KLDivergenceConfig, self).__init__('KL-Divergence', None, loss_module, loss, CosineDistance())
 
-    def optimizer(self, model: SimNet, task: str, lr: tuple):
+    def optimizer(self, model: MetricNet, task: str, lr: tuple):
         return base.Optimizer([optim.RMSprop(model.parameters(), lr=lr[0])], [])
 
 
@@ -50,21 +46,17 @@ class SoftmaxConfig(LossConfig):
         loss = LossWrapper(nn.NLLLoss().to(device))
         super(SoftmaxConfig, self).__init__('Cross Entropy', None, self.loss_module, loss, CosineDistance())
 
-    def optimizer(self, model: SimNet, task: str, lr: tuple):
+    def optimizer(self, model: MetricNet, task: str, lr: tuple):
         if task == 'mnist':
             # Was using lr=0.01
             optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
-        elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr[0])
-            optimizers.append(optim.RMSprop(self.loss_module.parameters(), lr=lr[0], alpha=0.95))
-            schedulers = []
         elif task in ['sts', 'ami', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0])]
             schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
                                                          patience=5, verbose=True)]
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts')
+            raise ValueError('Task must be one of mnist/sts')
         return base.Optimizer(optimizers, schedulers)
 
 
@@ -75,7 +67,7 @@ class ArcFaceConfig(LossConfig):
         loss = LossWrapper(nn.CrossEntropyLoss().to(device))
         super(ArcFaceConfig, self).__init__('ArcFace Loss', f"m={margin} s={s}", self.loss_module, loss, CosineDistance())
 
-    def optimizer(self, model: SimNet, task: str, lr: tuple):
+    def optimizer(self, model: MetricNet, task: str, lr: tuple):
         if task == 'mnist':
             # Was using lr0=0.005 and lr1=0.01
             params = model.all_params()
@@ -83,10 +75,6 @@ class ArcFaceConfig(LossConfig):
                           optim.SGD(params[1], lr=lr[1])]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
                           lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
-        elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr[0])
-            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr[1]))
-            schedulers = [lr_scheduler.StepLR(optimizers[-1], 8, gamma=0.8)]
         elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
@@ -96,7 +84,7 @@ class ArcFaceConfig(LossConfig):
                           lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.7,
                                                          patience=5, verbose=True)]
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts')
+            raise ValueError('Task must be one of mnist/sts')
         return base.Optimizer(optimizers, schedulers)
 
 
@@ -113,10 +101,6 @@ class CenterConfig(LossConfig):
             optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005),
                           optim.SGD(self.loss.center_parameters(), lr=lr[1])]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
-        elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr[0])
-            optimizers.append(optim.SGD(self.loss.center_parameters(), lr=lr[1]))
-            schedulers = []
         elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
@@ -126,7 +110,7 @@ class CenterConfig(LossConfig):
                           lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.7,
                                                          patience=5, verbose=True)]
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts')
+            raise ValueError('Task must be one of mnist/sts')
         return base.Optimizer(optimizers, schedulers)
 
 
@@ -144,10 +128,6 @@ class CocoConfig(LossConfig):
             optimizers = [optim.SGD(params[0], lr=lr[0], momentum=0.9, weight_decay=0.0005),
                           optim.SGD(params[1], lr=lr[1], momentum=0.9)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
-        elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr[0])
-            optimizers.append(optim.SGD(self.loss_module.parameters(), lr=lr[1]))
-            schedulers = []
         elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
@@ -157,7 +137,7 @@ class CocoConfig(LossConfig):
                           lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.7,
                                                          patience=5, verbose=True)]
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts')
+            raise ValueError('Task must be one of mnist/sts')
         return base.Optimizer(optimizers, schedulers)
 
 
@@ -172,15 +152,12 @@ class ContrastiveConfig(LossConfig):
             # Was using lr=0.001
             optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 4, gamma=0.8)]
-        elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr[0])
-            schedulers = []
         elif task in ['sts', 'ami', 'snli', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
                                                          patience=5, verbose=True)]
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts/ami/snli')
+            raise ValueError('Task must be one of mnist/sts/ami/snli')
         return base.Optimizer(optimizers, schedulers)
 
 
@@ -196,13 +173,10 @@ class TripletConfig(LossConfig):
             # Was using lr=0.0001
             optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 5, gamma=0.8)]
-        elif task == 'speaker':
-            optimizers = sincnet_optims(model, lr[0])
-            schedulers = []
         elif task in ['sts', 'ami', 'snli', 'sst2']:
             optimizers = [optim.RMSprop(model.parameters(), lr=lr[0], momentum=0.9)]
             schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
                                                          patience=5, verbose=True)]
         else:
-            raise ValueError('Task must be one of mnist/speaker/sts/ami/snli')
+            raise ValueError('Task must be one of mnist/sts/ami/snli')
         return base.Optimizer(optimizers, schedulers)

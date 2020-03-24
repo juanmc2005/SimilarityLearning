@@ -37,9 +37,9 @@ class SemEvalEvaluationExperiment(ModelEvaluationExperiment):
 
         vocab_vec = self.dataset.vocab_vec if word2vec_path is not None else Word2Vec.load(word2vec_model_path).wv
 
-        self.model = SemanticNet(DEVICE, nfeat, 1, self.dataset.vocab, vocab_vec,
+        self.model = SemanticNet(nfeat, 1, self.dataset.vocab, vocab_vec,
                                  mode=self._get_model_mode(),
-                                 loss_module=self._get_loss_module())
+                                 classifier=self._get_loss_module())
         model_loader.load(self.model, self.loss_name)
         self.model = self._transform_model(self.model)
         self.model = self.model.to(DEVICE)

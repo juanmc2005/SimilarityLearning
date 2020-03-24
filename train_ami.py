@@ -7,8 +7,8 @@ from core.plugins.storage import BestModelSaver, ModelLoader
 from core.plugins.misc import IntraClassDistanceStatLogger
 from datasets.ami import AMI
 from aminet import AMILSTM, AMIBert
-from models import HateNet
-from metrics import KNNF1ScoreMetric, LogitsF1ScoreMetric, ClassAccuracyEvaluator
+from models import MetricNet
+from metrics import KNNF1ScoreMetric, ClassAccuracyEvaluator
 from gensim.models import Word2Vec
 from transformers import BertTokenizer
 
@@ -62,7 +62,7 @@ elif args.model == 'bert':
 else:
     raise ValueError(f"Unknown model '{args.model}'. Only 'lstm' and 'bert' are accepted")
 
-model = HateNet(encoder=encoder, clf=config.loss_module)
+model = MetricNet(encoder=encoder, classifier=config.loss_module)
 dev = loader.dev_partition()
 test = loader.test_partition()
 train = loader.training_partition()
