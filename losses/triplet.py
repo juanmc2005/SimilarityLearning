@@ -137,19 +137,15 @@ class TripletLoss(nn.Module):
     :param sampling: a TripletSamplingStrategy
     """
 
-    def __init__(self, device: str, margin: float, distance: Distance,
-                 size_average: bool, online: bool = True, clamp: str = 'positive', sampling=BatchAll()):
+    def __init__(self, device: str, margin: float, scaling: float, distance: Distance,
+                 size_average: bool, online: bool = True, sampling=BatchAll()):
         super(TripletLoss, self).__init__()
         self.device = device
         self.margin = margin
+        self.scaling = scaling
         self.distance = distance
         self.size_average = size_average
         self.online = online
-        if clamp not in ['positive', 'sigmoid']:
-            raise ValueError("clamp must be one in 'positive'/'sigmoid'")
-        elif clamp == 'sigmoid':
-            print("Triplet loss is calculated using sigmoid. Margin won't be used")
-        self.clamp = clamp
         self.sampling = sampling
     
     def _calculate_distances(self, x, y):
@@ -195,9 +191,9 @@ class TripletLoss(nn.Module):
 
         # Calculate the loss using the margin
         delta = dpos - dneg
-        if self.clamp == 'sigmoid':
-            # TODO tune this '10'
-            loss = torch.sigmoid(10 * delta)
-        else:
-            loss = F.relu(delta + self.margin)
+        loss = torch.sigmoid(self.scaling * delta)
+        # if self.clamp == 'sigmoid':
+        #     loss = torch.sigmoid(self.scaling * delta)
+        # else:
+        #     loss = F.relu(delta + self.margin)
         return loss.mean() if self.size_average else loss.sum()
