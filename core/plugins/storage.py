@@ -56,18 +56,15 @@ class ModelLoader:
 
 class BestModelSaver(base.TestListener):
 
-    def __init__(self, task: str, loss_name: str, base_path: str, experience_name: str):
+    def __init__(self, base_path: str, loss_name: str):
         super(BestModelSaver, self).__init__()
-        self.task = task
-        self.loss_name = loss_name
         self.base_path = base_path
-        self.experience_name = experience_name
         self.saver = ModelSaver(loss_name)
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
         filepath = join(
             self.base_path,
-            f"{self.experience_name}-best-{self.task}-{self.loss_name}-epoch={epoch}-metric={accuracy:.3f}.pt")
+            f"best-epoch={epoch}-metric={accuracy:.3f}.pt")
         self.saver.save(epoch, model, loss_fn, optim, accuracy, filepath)
 
 

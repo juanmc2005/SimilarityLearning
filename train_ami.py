@@ -24,7 +24,7 @@ parser.add_argument('--word2vec-model', type=str, required=False, default=None, 
 args = parser.parse_args()
 
 # Create directory to save plots, models, results, etc
-log_path = common.create_log_dir(args.exp_id, task, args.loss)
+log_path = common.create_log_dir(args.exp_path, args)
 print(f"Logging to {log_path}")
 
 # Dumping all script arguments
@@ -85,7 +85,7 @@ else:
 # Model saving configuration
 print(f"[Model Saving: {common.enabled_str(args.save)}]")
 if args.save:
-    test_callbacks.append(BestModelSaver(task, args.loss, log_path, args.exp_id))
+    test_callbacks.append(BestModelSaver(log_path, args.loss))
 
 # Evaluation configuration
 metric = KNNF1ScoreMetric(config.test_distance, neighbors=10)

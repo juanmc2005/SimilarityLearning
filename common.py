@@ -1,7 +1,7 @@
 import argparse
 import time
 import os
-from os.path import isdir
+from os.path import isdir, join
 import torch
 import numpy as np
 import random
@@ -50,19 +50,25 @@ def enabled_str(value: bool) -> str:
     return 'ENABLED' if value else 'DISABLED'
 
 
-def create_log_dir(exp_id: str, task: str, loss: str):
+def create_log_dir(exp_path: str, args) -> str:
     """
     Create the directory where logs, models, plots and other experiment related files will be stored
-    :param exp_id: the name for this experiment
+    :param exp_path: the path to the log directory
     :param task: the name of the task
     :param loss: the name of the loss function that will be optimized
     :return: the name of the created directory, or exit the program if the directory exists
     """
-    log_path = f"tmp/{task}/{loss}-{exp_id}"
+    log_path = f"{exp_path}/{args.model}/{args.loss}/lr={args.lr}"
+    if args.loss in ['arcface', 'contrastive']:
+        log_path = join(log_path, f"margin={args.margin}")
+    if args.loss == 'center':
+        log_path = join(log_path, f"lambda={args.loss_scale}")
+    if args.loss in ['arcface', 'coco', 'triplet']:
+        log_path = join(log_path, f"scale={args.loss_scale}")
     if isdir(log_path):
         print(f"The experience directory '{log_path}' already exists")
         exit(1)
-    os.mkdir(log_path)
+    os.makedirs(log_path)
     return log_path
 
 
@@ -154,8 +160,8 @@ def get_arg_parser():
     parser.add_argument('-m', '--margin', type=float, default=2., help='The loss margin when available')
     parser.add_argument('-s', '--loss-scale', type=float, default=7.,
                         help='Loss scaling factor when available (s for ArcFace, lambda for Center and alpha for CoCo)')
-    parser.add_argument('--exp-id', type=str, default=f"EXP-{launch_datetime.replace(' ', '-')}",
-                        help='An identifier for the experience')
+    parser.add_argument('--exp-path', type=str, required=True,
+                        help='The path to output logs and results')
     parser.add_argument('--lr', type=float, default=0.001, help='Learning rate')
     parser.add_argument('--clf-lr', type=float, default=0.01,
                         help='Learning rate for the loss module if available')
