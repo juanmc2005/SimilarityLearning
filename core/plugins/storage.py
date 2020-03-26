@@ -62,10 +62,8 @@ class BestModelSaver(base.TestListener):
         self.saver = ModelSaver(loss_name)
 
     def on_best_accuracy(self, epoch, model, loss_fn, optim, accuracy, feat, y):
-        filepath = join(
-            self.base_path,
-            f"best-epoch={epoch}-metric={accuracy:.3f}.pt")
-        self.saver.save(epoch, model, loss_fn, optim, accuracy, filepath)
+        self.saver.save(epoch, model, loss_fn, optim, accuracy,
+                        join(self.base_path, "best.pt"))
 
 
 class RegularModelSaver(base.TrainingListener):
@@ -80,5 +78,5 @@ class RegularModelSaver(base.TrainingListener):
 
     def on_after_epoch(self, epoch, model, loss_fn, optim):
         if epoch % self.interval == 0:
-            filepath = join(self.base_path, f"{self.experience_name}-{self.task}-{self.loss_name}-epoch={epoch}.pt")
+            filepath = join(self.base_path, f"epoch={epoch}.pt")
             self.saver.save(epoch, model, loss_fn, optim, 0, filepath)

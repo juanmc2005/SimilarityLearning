@@ -72,13 +72,13 @@ class ArcFaceConfig(LossConfig):
             # Was using lr0=0.005 and lr1=0.01
             params = model.all_params()
             optimizers = [optim.SGD(params[0], lr=lr[0], momentum=0.9, weight_decay=0.0005),
-                          optim.SGD(params[1], lr=0.1 * lr[0])]
+                          optim.SGD(params[1], lr=10 * lr[0])]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 8, gamma=0.6),
                           lr_scheduler.StepLR(optimizers[1], 8, gamma=0.8)]
         elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
-                          optim.RMSprop(params[1], lr=0.1 * lr[0])]
+                          optim.RMSprop(params[1], lr=10 * lr[0])]
             schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
                                                          patience=5, verbose=True),
                           lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.5,
@@ -99,12 +99,12 @@ class CenterConfig(LossConfig):
         if task == 'mnist':
             # Was using lr0=0.001 and lr1=0.5
             optimizers = [optim.SGD(model.parameters(), lr=lr[0], momentum=0.9, weight_decay=0.0005),
-                          optim.SGD(self.loss.center_parameters(), lr=0.1 * lr[0])]
+                          optim.SGD(self.loss.center_parameters(), lr=10 * lr[0])]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 20, gamma=0.8)]
         elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
-                          optim.RMSprop(params[1], lr=0.1 * lr[0])]
+                          optim.RMSprop(params[1], lr=10 * lr[0])]
             schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
                                                          patience=5, verbose=True),
                           lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.5,
@@ -126,12 +126,12 @@ class CocoConfig(LossConfig):
             # Was using lr0=0.001 and lr1=0.01
             params = model.all_params()
             optimizers = [optim.SGD(params[0], lr=lr[0], momentum=0.9, weight_decay=0.0005),
-                          optim.SGD(params[1], lr=0.1 * lr[0], momentum=0.9)]
+                          optim.SGD(params[1], lr=10 * lr[0], momentum=0.9)]
             schedulers = [lr_scheduler.StepLR(optimizers[0], 10, gamma=0.5)]
         elif task in ['sts', 'ami', 'sst2']:
             params = model.all_params()
             optimizers = [optim.RMSprop(params[0], lr=lr[0]),
-                          optim.RMSprop(params[1], lr=0.1 * lr[0])]
+                          optim.RMSprop(params[1], lr=10 * lr[0])]
             schedulers = [lr_scheduler.ReduceLROnPlateau(optimizers[0], mode='max', factor=0.5,
                                                          patience=5, verbose=True),
                           lr_scheduler.ReduceLROnPlateau(optimizers[1], mode='max', factor=0.5,

@@ -107,6 +107,14 @@ print()
 # Start training
 trainer.train(args.epochs, log_path, common.get_basic_plots(args.lr, args.batch_size, 'Macro F1', 'green'))
 
-print(f"Best result at epoch {dev_evaluator.best_epoch}:")
-print(f"Dev: {dev_evaluator.best_metric}")
-print(f"Test: {test_evaluator.results[dev_evaluator.best_epoch-1]}")
+# Dump results
+best_epoch = dev_evaluator.best_epoch
+best_dev = dev_evaluator.best_metric
+best_test = test_evaluator.results[dev_evaluator.best_epoch-1]
+with open(join(log_path, 'results.txt'), 'w') as out:
+    out.write(f"epoch: {best_epoch}\n")
+    out.write(f"dev: {best_dev}\n")
+    out.write(f"test: {best_test}\n")
+print(f"Best result at epoch {best_epoch}:")
+print(f"Dev: {best_dev}")
+print(f"Test: {best_test}")
