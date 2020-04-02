@@ -1,5 +1,4 @@
 import argparse
-import time
 import os
 from os.path import isdir, join
 import torch
@@ -65,6 +64,7 @@ def create_log_dir(exp_path: str, args) -> str:
         log_path = join(log_path, f"lambda={args.loss_scale}")
     if args.loss in ['arcface', 'coco', 'triplet']:
         log_path = join(log_path, f"scale={args.loss_scale}")
+    log_path = join(log_path, f"seed={args.seed}")
     if isdir(log_path):
         print(f"The experience directory '{log_path}' already exists")
         exit(1)
@@ -139,7 +139,6 @@ def get_arg_parser():
     """
     :return: an ArgumentParser with the common configuration for all tasks
     """
-    launch_datetime = time.strftime('%c')
     parser = argparse.ArgumentParser()
     parser.add_argument('--loss', type=str, required=True, help=LOSS_OPTIONS_STR)
     parser.add_argument('--distance', type=str, default='cosine',
